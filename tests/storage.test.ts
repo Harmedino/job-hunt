@@ -1,3 +1,8 @@
+import {
+  GET as listLeads,
+  POST as addLead,
+  PATCH as archiveLead,
+} from "../src/app/api/leads/route";
 import { test, after } from "node:test";
 import assert from "node:assert/strict";
 import { MongoClient } from "mongodb";
@@ -138,3 +143,27 @@ test("scheduled discovery rejects missing/incorrect authorization", async () => 
     401,
   );
 });
+
+test(
+  "social inbox persists unverified posts, deduplicates them, and archives without creating jobs",
+  { skip: !enabled, timeout: 10000 },
+  async () => {
+    const body = {
+      url: "https://x.com/test/status/123",
+      text: "Shared job for a frontend developer. Employer and Nigeria eligibility need confirmation.",
+    };
+    assert.equal((await addLead(request(body))).status, 200);
+    assert.equal((await addLead(request(body))).status, 200);
+    const leads = await (await listLeads()).json();
+    assert.equal(leads.length, 1);
+    assert.equal(leads[0].status, "Needs verification");
+    assert.equal(await (await db()).collection("jobs").countDocuments(), 0);
+    assert.equal(
+      (await addLead(request({ ...body, url: "https://example.com/fake" })))
+        .status,
+      400,
+    );
+    assert.equal((await archiveLead(request({ id: leads[0].id }))).status, 200);
+    assert.equal((await (await listLeads()).json()).length, 0);
+  },
+);

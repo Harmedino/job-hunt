@@ -1,5 +1,6 @@
 "use client";
 import Link from "next/link";
+import SocialIntake from "@/components/social-intake";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ArrowUpRight,
@@ -384,6 +385,7 @@ export default function Home() {
                     : "On-demand discovery"}
                 </span>
               </section>
+              <SocialIntake connected={!!health?.database} />
               <div className="section-title">
                 <div>
                   <h2>

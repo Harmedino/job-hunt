@@ -24,6 +24,12 @@ test("dashboard navigation, empty states, and setup guidance", async ({
   await expect(
     page.getByText("Your next opportunity is out there."),
   ).toBeVisible();
+  await page.getByRole("button", { name: "Add social post" }).click();
+  await expect(page.getByLabel("Social post or channel link")).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Save for verification" }),
+  ).toBeDisabled();
+  await page.getByRole("button", { name: "Close social inbox" }).click();
   await page.getByRole("button", { name: "Find new jobs" }).click();
   await expect(page.getByRole("status")).toContainText("Source unavailable");
   await page.getByRole("button", { name: "My Profile", exact: true }).click();

@@ -31,6 +31,12 @@ For production, set a strong `APP_PASSWORD`, then run `npm run build && npm star
 - Saved/Preparing/Ready for review/Submitted/Interview/Rejected/Offer tracking and follow-up notes. Submitted is a user-reported status, not proof that an employer received anything.
 - New strong matches posted within 72 hours generate a deduplicated in-app notification. Notifications are read when the dashboard opens or discovery finishes; email/push delivery is not implemented.
 
+## Social job posts
+
+The Job Finder includes an inbox for individual job posts shared on X, Facebook, Reddit, and WhatsApp. Paste the source link and job text; MongoDB stores a deduplicated lead marked **Needs verification**. No social page, private group, or channel is scraped or fetched by the server. Posts never become verified jobs or submitted applications just because they were imported. Check the employer’s original listing, age, location eligibility, and application route first. Archive misleading, closed, or irrelevant posts.
+
+Monitoring specific accounts/groups/channels requires their public links and any necessary platform-authorized API access. Private content must be shared by the owner or connected through an authorized route. Do not upload unrelated conversations or third-party personal data. This inbox does not yet turn social-only posts into automated application packages.
+
 ## Scheduling
 
 `GET /api/cron` requires `Authorization: Bearer <CRON_SECRET>`. Set a strong secret in the deployment environment. Unlike the dashboard, that endpoint uses only its bearer token so external schedulers can call it.

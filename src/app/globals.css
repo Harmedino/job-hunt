@@ -1460,3 +1460,70 @@ footer > span {
     top: 55px;
   }
 }
+
+.social-intake {
+  margin-bottom: 26px;
+}
+.social-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 15px;
+}
+.social-heading h2 {
+  font-size: 14px;
+}
+.social-heading p {
+  margin: 4px 0 0;
+}
+.social-intake form label {
+  display: block;
+  color: #738369;
+  font-size: 11px;
+  margin-bottom: 17px;
+}
+.social-intake input,
+.social-intake textarea {
+  display: block;
+  width: 100%;
+  background: #fafbf8;
+  border: 1px solid #e0e7db;
+  border-radius: 6px;
+  padding: 11px;
+  margin-top: 7px;
+  color: #334a32;
+  font-size: 12px;
+  resize: vertical;
+}
+.social-leads article {
+  border-top: 1px solid var(--border);
+  padding-top: 20px;
+  margin-top: 20px;
+}
+.social-leads article > div:first-child {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+.social-leads article span {
+  font-size: 9px;
+  color: #ad884e;
+}
+.social-leads article > p {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-height: 220px;
+  overflow: auto;
+}
+.social-intake .eligibility-note {
+  margin: 20px 0;
+}
+@media (max-width: 600px) {
+  .social-heading {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+  .social-heading h2 {
+    line-height: 1.6;
+  }
+}
