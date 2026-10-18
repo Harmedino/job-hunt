@@ -35,7 +35,11 @@ For production, set a strong `APP_PASSWORD`, then run `npm run build && npm star
 
 `GET /api/cron` requires `Authorization: Bearer <CRON_SECRET>`. Set a strong secret in the deployment environment. Unlike the dashboard, that endpoint uses only its bearer token so external schedulers can call it.
 
-`vercel.json` requests discovery every six hours (UTC); this frequency requires a hosting plan that supports it. Deploying configuration and adding a secret are separate steps; **the app does not install a live schedule itself**. For another host, configure a scheduler to call `scripts/discover.sh` every six hours with `CRON_SECRET` and `JOB_HUNT_URL` supplied securely by the host. Do not paste secrets into committed crontabs or logs.
+`vercel.json` uses a daily schedule (`0 6 * * *`, approximately 07:00 WAT), which is compatible with Vercel Hobby. Hobby execution can occur within the scheduled hour. Set `CRON_SECRET` in Vercel before deployment. Deploying configuration and adding a secret are separate steps; **the app does not install a live schedule itself**.
+
+For discovery throughout the day without upgrading Vercel, the optional `.github/workflows/discover.yml` runs every six hours and can also be started manually in GitHub Actions. Enable it by adding repository Actions secrets `JOB_HUNT_URL` (your HTTPS deployment URL) and `CRON_SECRET` (the same value configured in Vercel). Without both secrets, it skips the request. GitHub schedules can be delayed and are not an exact-time guarantee; normal Actions usage limits apply. The daily Vercel run remains a fallback, and notification deduplication prevents repeat alerts. Do not paste secrets into workflow files, committed crontabs, logs, or chat.
+
+For another host, configure a scheduler to call `scripts/discover.sh` every six hours with those variables supplied securely by the host.
 
 Respect public source rate limits and terms. Manual discovery is available; do not repeatedly poll. The current sources may delay listings, omit eligible roles, or fail. No first-24-hours coverage is guaranteed.
 
