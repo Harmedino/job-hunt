@@ -21,15 +21,25 @@ For production, set a strong `APP_PASSWORD`, then run `npm run build && npm star
 ## What works in this stage
 
 - Responsive Job Finder, Applications, and My Profile navigation.
-- Real Remotive and Arbeitnow public feeds; source links, company, salary when provided, description, posting date, recency filters, and duplicate removal.
+- Real Remotive and Arbeitnow public feeds, Remote OK JSON, We Work Remotely frontend RSS, and Himalayas keyword search; source links, company, salary when provided, description, posting date, recency filters, and duplicate removal.
 - Worldwide employers and fully remote openings only; explicit onsite/hybrid title/location labels and office-work requirements are excluded. Hybrid-cloud technical skills are not confused with hybrid work. Junior/mid-level development and security title filtering. Source location evidence is checked for Nigeria: explicit global/Africa/Nigeria locations are candidates; ambiguous remote locations require review and are hidden by default. Some location restrictions are rejected automatically. **This is conservative text screening, not an immigration/work-authorization guarantee.** Confirm the employer's original posting.
-- Jobs older than 30 days are excluded. Successful source refreshes remove postings no longer present in that source's current feed; application history is retained. Feed pagination limitations can also remove still-open jobs from discovery, so always retain original application links. Preparation rechecks the current feed and blocks when the posting cannot be confirmed.
+- Jobs older than 30 days are excluded. Successful source refreshes remove postings no longer present in that source's current feed; application history is retained. Feed pagination limitations can also remove still-open jobs from discovery, so always retain original application links. Preparation rechecks the current sources and blocks when the posting cannot be confirmed. Bounded Himalayas search results are not treated as an exhaustive feed: missing listings are retained until expiry or the 30-day cutoff, and source outages retain cached jobs.
 - Profile editing and PDF/DOCX/TXT CV text import (4 MB maximum, below Vercel’s function request-size limit; scanned PDFs need OCR). The picker opens even before storage is configured. Uploads populate empty contact, skills, experience, education, and project fields from recognised CV content, and retain the raw text. Existing profile entries and browser edits are preserved. For earlier uploads, use **Fill profile from saved CV**. Saved versus unsaved state is shown explicitly. MongoDB is still required for durable storage. Original file bytes are not retained. Review imported text before use.
 - Explainable skill-overlap match scores. These scores are a heuristic, **not AI suitability judgments**. Save skills and refresh discovery to update scores.
 - Optional OpenAI CV extraction and evidence ranking during application preparation. Extracted profile values must be exact excerpts from the CV; unsupported claims are discarded. AI can only select existing evidence blocks by index; generated factual claims are never accepted. PDFs and cover letters use these exact facts. Without `OPENAI_API_KEY`, preparation clearly uses a profile-based template. Provider errors are surfaced rather than silently pretending AI succeeded.
 - Per-application downloadable PDF, reviewable cover letter, and profile snapshot. Preparation is blocked after submission to preserve the submitted package. Basic PDF output uses built-in Latin fonts; unsupported Unicode characters are replaced with spaces. Check the downloaded PDF before submission.
 - Saved/Preparing/Ready for review/Submitted/Interview/Rejected/Offer tracking and follow-up notes. Submitted is a user-reported status, not proof that an employer received anything.
 - New strong matches posted within 72 hours generate a deduplicated in-app notification. Notifications are read when the dashboard opens or discovery finishes; email/push delivery is not implemented.
+
+## Why an empty finder can happen
+
+The dashboard now starts a search on first visit or when the last stored search is older than six hours. After a complete source outage it retries on a later visit after 15 minutes. Scheduled discovery still needs a deployed scheduler and its credential. Without MongoDB, the first search runs on each visit and results are not saved.
+
+**Search activity** reports each source's checked and accepted counts, unavailable APIs, and exclusions for role, remote work, age, location and duplicates. Ambiguous applicant locations stay hidden by default, with a visible count and **Review location requirements** action. A failed search has its own error state. An AI API key is not required for job discovery. MongoDB failures preserve live results with an explicit unsaved warning.
+
+Himalayas searches six role keywords rather than scanning unrelated newest postings. The source's documented empty country list means worldwide; country lists and UTC+1 timezone restrictions are independently checked for an applicant based in Nigeria. The employer search remains worldwide. Each query checks one result page, so coverage is limited. Senior-only source metadata, founders/executives, volunteer positions, freelancer titles, explicit office arrangements and geographic restrictions are excluded. A generic software-engineer title can qualify when its description identifies frontend technologies.
+
+Outbound source fetches use Next.js caching: six hours for Remotive (whose public feed is delayed 24 hours and advises at most four calls daily), and 15 minutes for the other feeds. Sources are attributed on job cards and link to their original listing URLs. No first-day coverage or continuous availability is guaranteed.
 
 ## Connect the AI résumé assistant
 
@@ -65,7 +75,7 @@ Respect public source rate limits and terms. Manual discovery is available; do n
 
 ## Network access
 
-Allow outbound HTTPS to `remotive.com`, `www.arbeitnow.com`, and optionally `api.openai.com`. npm uses `registry.npmjs.org`. GitHub pull-request creation also needs `api.github.com`; Git transport alone does not imply API access. When the host requires a proxy, launch Node 24 with `NODE_USE_ENV_PROXY=1` to honor its supplied proxy variables. Do not disable TLS verification.
+Allow outbound HTTPS to `remotive.com`, `www.arbeitnow.com`, `remoteok.com`, `weworkremotely.com`, `himalayas.app`, and optionally `api.openai.com`. npm uses `registry.npmjs.org`. GitHub pull-request creation also needs `api.github.com`; Git transport alone does not imply API access. When the host requires a proxy, launch Node 24 with `NODE_USE_ENV_PROXY=1` to honor its supplied proxy variables. Do not disable TLS verification.
 
 ## Validation
 

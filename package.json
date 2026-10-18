@@ -13,6 +13,7 @@
     "test:cv": "node tests/production/cv-upload.mjs"
   },
   "dependencies": {
+    "fast-xml-parser": "^5.11.2",
     "lucide-react": "^1.59.0",
     "mammoth": "^1.13.0",
     "mongodb": "^7.7.0",

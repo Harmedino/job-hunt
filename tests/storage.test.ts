@@ -17,7 +17,7 @@ import { PDFDocument } from "pdf-lib";
 import { emptyProfile } from "../src/lib/types";
 import { db, closeDb } from "../src/lib/db";
 import { PUT as saveProfile } from "../src/app/api/profile/route";
-import { POST as discoverJobs } from "../src/app/api/discover/route";
+import { GET as cachedJobs, POST as discoverJobs } from "../src/app/api/discover/route";
 import {
   POST as saveApplication,
   PATCH as updateApplication,
@@ -281,3 +281,24 @@ test(
     }
   },
 );
+
+test("discovery remembers source diagnostics, requests an initial refresh and keeps cached jobs during outages", { skip: !enabled, timeout: 30000 }, async () => {
+  const database = await db();
+  await database.collection("discovery_state").deleteMany({});
+  assert.equal((await (await cachedJobs()).json()).refreshRecommended, true);
+  globalThis.fetch = async (url) => String(url).includes("remotive.com") ? Response.json({ jobs: [{ title: "React Developer", company_name: "Cache Outage Fixture", candidate_required_location: "Worldwide", publication_date: new Date().toISOString(), url: "https://remotive.com/remote-jobs/cache-fixture", description: "React frontend" }] }) : new Response("", { status: 503 });
+  const discovered = await (await discoverJobs()).json();
+  assert.equal(discovered.persisted, true);
+  const cached = await (await cachedJobs()).json();
+  assert.equal(cached.refreshRecommended, false);
+  assert.equal(cached.sources.length, 5);
+  assert.equal(cached.sources.find((s: { source: string }) => s.source === "Remote OK").status, "error");
+  assert.ok(cached.jobs.some((j: { company: string }) => j.company === "Cache Outage Fixture"));
+  globalThis.fetch = async () => new Response("", { status: 503 });
+  const outage = await (await discoverJobs()).json();
+  assert.equal(outage.successfulSources.length, 0);
+  assert.ok(outage.jobs.some((j: { company: string }) => j.company === "Cache Outage Fixture"));
+  assert.equal((await (await cachedJobs()).json()).sources.filter((s: { status: string }) => s.status === "error").length, 5);
+  await database.collection("discovery_state").updateOne({ key: "latest" }, { $set: { checkedAt: new Date(Date.now() - 20 * 60000).toISOString() } });
+  assert.equal((await (await cachedJobs()).json()).refreshRecommended, true);
+});

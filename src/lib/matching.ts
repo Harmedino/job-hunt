@@ -17,6 +17,9 @@ export function eligibility(
 ): { eligibility: Job["eligibility"]; eligibilityReason: string } | null {
   const text = `${location} ${description}`.toLowerCase();
   if (
+    /\b(?:remote|work(?:ing)? remotely?) (?:only )?(?:from|within|in) (?:the )?(?:us|usa|united states|canada|uk|united kingdom|europe|eu|india|ireland|australia)\b/i.test(text)
+  ) return null;
+  if (
     /\b(nigeria(?:n)? (?:applicants? )?(?:not|ineligible)|(?:excluding|except|not available in) nigeria)\b/.test(
       text,
     )
@@ -38,7 +41,7 @@ export function eligibility(
       eligibilityReason: `Source lists “${location}”. Confirm work authorization and timezone requirements before applying.`,
     };
   if (
-    /^(us|usa|uk|united states|canada|europe|eu|india|germany|united kingdom)(\b|$)/.test(
+    /^(?:remote\s*[-–—:]?\s*)?(us|usa|uk|united states|canada|europe|eu|india|germany|united kingdom|ireland|australia|new zealand|americas|north america|latin america)(\b|$)/.test(
       loc,
     )
   )
@@ -49,12 +52,11 @@ export function eligibility(
       "Remote location does not explicitly confirm Nigeria eligibility. Check the original posting.",
   };
 }
-export function relevant(title: string) {
+export function relevant(title: string, description = "") {
   return (
-    /front[ -]?end|react|angular|next\.?js|javascript|typescript|cyber.?security|soc analyst|security analyst/i.test(
-      title,
-    ) &&
-    !/\b(senior|sr\.?|staff|principal|lead|manager|director|head)\b/i.test(
+    (/front[ -]?end|react|angular|next\.?js|javascript|typescript|cyber.?security|soc analyst|security analyst/i.test(title) ||
+      (/\b(?:software|web|ui) (?:engineer|developer)\b/i.test(title) && /\b(?:front[ -]?end|react|angular|next\.?js)\b/i.test(description))) &&
+    !/\b(senior|sr\.?|staff|principal|lead|manager|director|head|architect|freelancer?|freelancing|backend|back-end|mobile|founder|chief|cpto|cmo|cpo|cco|cto|ceo)\b|coding tasks|\(internal\)|\bsecurity analyst (?:3rd|third|level[ -]?3)\b|\bsoftware engineer [4-9]\b/i.test(
       title,
     )
   );
@@ -71,7 +73,7 @@ export function match(job: Job, profile: Profile): Job {
         95,
         Math.round(
           (matchedSkills.length / skills.length) * 75 +
-            (relevant(job.title) ? 20 : 0),
+            (relevant(job.title, job.description) ? 20 : 0),
         ),
       )
     : 0;
@@ -104,6 +106,8 @@ export function fullyRemote(
   description: string,
 ) {
   if (/\b(?:hybrid|on[ -]?site|in[ -]?office)\b/i.test(title + " " + location))
+    return false;
+  if (/\b(?:work(?:ing)? from home(?: \(wfh\))?|wfh|remote work(?:ing)?)(?:\s+(?:option|is|available|for|up to|only)){0,5}\s+(?:one|two|three|four|[1-4])\s+days?\s+(?:per|a|each)\s+week\b/i.test(description))
     return false;
   return !/\bhybrid (?:work(?:ing)?|role|position|arrangement|schedule|model)\b|\b(?:must|required to|expected to) (?:work|be|attend|report) (?:on[ -]?site|in (?:the )?office)\b|\b(?:work|working) on[ -]?site\b|\b(?:office attendance|in[ -]?office attendance) (?:is )?(?:required|mandatory)\b/i.test(
     description,

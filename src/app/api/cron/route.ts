@@ -1,5 +1,6 @@
 import { runDiscovery } from "@/lib/run-discovery";
 import { errorResponse } from "@/lib/db";
+export const maxDuration = 60;
 export async function GET(request: Request) {
   if (
     !process.env.CRON_SECRET ||

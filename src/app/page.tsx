@@ -2,9 +2,11 @@
 import Link from "next/link";
 import SocialIntake from "@/components/social-intake";
 import CvUpload from "@/components/cv-upload";
+import DiscoveryReport from "@/components/discovery-report";
+import type { DiscoveryResponse, SourceReport } from "@/lib/discovery-types";
 import { missingProfileFields } from "@/lib/profile-import-fields";
 import SourceDirectory from "@/components/source-directory";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowUpRight,
   Bell,
@@ -81,6 +83,15 @@ export default function Home() {
   const [viewApp, setViewApp] = useState<Application>();
   const [checked, setChecked] = useState("");
   const [aiCheck, setAiCheck] = useState("");
+  const [sourceReports, setSourceReports] = useState<SourceReport[]>([]);
+  const [storageWarning, setStorageWarning] = useState("");
+  const autoSearched = useRef(false);
+  const receiveDiscovery = useCallback((data: DiscoveryResponse) => {
+    setJobs(data.jobs);
+    setChecked(data.checkedAt || "");
+    setSourceReports(data.sources || []);
+    setStorageWarning(data.storageWarning || "");
+  }, []);
   const refreshApplications = useCallback(
     async () => setApplications(await api<Application[]>("applications")),
     [],
@@ -92,7 +103,21 @@ export default function Home() {
         const h = await api<Health>("status");
         if (!active) return;
         setHealth(h);
-        const loads: Promise<void>[] = [api<{ jobs: Job[] }>("discover").then((data) => { if (active) setJobs(data.jobs); })];
+        const loads: Promise<void>[] = [api<DiscoveryResponse>("discover").then(async (data) => {
+          if (!active) return;
+          if (!autoSearched.current) receiveDiscovery(data);
+          if (data.refreshRecommended && !autoSearched.current) {
+            autoSearched.current = true;
+            setBusy("discovery");
+            try {
+              const result = await api<DiscoveryResponse>("discover", "POST");
+              if (active) {
+                receiveDiscovery(result);
+                if (result.failures?.length) setMessage(result.failures.join(" · "));
+              }
+            } finally { if (active) setBusy(""); }
+          }
+        })];
         if (h.database) {
           loads.push(
             api<Profile>("profile").then((p) => { if (active) setProfile({ ...emptyProfile, ...p }); }),
@@ -110,7 +135,7 @@ export default function Home() {
     return () => {
       active = false;
     };
-  }, []);
+  }, [receiveDiscovery]);
   async function task(name: string, work: () => Promise<void>) {
     setBusy(name);
     setMessage("");
@@ -123,21 +148,16 @@ export default function Home() {
     }
   }
   async function findJobs() {
+    autoSearched.current = true;
     await task("discovery", async () => {
-      const data = await api<{
-        jobs: Job[];
-        failures: string[];
-        checkedAt: string;
-        persisted: boolean;
-      }>("discover", "POST");
-      setJobs(data.jobs);
-      setChecked(data.checkedAt);
+      const data = await api<DiscoveryResponse>("discover", "POST");
+      receiveDiscovery(data);
       setMessage(
-        data.failures.length
+        data.failures?.length
           ? data.failures.join(" · ")
           : `Discovery complete. ${data.jobs.length} relevant openings found.${data.persisted ? "" : " Connect MongoDB to save jobs."}`,
       );
-      if (health?.database) setNotices(await api("notifications"));
+      if (health?.database && data.persisted) setNotices(await api("notifications"));
     });
   }
   async function save(job: Job) {
@@ -168,7 +188,7 @@ export default function Home() {
           (review || j.eligibility === "eligible") &&
           (category === "All opportunities" ||
             (category === "Development"
-              ? /front|react|angular|javascript|typescript|next/i.test(j.title)
+              ? !/security|soc/i.test(j.title)
               : /security|soc/i.test(j.title))) &&
           now - Date.parse(j.postedAt) <= Number(fresh) * 86400000,
       ),
@@ -179,6 +199,8 @@ export default function Home() {
       now - Date.parse(j.postedAt) < 72 * 3600000 &&
       j.eligibility === "eligible",
   ).length;
+  const reviewCount = jobs.filter((j) => j.eligibility === "review").length;
+  const sourcesUnavailable = sourceReports.length > 0 && sourceReports.every((s) => s.status === "error");
   return (
     <div className="app-shell">
       <aside className="sidebar">
@@ -265,7 +287,7 @@ export default function Home() {
               <button
                 className="icon-button"
                 aria-label="Sign out"
-                disabled={!!busy}
+                disabled={busy === "logout"}
                 onClick={() =>
                   void task("logout", async () => {
                     await api("auth/logout", "POST");
@@ -404,6 +426,7 @@ export default function Home() {
               </section>
               <SourceDirectory />
               <SocialIntake connected={!!health?.database} />
+              <DiscoveryReport sources={sourceReports} storageWarning={storageWarning} />
               <div className="section-title">
                 <div>
                   <h2>
@@ -416,7 +439,7 @@ export default function Home() {
                   </p>
                 </div>
                 <span className="source-label">
-                  Sourced from Remotive & Arbeitnow <ExternalLink size={13} />
+                  5 public feeds <ExternalLink size={13} />
                 </span>
               </div>
               <div className="filter-bar">
@@ -444,7 +467,7 @@ export default function Home() {
                     checked={review}
                     onChange={(e) => setReview(e.target.checked)}
                   />
-                  Include location review
+                  Include location review{reviewCount ? ` (${reviewCount})` : ""}
                 </label>
               </div>
               <div className="category-tabs">
@@ -464,6 +487,10 @@ export default function Home() {
                   Newest first
                 </span>
               </div>
+              {!review && reviewCount > 0 && <div className="notice">
+                <CircleHelp size={17} /><span>{reviewCount} remote {reviewCount === 1 ? "opening needs" : "openings need"} applicant-location confirmation and {reviewCount === 1 ? "is" : "are"} hidden. These are unverified candidates.</span>
+                <button className="secondary" onClick={() => setReview(true)}>Review location requirements</button>
+              </div>}
               {filtered.length ? (
                 <div className="job-grid">
                   {filtered.map((job) => (
@@ -551,14 +578,14 @@ export default function Home() {
                     <Search size={29} />
                   </div>
                   <h3>
-                    {jobs.length
+                    {busy === "discovery" ? "Searching live job sources…" : sourcesUnavailable && !jobs.length ? "Job sources could not be reached" : jobs.length
                       ? "No opportunities match these filters"
-                      : "Your next opportunity is out there."}
+                      : checked ? "No matching jobs in this search" : "Your next opportunity is out there."}
                   </h3>
                   <p>
-                    {jobs.length
+                    {busy === "discovery" ? "Checking new remote openings and applicant-location requirements." : sourcesUnavailable && !jobs.length ? "The search failed. Source errors are shown in Search activity above; retry when the sources are available." : jobs.length
                       ? "Try a wider date range or include jobs that need a location review."
-                      : "Search real job boards for fresh remote roles. Your results will appear here—no made-up listings, ever."}
+                      : checked ? "The checked feeds did not return a current role that passed your filters. See Search activity for the counts; a missing AI key does not block discovery." : "Search real job boards for fresh remote roles. Your results will appear here—no made-up listings, ever."}
                   </p>
                   <button
                     className="primary"
@@ -570,7 +597,7 @@ export default function Home() {
                   </button>
                   <div className="empty-sources">
                     <Globe2 size={14} /> Remotive <span>·</span> Arbeitnow{" "}
-                    <span>·</span> Remote-first
+                    <span>·</span> Remote OK <span>·</span> Himalayas <span>·</span> We Work Remotely
                   </div>
                 </div>
               )}

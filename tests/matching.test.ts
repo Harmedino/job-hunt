@@ -25,6 +25,7 @@ test("explicit restrictions override worldwide labels", () => {
     "Must reside in the United States",
     "EU residents",
     "Not available in Nigeria",
+    "Full Stack Developer - Remote from EU",
   ])
     assert.equal(eligibility("Worldwide", description), null);
   assert.equal(eligibility("United States", "Remote"), null);
@@ -41,6 +42,12 @@ test("roles exclude senior and unrelated work", () => {
   assert.equal(relevant("SOC Analyst Intern"), true);
   assert.equal(relevant("Senior Frontend Developer"), false);
   assert.equal(relevant("Sales Executive"), false);
+  assert.equal(relevant("Software Engineer", "Build React frontend features."), true);
+  assert.equal(relevant("Senior Software Engineer", "Build React frontend features."), false);
+  assert.equal(relevant("Software Engineer", "Build Rust database internals."), false);
+  assert.equal(relevant("Wordpress Developer - Frontend Design - Freelancer"), false);
+  assert.equal(relevant("Cybersecurity Co-Founder / CPTO (100% remote)"), false);
+  assert.equal(relevant("Security Analyst 3rd Level"), false);
 });
 test("matching uses saved skills and never creates evidence", () => {
   const job = {
@@ -68,6 +75,7 @@ test("remote-only discovery rejects office arrangements while allowing hybrid-cl
     fullyRemote("React Developer", "Remote", "This is a hybrid position."),
     false,
   );
+  assert.equal(fullyRemote("Web Developer", "Anywhere in the World", "Work From Home (WFH) option available one day per week."), false);
   assert.equal(
     fullyRemote("React Developer", "Remote", "You must work in the office."),
     false,

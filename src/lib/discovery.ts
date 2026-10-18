@@ -1,107 +1,164 @@
 import { createHash } from "node:crypto";
+import { XMLParser } from "fast-xml-parser";
 import { eligibility, plainText, relevant, fullyRemote } from "./matching";
 import type { Job } from "./types";
+import type { SourceReport } from "./discovery-types";
 type Raw = {
-  title: string;
-  company: string;
-  location: string;
-  salary: string;
-  description: string;
-  url: string;
-  date: string;
-  source: string;
+  title: string; company: string; location: string; salary: string;
+  description: string; url: string; date: string; source: string;
+  remote?: boolean; expiresAt?: string; countries?: string[]; timezones?: number[];
+  seniority?: string[]; employmentType?: string;
 };
+type Feed = { jobs: Raw[]; partial?: boolean };
+const string = (value: unknown) => typeof value === "string" ? value : "";
+const timestamp = (value: unknown) => {
+  const date = new Date(Number(value) * 1000);
+  return Number.isFinite(date.getTime()) ? date.toISOString() : "";
+};
+async function json(url: string, signal = AbortSignal.timeout(15000)) {
+  const response = await fetch(url, {
+    signal, cache: "force-cache", next: { revalidate: url.includes("remotive.com/") ? 21600 : 900 }, headers: { "User-Agent": "PersonalJobFinder/1.0" },
+  });
+  if (!response.ok) throw new Error(`HTTP ${response.status}`);
+  return response.json();
+}
+const adapters: { name: string; read: () => Promise<Feed> }[] = [
+  { name: "We Work Remotely", read: async () => {
+    const response = await fetch("https://weworkremotely.com/categories/remote-front-end-programming-jobs.rss", {
+      signal: AbortSignal.timeout(15000), cache: "force-cache", next: { revalidate: 900 }, headers: { "User-Agent": "PersonalJobFinder/1.0" },
+    });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    // RSS text and CDATA are data only; disable entity processing and never render HTML.
+    const parsed = new XMLParser({ processEntities: false, ignoreAttributes: true }).parse(await response.text());
+    const channel = parsed?.rss?.channel;
+    if (!channel) throw new Error("Invalid response");
+    const items = channel.item ? (Array.isArray(channel.item) ? channel.item : [channel.item]) : [];
+    return { jobs: items.map((j: Record<string, unknown>): Raw => {
+      const title = string(j.title);
+      const separator = title.indexOf(": ");
+      return {
+        company: separator > 0 ? title.slice(0, separator) : "", title: separator > 0 ? title.slice(separator + 2) : title,
+        location: string(j.country) || string(j.region), salary: "", description: plainText(string(j.description)),
+        date: string(j.pubDate), expiresAt: j.expires_at && Number.isFinite(Date.parse(string(j.expires_at))) ? new Date(string(j.expires_at)).toISOString() : undefined,
+        url: string(j.link), source: "We Work Remotely",
+      };
+    }) };
+  } },
+  { name: "Remotive", read: async () => {
+    const data = await json("https://remotive.com/api/remote-jobs");
+    if (!Array.isArray(data.jobs)) throw new Error("Invalid response");
+    return { jobs: data.jobs.map((j: Record<string, unknown>): Raw => ({
+      title: string(j.title), company: string(j.company_name), location: string(j.candidate_required_location),
+      salary: string(j.salary), description: plainText(string(j.description)), url: string(j.url),
+      date: string(j.publication_date), source: "Remotive",
+    })) };
+  } },
+  { name: "Arbeitnow", read: async () => {
+    const data = await json("https://www.arbeitnow.com/api/job-board-api");
+    if (!Array.isArray(data.data)) throw new Error("Invalid response");
+    return { jobs: data.data.map((j: Record<string, unknown>): Raw => ({
+      title: string(j.title), company: string(j.company_name), location: string(j.location), salary: "",
+      description: plainText(string(j.description)), url: string(j.url), date: timestamp(j.created_at),
+      remote: j.remote === true, source: "Arbeitnow",
+    })) };
+  } },
+  { name: "Remote OK", read: async () => {
+    const data = await json("https://remoteok.com/api");
+    if (!Array.isArray(data)) throw new Error("Invalid response");
+    // The first entry contains API terms, not a job. Link to source listings for attribution.
+    return { jobs: data.filter((j) => j && typeof j.position === "string").map((j): Raw => ({
+      title: string(j.position), company: string(j.company), location: string(j.location),
+      salary: j.salary_min && j.salary_max ? `${j.salary_min}–${j.salary_max} ${string(j.salary_currency)}` : "",
+      description: plainText(string(j.description)), url: string(j.url), date: string(j.date), source: "Remote OK",
+    })) };
+  } },
+  { name: "Himalayas", read: async () => {
+    // The documented search API targets the desired roles instead of scanning unrelated newest jobs.
+    // country=NG filters applicant eligibility; employers still come from around the world.
+    const queries = ["frontend", "React", "Angular", "Next.js", "cybersecurity", "SOC analyst"];
+    const signal = AbortSignal.timeout(20000);
+    const responses = await Promise.allSettled(queries.map((q) => {
+      const parameters = new URLSearchParams({ q, country: "NG", timezone: "1", sort: "recent" });
+      return json(`https://himalayas.app/jobs/api/search?${parameters}`, signal);
+    }));
+    const jobs: Raw[] = [];
+    let successful = 0;
+    for (const response of responses) {
+      if (response.status !== "fulfilled" || !Array.isArray(response.value.jobs)) continue;
+      successful++;
+      jobs.push(...response.value.jobs.map((j: Record<string, unknown>): Raw => {
+        const countries = Array.isArray(j.locationRestrictions) ? j.locationRestrictions.filter((s): s is string => typeof s === "string") : undefined;
+        return {
+          title: string(j.title), company: string(j.companyName),
+          // Himalayas documents an empty country list as worldwide, checked independently of timezones.
+          location: countries ? (countries.length ? countries.join(", ") : "Worldwide") : "Remote — location unspecified",
+          countries,
+          seniority: Array.isArray(j.seniority) ? j.seniority.filter((v): v is string => typeof v === "string") : typeof j.seniority === "string" ? [j.seniority] : [],
+          employmentType: string(j.employmentType),
+          timezones: Array.isArray(j.timezoneRestrictions) ? j.timezoneRestrictions.filter((v): v is number => typeof v === "number") : undefined,
+          salary: j.minSalary && j.maxSalary ? `${j.minSalary}–${j.maxSalary} ${string(j.currency)} ${string(j.salaryPeriod)}`.trim() : "",
+          description: plainText(string(j.description)), url: string(j.applicationLink), date: timestamp(j.pubDate),
+          expiresAt: j.expiryDate ? timestamp(j.expiryDate) : undefined, source: "Himalayas",
+        };
+      }));
+    }
+    if (!successful) throw new Error("Request failed or timed out");
+    // Search is bounded to one result page per role; absence here is not proof that a listing closed.
+    return { jobs, partial: true };
+  } },
+];
 export async function discover() {
   const failures: string[] = [];
   const successfulSources: string[] = [];
-  const sources = await Promise.allSettled([
-    fetch("https://remotive.com/api/remote-jobs", {
-      signal: AbortSignal.timeout(20000),
-      headers: { "User-Agent": "PersonalJobFinder/1.0" },
-      cache: "no-store",
-    }).then(async (r) => {
-      if (!r.ok) throw new Error(`HTTP ${r.status}`);
-      const data = await r.json();
-      if (!Array.isArray(data.jobs)) throw new Error("Invalid response");
-      return data.jobs.map((j: Record<string, unknown>): Raw => ({
-        title: String(j.title || ""),
-        company: String(j.company_name || ""),
-        location: String(j.candidate_required_location || ""),
-        salary: String(j.salary || ""),
-        description: plainText(String(j.description || "")),
-        url: String(j.url || ""),
-        date: String(j.publication_date || ""),
-        source: "Remotive",
-      }));
-    }),
-    fetch("https://www.arbeitnow.com/api/job-board-api", {
-      signal: AbortSignal.timeout(20000),
-      cache: "no-store",
-    }).then(async (r) => {
-      if (!r.ok) throw new Error(`HTTP ${r.status}`);
-      const data = await r.json();
-      if (!Array.isArray(data.data)) throw new Error("Invalid response");
-      return data.data
-        .filter((j: Record<string, unknown>) => j.remote === true)
-        .map((j: Record<string, unknown>): Raw => ({
-          title: String(j.title || ""),
-          company: String(j.company_name || ""),
-          location: String(j.location || ""),
-          salary: "",
-          description: plainText(String(j.description || "")),
-          url: String(j.url || ""),
-          date: new Date(Number(j.created_at) * 1000).toISOString(),
-          source: "Arbeitnow",
-        }));
-    }),
-  ]);
+  const results = await Promise.allSettled(adapters.map((source) => source.read()));
   const jobs: Job[] = [];
+  const reports: SourceReport[] = [];
   const seen = new Set<string>();
-  sources.forEach((result, i) => {
+  results.forEach((result, index) => {
+    const source = adapters[index].name;
+    const report: SourceReport = {
+      source, status: "ok", fetched: 0, accepted: 0, eligible: 0, review: 0,
+      excluded: { role: 0, remote: 0, invalid: 0, age: 0, location: 0, duplicate: 0 },
+    };
+    reports.push(report);
     if (result.status === "rejected") {
-      failures.push(
-        `${["Remotive", "Arbeitnow"][i]} unavailable: ${result.reason instanceof Error ? result.reason.message : "request failed"}`,
-      );
+      report.status = "error";
+      // Never expose raw upstream response bodies or proxy credentials.
+      report.error = result.reason instanceof Error && /^HTTP \d{3}$|^Invalid response$/.test(result.reason.message)
+        ? result.reason.message : "Request failed or timed out";
+      failures.push(`${source} unavailable: ${report.error}`);
       return;
     }
-    successfulSources.push(["Remotive", "Arbeitnow"][i]);
-    for (const j of result.value) {
-      if (
-        !relevant(j.title) ||
-        !fullyRemote(j.title, j.location, j.description) ||
-        !j.company ||
-        !/^https:\/\//.test(j.url)
-      )
-        continue;
+    successfulSources.push(source);
+    report.status = result.value.partial ? "partial" : "ok";
+    report.fetched = result.value.jobs.length;
+    for (const j of result.value.jobs) {
+      if (j.remote === false || !fullyRemote(j.title, j.location, j.description)) { report.excluded.remote++; continue; }
+      if (!relevant(j.title, j.description)) { report.excluded.role++; continue; }
+      if (j.employmentType === "Volunteer" || (j.seniority?.length && j.seniority.every((level) => /^(?:senior|manager|director|executive)$/i.test(level)))) { report.excluded.role++; continue; }
+      let url: URL;
+      try { url = new URL(j.url); } catch { report.excluded.invalid++; continue; }
+      if (!j.company || url.protocol !== "https:" || url.username || url.password) { report.excluded.invalid++; continue; }
       const age = Date.now() - Date.parse(j.date);
-      if (!Number.isFinite(age) || age < -86400000 || age > 30 * 86400000)
-        continue;
-      const eligible = eligibility(j.location, j.description);
-      if (!eligible) continue;
+      if (!Number.isFinite(age) || age < -86400000 || age > 30 * 86400000 || (j.expiresAt && Date.parse(j.expiresAt) < Date.now())) { report.excluded.age++; continue; }
+      if (j.countries?.length && !j.countries.some((s) => /^(?:nigeria|africa|worldwide|anywhere|global)$/i.test(s.trim()))) { report.excluded.location++; continue; }
+      if (j.timezones && !j.timezones.includes(1)) { report.excluded.location++; continue; }
+      const eligible = eligibility(j.location, `${j.title} ${j.description}`);
+      if (!eligible) { report.excluded.location++; continue; }
+      if (source === "Himalayas" && j.timezones === undefined) { eligible.eligibility = "review"; eligible.eligibilityReason = "Country restrictions were checked, but timezone eligibility needs confirmation on the original posting."; }
       const key = `${j.company.toLowerCase().trim()}|${j.title.toLowerCase().trim()}`;
-      if (seen.has(key)) continue;
+      if (seen.has(key)) { report.excluded.duplicate++; continue; }
       seen.add(key);
+      report.accepted++;
+      report[eligible.eligibility]++;
       jobs.push({
         id: createHash("sha256").update(key).digest("hex").slice(0, 24),
-        title: j.title,
-        company: j.company,
-        location: j.location,
-        salary: j.salary,
-        description: j.description.slice(0, 25000),
-        url: j.url,
-        postedAt: new Date(j.date).toISOString(),
-        source: j.source,
-        discoveredAt: new Date().toISOString(),
-        ...eligible,
-        score: 0,
-        matchedSkills: [],
+        title: j.title, company: j.company, location: j.location, salary: j.salary,
+        description: j.description.slice(0, 25000), url: j.url, postedAt: new Date(j.date).toISOString(),
+        source, discoveredAt: new Date().toISOString(), ...eligible, score: 0, matchedSkills: [],
+        ...(j.expiresAt ? { expiresAt: j.expiresAt } : {}),
       });
     }
   });
-  return {
-    successfulSources,
-    jobs: jobs.sort((a, b) => b.postedAt.localeCompare(a.postedAt)),
-    failures,
-    checkedAt: new Date().toISOString(),
-  };
+  return { successfulSources, sources: reports, jobs: jobs.sort((a, b) => b.postedAt.localeCompare(a.postedAt)), failures, checkedAt: new Date().toISOString() };
 }
