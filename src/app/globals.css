@@ -1727,3 +1727,48 @@ footer > span {
     padding-bottom: 35px;
   }
 }
+
+.cv-upload .upload-box {
+  cursor: default;
+}
+.cv-upload .upload-box button {
+  cursor: pointer;
+}
+.cv-file-name {
+  display: flex;
+  gap: 5px;
+  align-items: center;
+  overflow-wrap: anywhere;
+}
+.cv-feedback {
+  padding: 12px;
+  border-radius: 7px;
+  font-size: 11px;
+  line-height: 1.9;
+  margin-top: 12px;
+  overflow-wrap: anywhere;
+}
+.cv-feedback.success {
+  background: #eff6e9;
+  color: #557a47;
+  border: 1px solid #dce8d1;
+}
+.cv-feedback.warning {
+  background: #fff8e9;
+  color: #967440;
+  border: 1px solid #eadfbe;
+}
+.cv-feedback.error {
+  background: #fff3f0;
+  color: #a35745;
+  border: 1px solid #edd5cb;
+}
+.cv-feedback .secondary {
+  margin-top: 9px;
+}
+.cv-upload-note {
+  font-size: 10px !important;
+}
+.cv-upload .upload-box span {
+  text-align: center;
+}

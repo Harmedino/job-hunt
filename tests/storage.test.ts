@@ -106,7 +106,14 @@ test(
       new Request("http://localhost/api/cv", { method: "POST", body: upload }),
     );
     assert.equal(imported.status, 200);
-    assert.match((await imported.json()).text, /Test Applicant/);
+    const importedCv = await imported.json();
+    assert.match(importedCv.text, /Test Applicant/);
+    assert.equal(importedCv.persisted, true);
+    assert.match(
+      (await (await db()).collection("profile").findOne({ key: "owner" }))
+        ?.profile.cvText,
+      /Test Applicant/,
+    );
     const saved = await (
       await db()
     )

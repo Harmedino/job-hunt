@@ -9,10 +9,12 @@
     "lint": "eslint",
     "test": "tsx --test tests/*.test.ts",
     "test:e2e": "playwright test",
-    "test:auth": "node tests/production/auth.mjs"
+    "test:auth": "node tests/production/auth.mjs",
+    "test:cv": "node tests/production/cv-upload.mjs"
   },
   "dependencies": {
     "lucide-react": "^1.59.0",
+    "mammoth": "^1.13.0",
     "mongodb": "^7.7.0",
     "next": "16.4.2",
     "pdf-lib": "^1.17.1",
@@ -28,6 +30,7 @@
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.4.2",
+    "jszip": "^3.10.2",
     "tailwindcss": "^4",
     "tsx": "^4.23.15",
     "typescript": "^5"

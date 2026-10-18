@@ -24,7 +24,7 @@ For production, set a strong `APP_PASSWORD`, then run `npm run build && npm star
 - Real Remotive and Arbeitnow public feeds; source links, company, salary when provided, description, posting date, recency filters, and duplicate removal.
 - Worldwide employers and fully remote openings only; explicit onsite/hybrid title/location labels and office-work requirements are excluded. Hybrid-cloud technical skills are not confused with hybrid work. Junior/mid-level development and security title filtering. Source location evidence is checked for Nigeria: explicit global/Africa/Nigeria locations are candidates; ambiguous remote locations require review and are hidden by default. Some location restrictions are rejected automatically. **This is conservative text screening, not an immigration/work-authorization guarantee.** Confirm the employer's original posting.
 - Jobs older than 30 days are excluded. Successful source refreshes remove postings no longer present in that source's current feed; application history is retained. Feed pagination limitations can also remove still-open jobs from discovery, so always retain original application links. Preparation rechecks the current feed and blocks when the posting cannot be confirmed.
-- Profile editing and PDF/TXT CV text import (5 MB maximum; scanned PDFs need OCR). Original file bytes are not retained; extracted text is saved in MongoDB. Review imported text before use.
+- Profile editing and PDF/DOCX/TXT CV text import (4 MB maximum, below Vercel’s function request-size limit; scanned PDFs need OCR). The picker opens even before storage is configured. Parsed text appears in your form; saved versus unsaved state is shown explicitly. MongoDB is still required for durable storage. Original file bytes are not retained. Review imported text before use.
 - Explainable skill-overlap match scores. These scores are a heuristic, **not AI suitability judgments**. Save skills and refresh discovery to update scores.
 - Optional OpenAI evidence ranking during application preparation. AI can only select existing evidence blocks by index; generated factual claims are never accepted. PDFs and cover letters use these exact facts. Without `OPENAI_API_KEY`, preparation clearly uses a profile-based template. Provider errors are surfaced rather than silently pretending AI succeeded.
 - Per-application downloadable PDF, reviewable cover letter, and profile snapshot. Preparation is blocked after submission to preserve the submitted package. Basic PDF output uses built-in Latin fonts; unsupported Unicode characters are replaced with spaces. Check the downloaded PDF before submission.
@@ -66,6 +66,7 @@ npm run build
 npx playwright install chromium
 npm run test:e2e
 npm run test:auth # requires a production build and Chromium
+npm run test:cv # actual production upload route and deployment tracing
 # Or use a trusted system Chromium:
 PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/usr/bin/chromium npm run test:e2e
 ```
@@ -74,6 +75,6 @@ Storage tests use a temporary `job_hunt_test_<pid>` database and drop it afterwa
 
 ## Next stages / deliberate limitations
 
-Direct company-career adapters, semantic AI job matching, email/push alerts, OCR/DOCX import, full Unicode PDF typography, and platform-specific browser form filling remain future stages. Current application actions open the original job page and prepare downloadable materials. No browser automation or automatic submission is enabled. A future adapter must verify platform permission, keep unknown answers pending, and stop for your review before any submission. It must not bypass CAPTCHAs, logins, or platform rules.
+Direct company-career adapters, semantic AI job matching, email/push alerts, OCR, full Unicode PDF typography, and platform-specific browser form filling remain future stages. Current application actions open the original job page and prepare downloadable materials. No browser automation or automatic submission is enabled. A future adapter must verify platform permission, keep unknown answers pending, and stop for your review before any submission. It must not bypass CAPTCHAs, logins, or platform rules.
 
 For source research, allow HTTPS to remotive.com, weworkremotely.com, remoteok.com, himalayas.app, workingnomads.com (and their www variants for redirects), and www.reddit.com. Visiting discovered social pages may additionally require x.com, facebook.com, and whatsapp.com. The cloud draft includes these additions; it does not establish current connectivity.
