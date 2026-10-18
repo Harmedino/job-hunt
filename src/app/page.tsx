@@ -1,6 +1,7 @@
 "use client";
 import Link from "next/link";
 import SocialIntake from "@/components/social-intake";
+import CvUpload from "@/components/cv-upload";
 import SourceDirectory from "@/components/source-directory";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
@@ -14,7 +15,6 @@ import {
   Clock3,
   Download,
   ExternalLink,
-  FileText,
   Globe2,
   LayoutGrid,
   LogOut,
@@ -24,7 +24,6 @@ import {
   Settings2,
   ShieldCheck,
   Sparkles,
-  Upload,
   UserRound,
   X,
   Zap,
@@ -686,49 +685,21 @@ export default function Home() {
                 </button>
               </form>
               <div className="profile-side">
-                <section className="panel">
-                  <h3>
-                    <FileText size={18} />
-                    Start with your CV
-                  </h3>
-                  <p>
-                    Upload a text-based PDF or .txt file (up to 5 MB). Extracted
-                    text is saved privately in MongoDB. Scanned PDFs need OCR
-                    first.
-                  </p>
-                  <label className="upload-box">
-                    <Upload size={25} />
-                    <b>
-                      {busy === "upload"
-                        ? "Reading your CV…"
-                        : "Choose your CV"}
-                    </b>
-                    <span>PDF or TXT · 5 MB maximum</span>
-                    <input
-                      type="file"
-                      accept=".pdf,.txt"
-                      disabled={!!busy || !health?.database}
-                      onChange={(e) => {
-                        const file = e.target.files?.[0];
-                        if (file)
-                          void task("upload", async () => {
-                            const form = new FormData();
-                            form.set("file", file);
-                            const r = await fetch("/api/cv", {
-                              method: "POST",
-                              body: form,
-                            });
-                            const data = await r.json();
-                            if (!r.ok) throw new Error(data.error);
-                            setProfile((p) => ({ ...p, cvText: data.text }));
-                            setMessage(
-                              "CV text imported. Review it and save the rest of your profile.",
-                            );
-                          });
-                      }}
-                    />
-                  </label>
-                </section>
+                <CvUpload
+                  disabled={!!busy}
+                  onBusyChange={(uploading) =>
+                    setBusy(uploading ? "upload" : "")
+                  }
+                  onImport={(text, persisted, warning) => {
+                    setProfile((p) => ({ ...p, cvText: text }));
+                    setMessage(
+                      persisted
+                        ? "CV imported and saved. Review the extracted text."
+                        : warning ||
+                            "CV imported, but not saved yet. Connect storage before leaving this page.",
+                    );
+                  }}
+                />
                 <section className="panel">
                   <h3>
                     <Settings2 size={18} />
@@ -751,9 +722,11 @@ export default function Home() {
                     connected={!!health?.protected}
                   />
                   <p>
-                    Configure credentials in <code>.env.local</code> using{" "}
-                    <code>.env.example</code>. Restart after changes. Never
-                    enter API keys here.
+                    On Vercel, set <code>MONGODB_URI</code> to your MongoDB
+                    Atlas connection string in Project Settings → Environment
+                    Variables, then redeploy. For local development, use{" "}
+                    <code>.env.local</code>. Never enter credentials in this
+                    form.
                   </p>
                   <p>
                     Scheduling requires deploying the cron configuration or
