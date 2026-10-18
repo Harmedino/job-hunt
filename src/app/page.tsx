@@ -2,6 +2,8 @@
 import Link from "next/link";
 import SocialIntake from "@/components/social-intake";
 import CvUpload from "@/components/cv-upload";
+import CvBuilder from "@/components/cv-builder";
+import type { BuilderJob } from "@/lib/resume-types";
 import DiscoveryReport from "@/components/discovery-report";
 import type { DiscoveryResponse, SourceReport } from "@/lib/discovery-types";
 import { missingProfileFields } from "@/lib/profile-import-fields";
@@ -19,6 +21,7 @@ import {
   Download,
   ExternalLink,
   Globe2,
+  FileText,
   LayoutGrid,
   LogOut,
   MapPin,
@@ -81,6 +84,7 @@ export default function Home() {
   const [notices, setNotices] = useState<{ id: string; title: string }[]>([]);
   const [showNotices, setShowNotices] = useState(false);
   const [viewApp, setViewApp] = useState<Application>();
+  const [builderJob, setBuilderJob] = useState<BuilderJob>();
   const [checked, setChecked] = useState("");
   const [aiCheck, setAiCheck] = useState("");
   const [sourceReports, setSourceReports] = useState<SourceReport[]>([]);
@@ -167,17 +171,14 @@ export default function Home() {
       setMessage("Job saved to your applications.");
     });
   }
-  async function prepare(application: Application) {
-    await task(application.id, async () => {
-      const result = await api<{ method: string }>("prepare", "POST", {
-        id: application.id,
-      });
-      await refreshApplications();
-      setMessage(
-        `Application prepared using ${result.method.toLowerCase()}. Review the CV and cover letter before applying.`,
-      );
-    });
+  function openBuilder(job: Job, application?: Application) {
+    setBuilderJob({ ...job, applicationId: application?.id, draftId: application?.cvDraftId });
+    setSelected(undefined); setViewApp(undefined); setTab("CV Builder");
   }
+  const builderJobs = useMemo(() => [
+    ...applications.map((a) => ({ ...a.job, applicationId: a.id, draftId: a.cvDraftId })),
+    ...jobs.filter((j) => !applications.some((a) => a.job.id === j.id)),
+  ], [applications, jobs]);
   const filtered = useMemo(
     () =>
       jobs.filter(
@@ -215,6 +216,7 @@ export default function Home() {
           {[
             { name: "Job Finder", icon: Search },
             { name: "Applications", icon: BriefcaseBusiness },
+            { name: "CV Builder", icon: FileText },
             { name: "My Profile", icon: UserRound },
           ].map(({ name, icon: Icon }) => (
             <button
@@ -318,14 +320,14 @@ export default function Home() {
                   ? "Find your next opportunity."
                   : tab === "Applications"
                     ? "Every application. One place."
-                    : "Let your experience shine."}
+                    : tab === "CV Builder" ? "Your experience. Tailored to the role." : "Let your experience shine."}
               </h1>
               <p>
                 {tab === "Job Finder"
                   ? "Remote-only roles from employers worldwide. Find your next move early."
                   : tab === "Applications"
                     ? "Keep your momentum, from the first save to the final offer."
-                    : "Your real skills and experience power every match and application."}
+                    : tab === "CV Builder" ? "Build, edit and download a CV for any job description." : "Your real skills and experience power every match and application."}
               </p>
             </div>
             {tab === "Job Finder" && (
@@ -608,6 +610,9 @@ export default function Home() {
               </footer>
             </>
           )}
+          <div hidden={tab !== "CV Builder"}>
+            <CvBuilder active={tab === "CV Builder"} connected={!!health?.database} ai={!!health?.ai} jobs={builderJobs} initialJob={builderJob} onProfile={() => setTab("My Profile")} onAttached={refreshApplications} />
+          </div>
           {tab === "My Profile" && (
             <div className="profile-layout">
               <form
@@ -721,7 +726,7 @@ export default function Home() {
                     setProfile((p) => ({ ...p, ...missingProfileFields(p, result.fields || {}), cvText: result.text }));
                     setMessage(
                       result.persisted
-                        ? "CV imported and saved. Review your profile details, save any edits, then prepare a job-specific résumé from Applications."
+                        ? "CV imported and saved. Review your profile details, save any edits, then build a tailored CV in CV Builder."
                         : result.warning ||
                             "CV imported, but not saved yet. Connect storage before leaving this page.",
                     );
@@ -759,7 +764,7 @@ export default function Home() {
                     To enable AI, create an API key at{" "}
                     <a href="https://platform.openai.com/api-keys" target="_blank" rel="noopener noreferrer">OpenAI</a>,
                     add <code>OPENAI_API_KEY</code> in Vercel Environment Variables, and redeploy.
-                    API billing is separate from a ChatGPT subscription. One connection handles CV extraction and job-specific evidence ranking.
+                    API billing is separate from a ChatGPT subscription. One connection handles CV extraction, CV writing and job-specific evidence ranking.
                   </p>
                   <button className="secondary" type="button" disabled={!!busy || !health?.ai} onClick={() => void task("ai-check", async () => {
                     setAiCheck("");
@@ -785,8 +790,7 @@ export default function Home() {
                   <ShieldCheck size={22} />
                   <h3>Your experience. Your words.</h3>
                   <p>
-                    AI can prioritize your existing evidence. It cannot add
-                    qualifications or submit an application for you.
+                    AI drafts use your saved qualifications and check the rewritten claims. Review the wording before applying.
                   </p>
                 </section>
               </div>
@@ -858,14 +862,12 @@ export default function Home() {
                         <button
                           className="secondary"
                           disabled={!!busy}
-                          onClick={() => prepare(app)}
+                          onClick={() => openBuilder(app.job, app)}
                         >
                           <Sparkles size={14} />
-                          {busy === app.id
-                            ? "Preparing…"
-                            : "Prepare application"}
+                          {app.cvDraftId ? "Open CV builder" : "Build tailored CV"}
                         </button>
-                        {app.cvFacts && (
+                        {(app.cvFacts || app.cvDraftId) && (
                           <>
                             <a
                               className="secondary"
@@ -975,8 +977,9 @@ export default function Home() {
               <p>Matching skills: {selected.matchedSkills.join(", ")}</p>
             )}
             <div className="modal-actions">
+              <button className="primary" onClick={() => openBuilder(selected)}><FileText size={16} /> Build tailored CV</button>
               <button
-                className="primary"
+                className="secondary"
                 disabled={!!busy || !health?.database}
                 onClick={() => save(selected)}
               >
@@ -1022,7 +1025,8 @@ export default function Home() {
               {viewApp.preparationMethod} · Snapshot saved{" "}
               {new Date(viewApp.updatedAt).toLocaleString()}
             </p>
-            <h3>CV evidence</h3>
+            <h3>{viewApp.cvDraftId ? "Saved CV version" : "CV evidence"}</h3>
+            {viewApp.cvDraftId && <button className="secondary" onClick={() => openBuilder(viewApp.job, viewApp)}>Open in CV Builder</button>}
             {viewApp.cvFacts?.map((fact, i) => (
               <p className="description" key={i}>
                 {fact}

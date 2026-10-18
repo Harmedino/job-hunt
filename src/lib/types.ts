@@ -68,6 +68,7 @@ export type Application = {
   followUp: string;
   coverLetter?: string;
   cvFacts?: string[];
+  cvDraftId?: string;
   profileSnapshot?: Profile;
   preparationMethod?: string;
 };
