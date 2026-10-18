@@ -3,6 +3,10 @@ import {
   POST as addLead,
   PATCH as archiveLead,
 } from "../src/app/api/leads/route";
+import {
+  GET as getSources,
+  POST as checkSources,
+} from "../src/app/api/sources/route";
 import { test, after } from "node:test";
 import assert from "node:assert/strict";
 import { MongoClient } from "mongodb";
@@ -165,5 +169,56 @@ test(
     );
     assert.equal((await archiveLead(request({ id: leads[0].id }))).status, 200);
     assert.equal((await (await listLeads()).json()).length, 0);
+  },
+);
+
+test(
+  "source directory retains provenance and removes links withdrawn by a successful publisher check",
+  { skip: !enabled, timeout: 10000 },
+  async () => {
+    const previousFetch = globalThis.fetch;
+    try {
+      globalThis.fetch = async (input) =>
+        String(input).includes("reddit.com")
+          ? Response.json({
+              kind: "t5",
+              data: {
+                display_name: new URL(String(input)).pathname.split("/")[2],
+                subreddit_type: "public",
+              },
+            })
+          : new Response('<a href="https://x.com/publisher_test">Account</a>', {
+              headers: { "content-type": "text/html" },
+            });
+      assert.equal((await checkSources()).status, 200);
+      const first = await (await getSources()).json();
+      assert.equal(
+        first.sources.filter((s: { platform: string }) => s.platform === "X")
+          .length,
+        5,
+      );
+      globalThis.fetch = async (input) =>
+        String(input).includes("reddit.com")
+          ? Response.json({
+              kind: "t5",
+              data: {
+                display_name: new URL(String(input)).pathname.split("/")[2],
+                subreddit_type: "public",
+              },
+            })
+          : new Response("<p>No social links</p>", {
+              headers: { "content-type": "text/html" },
+            });
+      await checkSources();
+      assert.equal(
+        (await (await getSources()).json()).sources.filter(
+          (s: { platform: string }) => s.platform === "X",
+        ).length,
+        0,
+      );
+      assert.equal(await (await db()).collection("jobs").countDocuments(), 0);
+    } finally {
+      globalThis.fetch = previousFetch;
+    }
   },
 );

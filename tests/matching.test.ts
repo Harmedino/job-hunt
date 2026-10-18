@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
+  fullyRemote,
   eligibility,
   relevant,
   match,
@@ -60,3 +61,23 @@ test("job descriptions are rendered as text", () =>
     plainText("<p>Hello &amp; welcome</p><script>bad()</script>"),
     "Hello & welcome",
   ));
+
+test("remote-only discovery rejects office arrangements while allowing hybrid-cloud skills", () => {
+  assert.equal(fullyRemote("React Developer (Hybrid)", "Worldwide", ""), false);
+  assert.equal(
+    fullyRemote("React Developer", "Remote", "This is a hybrid position."),
+    false,
+  );
+  assert.equal(
+    fullyRemote("React Developer", "Remote", "You must work in the office."),
+    false,
+  );
+  assert.equal(
+    fullyRemote(
+      "SOC Analyst Intern",
+      "Worldwide",
+      "Fully remote role working with hybrid cloud security.",
+    ),
+    true,
+  );
+});

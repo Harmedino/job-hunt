@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { eligibility, plainText, relevant } from "./matching";
+import { eligibility, plainText, relevant, fullyRemote } from "./matching";
 import type { Job } from "./types";
 type Raw = {
   title: string;
@@ -66,7 +66,12 @@ export async function discover() {
     }
     successfulSources.push(["Remotive", "Arbeitnow"][i]);
     for (const j of result.value) {
-      if (!relevant(j.title) || !j.company || !/^https:\/\//.test(j.url))
+      if (
+        !relevant(j.title) ||
+        !fullyRemote(j.title, j.location, j.description) ||
+        !j.company ||
+        !/^https:\/\//.test(j.url)
+      )
         continue;
       const age = Date.now() - Date.parse(j.date);
       if (!Number.isFinite(age) || age < -86400000 || age > 30 * 86400000)

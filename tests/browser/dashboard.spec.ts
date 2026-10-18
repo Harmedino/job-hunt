@@ -17,6 +17,24 @@ test("dashboard navigation, empty states, and setup guidance", async ({
       },
     }),
   );
+  await page.route("**/api/sources", (route) =>
+    route.fulfill({
+      json: {
+        sources: [
+          {
+            id: "remotive",
+            name: "Remotive",
+            platform: "Publisher website",
+            url: "https://remotive.com",
+            provenanceUrl: "https://remotive.com",
+            status: "Check failed",
+            note: "Network unavailable",
+          },
+        ],
+        persisted: false,
+      },
+    }),
+  );
   await page.goto("/");
   await expect(
     page.getByRole("heading", { name: "Find your next opportunity." }),
@@ -24,6 +42,17 @@ test("dashboard navigation, empty states, and setup guidance", async ({
   await expect(
     page.getByText("Your next opportunity is out there."),
   ).toBeVisible();
+  await page.getByRole("button", { name: "Browse job sources" }).click();
+  await expect(page.getByText("Remotive", { exact: true })).toBeVisible();
+  await page
+    .getByRole("button", { name: "Find publisher social links" })
+    .click();
+  await expect(
+    page.getByText(
+      "Source checks could not confirm any candidates. Review network access or retry later.",
+    ),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Hide sources" }).click();
   await page.getByRole("button", { name: "Add social post" }).click();
   await expect(page.getByLabel("Social post or channel link")).toBeVisible();
   await expect(

@@ -1,6 +1,7 @@
 "use client";
 import Link from "next/link";
 import SocialIntake from "@/components/social-intake";
+import SourceDirectory from "@/components/source-directory";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ArrowUpRight,
@@ -283,7 +284,7 @@ export default function Home() {
               </h1>
               <p>
                 {tab === "Job Finder"
-                  ? "Fresh opportunities. Thoughtful matches. A head start on what’s next."
+                  ? "Remote-only roles from employers worldwide. Find your next move early."
                   : tab === "Applications"
                     ? "Keep your momentum, from the first save to the final offer."
                     : "Your real skills and experience power every match and application."}
@@ -333,7 +334,7 @@ export default function Home() {
                   value={
                     jobs.filter((j) => j.eligibility === "eligible").length
                   }
-                  hint="Nigeria-eligible source locations"
+                  hint="Worldwide employers · location checked"
                   icon={<BriefcaseBusiness size={19} />}
                 />
                 <Stat
@@ -374,8 +375,8 @@ export default function Home() {
                 <div>
                   <b>A wider search. A clearer path.</b>
                   <p>
-                    Discover remote development and cybersecurity roles, with
-                    Nigeria eligibility checked from source locations.
+                    Discover fully remote development and cybersecurity roles
+                    worldwide. Applicant-location restrictions still apply.
                   </p>
                 </div>
                 <span className="pill">
@@ -385,6 +386,7 @@ export default function Home() {
                     : "On-demand discovery"}
                 </span>
               </section>
+              <SourceDirectory />
               <SocialIntake connected={!!health?.database} />
               <div className="section-title">
                 <div>
@@ -521,7 +523,7 @@ export default function Home() {
                       </button>
                       {job.eligibility === "review" && (
                         <small className="location-warning">
-                          Nigeria eligibility needs review
+                          Applicant location needs review
                         </small>
                       )}
                     </article>
