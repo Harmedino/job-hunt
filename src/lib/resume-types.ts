@@ -31,7 +31,15 @@ export type ResumeTarget = {
   applicationId?: string;
 };
 export type ResumeEvidence = { section: ResumeSection; text: string };
+export const resumeTemplates = {
+  classic: "Clean professional",
+  modern: "Modern accent",
+  compact: "Compact minimal",
+} as const;
+export type ResumeTemplate = keyof typeof resumeTemplates;
 export type ResumeDraft = {
+  coverLetter?: string;
+  template?: ResumeTemplate;
   id: string;
   familyId: string;
   previousId?: string;
@@ -103,4 +111,38 @@ export function validateResumeContent(value: unknown): ResumeContent {
     }
   }
   return result;
+}
+
+export function validateCoverLetter(value: unknown): string {
+  if (typeof value !== "string" || value.length > 20000)
+    throw new ResumeInputError(
+      "Keep the cover letter under 20,000 characters.",
+    );
+  return value.trim();
+}
+export function validateTemplate(value: unknown): ResumeTemplate {
+  if (typeof value !== "string" || !Object.hasOwn(resumeTemplates, value))
+    throw new ResumeInputError("Choose a valid document style.");
+  return value as ResumeTemplate;
+}
+export function profileCoverLetter(
+  content: ResumeContent,
+  target: ResumeTarget,
+  body?: string,
+): string {
+  const skills = content.skills.trim().replace(/\s+/g, " ");
+  const experience = (content.projects || content.experience)
+    .trim()
+    .slice(0, 1200);
+  const paragraphs =
+    body ||
+    [
+      skills
+        ? `My skills include ${skills.replace(/[.!]+$/, "")}.`
+        : content.summary,
+      experience ? `Relevant work from my CV:\n${experience}` : "",
+    ]
+      .filter(Boolean)
+      .join("\n\n");
+  return `Dear Hiring Team,\n\nI am applying for the ${target.title} position${target.company ? " at " + target.company : ""}.\n\n${paragraphs}\n\nI would welcome the opportunity to discuss how my qualifications relate to this role. Thank you for considering my application.\n\nKind regards,\n${content.name}`;
 }

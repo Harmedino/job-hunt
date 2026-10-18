@@ -3,6 +3,9 @@ import { useEffect, useRef, useState } from "react";
 import { Download, FileText, History, Save, Sparkles } from "lucide-react";
 import {
   resumeContactFields,
+  resumeTemplates,
+  profileCoverLetter,
+  type ResumeTemplate,
   resumeSections,
   type BuilderJob,
   type ResumeContent,
@@ -65,6 +68,9 @@ export default function CvBuilder({
   const [mode, setMode] = useState<"auto" | "ai" | "profile">("auto");
   const [draft, setDraft] = useState<ResumeDraft>();
   const [content, setContent] = useState<ResumeContent>();
+  const [coverLetter, setCoverLetter] = useState("");
+  const [template, setTemplate] = useState<ResumeTemplate>("classic");
+  const [documentKind, setDocumentKind] = useState<"cv" | "letter">("cv");
   const [history, setHistory] = useState<ResumeListItem[]>([]);
   const [busy, setBusy] = useState("");
   const [feedback, setFeedback] = useState("");
@@ -74,7 +80,11 @@ export default function CvBuilder({
   const dirty =
     !!draft &&
     !!content &&
-    JSON.stringify(content) !== JSON.stringify(draft.content);
+    (JSON.stringify(content) !== JSON.stringify(draft.content) ||
+      coverLetter !==
+        (draft.coverLetter ??
+          profileCoverLetter(draft.content, draft.target)) ||
+      template !== (draft.template || "classic"));
   useEffect(() => {
     if (!active || !draft || !revealEditor.current) return;
     revealEditor.current = false;
@@ -128,6 +138,10 @@ export default function CvBuilder({
   function remember(value: ResumeDraft) {
     setDraft(value);
     setContent(value.content);
+    setCoverLetter(
+      value.coverLetter ?? profileCoverLetter(value.content, value.target),
+    );
+    setTemplate(value.template || "classic");
     setHistory((items) =>
       [
         {
@@ -163,6 +177,8 @@ export default function CvBuilder({
       action: "save",
       draftId: draft.id,
       content,
+      coverLetter,
+      template,
     });
     remember(value);
     return value;
@@ -173,6 +189,7 @@ export default function CvBuilder({
       const value = await request<ResumeDraft>("", {
         action: "generate",
         useAi,
+        template,
         ...(target.jobId
           ? { jobId: target.jobId, applicationId: target.applicationId }
           : { target }),
@@ -180,7 +197,7 @@ export default function CvBuilder({
       revealEditor.current = true;
       remember(value);
       setFeedback(
-        "CV draft created and saved. Edit the sections, check the preview and download your PDF.",
+        "CV and cover letter saved. Edit either document, choose a style and download PDF or editable Word files.",
       );
     });
   }
@@ -197,26 +214,31 @@ export default function CvBuilder({
       );
     });
   }
-  async function download() {
+  async function download(format: "pdf" | "docx" = "pdf") {
     await work("download", async () => {
       const value = await saved();
-      const response = await fetch(`/api/resumes/${value.id}/pdf`);
+      const path =
+        documentKind === "cv" && format === "pdf"
+          ? "pdf"
+          : `export?document=${documentKind}&format=${format}`;
+      const response = await fetch(`/api/resumes/${value.id}/${path}`);
       if (!response.ok) {
         const data = await response.json().catch(() => null);
         throw new Error(
-          data?.error || "PDF export failed. Your CV is saved; try again.",
+          data?.error ||
+            "Document export failed. Your saved version is safe; try again.",
         );
       }
       const url = URL.createObjectURL(await response.blob());
-      const link = document.createElement("a");
+      const link = window.document.createElement("a");
       link.href = url;
-      link.download = "tailored-cv.pdf";
-      document.body.appendChild(link);
+      link.download = `${documentKind === "cv" ? "tailored-cv" : "cover-letter"}.${format}`;
+      window.document.body.appendChild(link);
       link.click();
       link.remove();
       setTimeout(() => URL.revokeObjectURL(url), 10000);
       setFeedback(
-        "PDF downloaded from your saved CV version. Review it before applying.",
+        "Document downloaded from your saved version. Review it before applying.",
       );
     });
   }
@@ -433,7 +455,7 @@ export default function CvBuilder({
               >
                 <div className="builder-editor-heading">
                   <div>
-                    <h3>2. Edit your CV</h3>
+                    <h3>2. Edit your application documents</h3>
                     <p>
                       {draft.manualEdits ? "Manually edited CV" : draft.method}{" "}
                       · {dirty ? "Unsaved edits" : "Saved version"}
@@ -447,7 +469,7 @@ export default function CvBuilder({
                         ?.scrollIntoView({ behavior: "smooth" })
                     }
                   >
-                    Preview CV
+                    Preview {documentKind === "cv" ? "CV" : "cover letter"}
                   </button>
                 </div>
                 <p>
@@ -456,13 +478,73 @@ export default function CvBuilder({
                   submitted applications. Manual edits are not automatically
                   fact-checked.
                 </p>
-                <div className="form-grid">
-                  {resumeContactFields.map((key) => (
+                <div
+                  className="builder-document-tabs"
+                  role="group"
+                  aria-label="Document to edit"
+                >
+                  <button
+                    className={documentKind === "cv" ? "primary" : "secondary"}
+                    aria-pressed={documentKind === "cv"}
+                    onClick={() => setDocumentKind("cv")}
+                  >
+                    CV
+                  </button>
+                  <button
+                    className={
+                      documentKind === "letter" ? "primary" : "secondary"
+                    }
+                    aria-pressed={documentKind === "letter"}
+                    onClick={() => setDocumentKind("letter")}
+                  >
+                    Cover letter
+                  </button>
+                </div>
+                <label>
+                  Document style
+                  <select
+                    aria-label="Document style"
+                    value={template}
+                    disabled={!!busy}
+                    onChange={(e) =>
+                      setTemplate(e.target.value as ResumeTemplate)
+                    }
+                  >
+                    {Object.entries(resumeTemplates).map(([key, label]) => (
+                      <option key={key} value={key}>
+                        {label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <div hidden={documentKind !== "cv"}>
+                  <div className="form-grid">
+                    {resumeContactFields.map((key) => (
+                      <label key={key}>
+                        {labels[key]}
+                        <input
+                          value={content[key]}
+                          type={key === "email" ? "email" : "text"}
+                          disabled={!!busy}
+                          onChange={(e) =>
+                            setContent({ ...content, [key]: e.target.value })
+                          }
+                        />
+                      </label>
+                    ))}
+                  </div>
+                  {(
+                    Object.keys(
+                      resumeSections,
+                    ) as (keyof typeof resumeSections)[]
+                  ).map((key) => (
                     <label key={key}>
-                      {labels[key]}
-                      <input
+                      {resumeSections[key]}
+                      <textarea
+                        aria-label={resumeSections[key]}
+                        rows={key === "summary" || key === "skills" ? 3 : 6}
+                        maxLength={20000}
                         value={content[key]}
-                        type={key === "email" ? "email" : "text"}
                         disabled={!!busy}
                         onChange={(e) =>
                           setContent({ ...content, [key]: e.target.value })
@@ -471,23 +553,19 @@ export default function CvBuilder({
                     </label>
                   ))}
                 </div>
-                {(
-                  Object.keys(resumeSections) as (keyof typeof resumeSections)[]
-                ).map((key) => (
-                  <label key={key}>
-                    {resumeSections[key]}
+                {documentKind === "letter" && (
+                  <label>
+                    Cover letter text
                     <textarea
-                      aria-label={resumeSections[key]}
-                      rows={key === "summary" || key === "skills" ? 3 : 6}
+                      aria-label="Cover letter text"
+                      rows={20}
                       maxLength={20000}
-                      value={content[key]}
+                      value={coverLetter}
                       disabled={!!busy}
-                      onChange={(e) =>
-                        setContent({ ...content, [key]: e.target.value })
-                      }
+                      onChange={(e) => setCoverLetter(e.target.value)}
                     />
                   </label>
-                ))}
+                )}
                 {draft.warnings.map((warning) => (
                   <p key={warning} className="location-warning">
                     {warning}
@@ -544,7 +622,17 @@ export default function CvBuilder({
                       ? "Exporting…"
                       : dirty
                         ? "Save & download PDF"
-                        : "Download CV PDF"}
+                        : documentKind === "cv"
+                          ? "Download CV PDF"
+                          : "Download cover letter PDF"}
+                  </button>
+                  <button
+                    className="secondary"
+                    disabled={!!busy}
+                    onClick={() => void download("docx")}
+                  >
+                    <Download size={15} />
+                    Download editable Word (.docx)
                   </button>
                 </div>
                 {draft.target.applicationId && (
@@ -571,10 +659,13 @@ export default function CvBuilder({
               <section
                 id="cv-builder-preview"
                 className="builder-preview"
-                aria-label="CV preview"
+                aria-label={
+                  documentKind === "cv" ? "CV preview" : "Cover letter preview"
+                }
               >
                 <div className="builder-preview-label">
-                  3. Preview your CV{" "}
+                  3. Preview your{" "}
+                  {documentKind === "cv" ? "CV" : "cover letter"}{" "}
                   <button
                     className="builder-profile-link"
                     onClick={() =>
@@ -586,7 +677,7 @@ export default function CvBuilder({
                     Back to editor
                   </button>
                 </div>
-                <article className="resume-paper">
+                <article className={`resume-paper resume-${template}`}>
                   <h2>{content.name}</h2>
                   <p className="resume-contact">
                     {[content.email, content.phone, content.location]
@@ -601,21 +692,31 @@ export default function CvBuilder({
                       </p>
                     ))}
                   <p className="resume-target">
-                    Application: {draft.target.title}
-                    {draft.target.company ? ` · ${draft.target.company}` : ""}
+                    {documentKind === "letter" ? "Re: " : ""}
+                    {draft.target.title}
+                    {documentKind === "letter" && draft.target.company
+                      ? ` · ${draft.target.company}`
+                      : ""}
                   </p>
-                  {(
-                    Object.keys(
-                      resumeSections,
-                    ) as (keyof typeof resumeSections)[]
-                  ).map(
-                    (key) =>
-                      content[key].trim() && (
-                        <section key={key}>
-                          <h3>{resumeSections[key]}</h3>
-                          <div>{content[key]}</div>
-                        </section>
-                      ),
+                  {documentKind === "letter" && (
+                    <div className="letter-body">{coverLetter}</div>
+                  )}
+                  {documentKind === "cv" && (
+                    <>
+                      {(
+                        Object.keys(
+                          resumeSections,
+                        ) as (keyof typeof resumeSections)[]
+                      ).map(
+                        (key) =>
+                          content[key].trim() && (
+                            <section key={key}>
+                              <h3>{resumeSections[key]}</h3>
+                              <div>{content[key]}</div>
+                            </section>
+                          ),
+                      )}
+                    </>
                   )}
                 </article>
               </section>
@@ -627,7 +728,7 @@ export default function CvBuilder({
               <p>
                 Pick a job or paste its description, then create a draft from
                 your saved profile. You can edit every section and download a
-                formatted PDF.
+                formatted PDF or editable Word document.
               </p>
             </div>
           )}

@@ -54,9 +54,9 @@ export function eligibility(
 }
 export function relevant(title: string, description = "") {
   return (
-    (/front[ -]?end|react|angular|next\.?js|javascript|typescript|cyber.?security|soc analyst|security analyst/i.test(title) ||
+    (/front[ -]?end|react|angular|next\.?js|javascript|typescript|cyber.?security|soc (?:analyst|intern)|security (?:analyst|operations|intern)/i.test(title) ||
       (/\b(?:software|web|ui) (?:engineer|developer)\b/i.test(title) && /\b(?:front[ -]?end|react|angular|next\.?js)\b/i.test(description))) &&
-    !/\b(senior|sr\.?|staff|principal|lead|manager|director|head|architect|freelancer?|freelancing|backend|back-end|mobile|founder|chief|cpto|cmo|cpo|cco|cto|ceo)\b|coding tasks|\(internal\)|\bsecurity analyst (?:3rd|third|level[ -]?3)\b|\bsoftware engineer [4-9]\b/i.test(
+    !/\b(senior|sr\.?|staff|principal|lead|manager|director|head|architect|freelancer?|freelancing|backend|back-end|mobile|founder|chief|cpto|cmo|cpo|cco|cto|ceo)\b|react native|\b(?:sales|account executive|future position|talent (?:pool|community))\b|coding tasks|\(internal\)|\bsecurity analyst (?:3rd|third|level[ -]?3)\b|\bsoftware engineer [4-9]\b/i.test(
       title,
     )
   );

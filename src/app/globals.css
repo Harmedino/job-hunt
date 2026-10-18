@@ -1842,3 +1842,11 @@ footer > span {
   .resume-paper { padding: 23px; }
   .builder-editor .form-grid { grid-template-columns: minmax(0, 1fr); }
 }
+
+.builder-document-tabs { display: flex; gap: 8px; margin: 18px 0; }
+.resume-paper .letter-body { white-space: pre-wrap; font-size: 12px; line-height: 1.9; margin-top: 24px; }
+.resume-modern > h2, .resume-modern .resume-target, .resume-modern section h3 { color: #1f5e5e; }
+.resume-modern section h3 { border-color: #1f5e5e; }
+.resume-compact { padding: 28px; }
+.resume-compact section { margin-top: 16px; }
+.resume-compact section > div, .resume-compact .letter-body { line-height: 1.5; }

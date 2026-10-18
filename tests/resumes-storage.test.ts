@@ -7,6 +7,7 @@ import {
 } from "../src/app/api/resumes/route";
 import { GET as readResume } from "../src/app/api/resumes/[id]/route";
 import { GET as exportResume } from "../src/app/api/resumes/[id]/pdf/route";
+import { GET as exportDocuments } from "../src/app/api/resumes/[id]/export/route";
 import { POST as attachResume } from "../src/app/api/resumes/[id]/attach/route";
 import { POST as discoverJobs } from "../src/app/api/discover/route";
 import {
@@ -78,6 +79,8 @@ test(
       request({
         action: "save",
         draftId: first.id,
+        coverLetter: "My edited cover letter with React experience.",
+        template: "compact",
         content: {
           ...first.content,
           summary: "React and TypeScript frontend skills.",
@@ -89,6 +92,32 @@ test(
     assert.notEqual(first.id, second.id);
     assert.equal(first.familyId, second.familyId);
     assert.equal(second.previousId, first.id);
+    assert.equal(second.template, "compact");
+    const word = await exportDocuments(
+      new Request(
+        "http://localhost/api/resumes/export?document=letter&format=docx",
+      ),
+      params(second.id),
+    );
+    assert.equal(word.status, 200);
+    assert.match(
+      await extractCv(
+        new File([new Uint8Array(await word.arrayBuffer())], "letter.docx"),
+      ),
+      /My edited cover letter with React experience/,
+    );
+    assert.equal(
+      (
+        await exportDocuments(
+          new Request(
+            "http://localhost/api/resumes/export?document=bad&format=html",
+          ),
+          params(second.id),
+        )
+      ).status,
+      400,
+    );
+
     assert.equal(
       (
         await (
@@ -175,6 +204,7 @@ test(
       .findOne({ id: application.id });
     assert.equal(linked?.cvDraftId, draft.id);
     assert.equal(linked?.status, "Ready for review");
+    assert.equal(linked?.coverLetter, draft.coverLetter);
     const pdf = await applicationPdf(
       new Request("http://localhost"),
       params(application.id),
@@ -188,6 +218,7 @@ test(
         request({
           action: "save",
           draftId: draft.id,
+          coverLetter: "A new letter after submission.",
           content: {
             ...draft.content,
             summary: "An edited version after submission.",
@@ -213,6 +244,8 @@ test(
       await readResume(new Request("http://localhost"), params(draft.id))
     ).json();
     assert.equal(original.content.summary, draft.content.summary);
+    assert.equal(original.coverLetter, draft.coverLetter);
+    assert.equal((await (await db()).collection("applications").findOne({ id: application.id }))?.coverLetter, draft.coverLetter);
   },
 );
 test(

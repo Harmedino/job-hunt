@@ -1,7 +1,7 @@
 import { db } from "@/lib/db";
 import { discover } from "@/lib/discovery";
 import { loadResume, privateHeaders, resumeError } from "@/lib/resume-store";
-import { ResumeInputError } from "@/lib/resume-types";
+import { ResumeInputError, profileCoverLetter } from "@/lib/resume-types";
 export const maxDuration = 60;
 export async function POST(
   _request: Request,
@@ -35,20 +35,19 @@ export async function POST(
         409,
       );
     const coverLetter =
-      application.coverLetter ||
-      `Dear Hiring Team,\n\nI am applying for the ${draft.target.title} position${draft.target.company ? " at " + draft.target.company : ""}.\n\n${draft.content.summary || draft.content.skills}\n\nThank you for considering my application.\n\n${draft.content.name}`;
-    const result = await database
-      .collection("applications")
-      .updateOne(query, {
-        $set: {
-          cvDraftId: draft.id,
-          profileSnapshot: draft.profileSnapshot,
-          preparationMethod: "CV builder saved version",
-          coverLetter,
-          status: "Ready for review",
-          updatedAt: new Date().toISOString(),
-        },
-      });
+      draft.coverLetter ??
+      application.coverLetter ??
+      profileCoverLetter(draft.content, draft.target);
+    const result = await database.collection("applications").updateOne(query, {
+      $set: {
+        cvDraftId: draft.id,
+        profileSnapshot: draft.profileSnapshot,
+        preparationMethod: "CV builder saved version",
+        coverLetter,
+        status: "Ready for review",
+        updatedAt: new Date().toISOString(),
+      },
+    });
     if (!result.modifiedCount)
       throw new ResumeInputError(
         "The application changed while linking. Its CV was not replaced.",

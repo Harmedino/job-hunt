@@ -8,6 +8,7 @@ const nextConfig: NextConfig = {
     "mammoth",
   ],
   outputFileTracingIncludes: {
+    "/api/resumes/*/export": ["./src/assets/fonts/*.ttf"],
     "/api/resumes/*/pdf": ["./src/assets/fonts/*.ttf"],
     "/api/documents/*": ["./src/assets/fonts/*.ttf"],
     "/api/cv": [

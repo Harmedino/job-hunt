@@ -13,13 +13,16 @@ export async function GET(
         .replace(/[^a-zA-Z0-9 -]/g, "")
         .trim()
         .slice(0, 100) || "tailored-cv";
-    return new Response(await resumePdf(draft.content, draft.target), {
-      headers: {
-        ...privateHeaders,
-        "Content-Type": "application/pdf",
-        "Content-Disposition": `attachment; filename="${filename}.pdf"`,
+    return new Response(
+      await resumePdf(draft.content, draft.target, draft.template),
+      {
+        headers: {
+          ...privateHeaders,
+          "Content-Type": "application/pdf",
+          "Content-Disposition": `attachment; filename="${filename}.pdf"`,
+        },
       },
-    });
+    );
   } catch (error) {
     return resumeError(error);
   }

@@ -292,6 +292,9 @@ test("discovery remembers source diagnostics, requests an initial refresh and ke
   const cached = await (await cachedJobs()).json();
   assert.equal(cached.refreshRecommended, false);
   assert.equal(cached.sources.length, 5);
+  await database.collection("discovery_state").updateOne({ key: "latest" }, { $unset: { revision: "" } });
+  assert.equal((await (await cachedJobs()).json()).refreshRecommended, true);
+
   assert.equal(cached.sources.find((s: { source: string }) => s.source === "Remote OK").status, "error");
   assert.ok(cached.jobs.some((j: { company: string }) => j.company === "Cache Outage Fixture"));
   globalThis.fetch = async () => new Response("", { status: 503 });
