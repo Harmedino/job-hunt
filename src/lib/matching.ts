@@ -78,13 +78,24 @@ export function match(job: Job, profile: Profile): Job {
   return { ...job, score, matchedSkills };
 }
 export function facts(profile: Profile) {
-  return [
-    profile.skills && `Skills: ${profile.skills}`,
-    profile.experience && `Experience: ${profile.experience}`,
-    profile.education && `Education: ${profile.education}`,
-    profile.projects && `Projects: ${profile.projects}`,
-    profile.cvText && `Existing CV: ${profile.cvText}`,
-  ].filter(Boolean) as string[];
+  const sections = [
+    ["Skills", profile.skills], ["Experience", profile.experience],
+    ["Education", profile.education], ["Projects", profile.projects],
+  ];
+  const evidence = sections.flatMap(([title, text]) =>
+    text ? text.split(/\n\s*\n/).filter((s) => s.trim()).map((s) => `${title}: ${s.trim()}`) : [],
+  );
+  // Keep unstructured qualifications available without adding the whole CV again after import.
+  const normalized = (s: string) => s.replace(/\s+/g, " ").trim().toLowerCase();
+  const known = sections.map(([, text]) => normalized(text || ""));
+  const contacts = [profile.name, profile.email, profile.phone, profile.location, profile.github, profile.linkedin, profile.portfolio].filter(Boolean).map(normalized);
+  const remaining = (profile.cvText || "").split(/\n/).map((s) => s.trim()).filter((line) => {
+    const value = normalized(line);
+    return value && !known.some((s) => s.includes(value)) && !contacts.some((s) => s.includes(value)) &&
+      !/^(?:technical )?skills:?$|^(?:work |professional )?experience:?$|^education:?$|^(?:personal |selected )?projects:?$/i.test(line);
+  });
+  if (remaining.length) evidence.push(`Existing CV: ${remaining.join("\n")}`);
+  return evidence;
 }
 
 export function fullyRemote(

@@ -2,6 +2,7 @@
 import Link from "next/link";
 import SocialIntake from "@/components/social-intake";
 import CvUpload from "@/components/cv-upload";
+import { missingProfileFields } from "@/lib/profile-import-fields";
 import SourceDirectory from "@/components/source-directory";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
@@ -79,6 +80,7 @@ export default function Home() {
   const [showNotices, setShowNotices] = useState(false);
   const [viewApp, setViewApp] = useState<Application>();
   const [checked, setChecked] = useState("");
+  const [aiCheck, setAiCheck] = useState("");
   const refreshApplications = useCallback(
     async () => setApplications(await api<Application[]>("applications")),
     [],
@@ -90,20 +92,17 @@ export default function Home() {
         const h = await api<Health>("status");
         if (!active) return;
         setHealth(h);
-        const data = await api<{ jobs: Job[] }>("discover");
-        if (active) setJobs(data.jobs);
+        const loads: Promise<void>[] = [api<{ jobs: Job[] }>("discover").then((data) => { if (active) setJobs(data.jobs); })];
         if (h.database) {
-          const [p, a, n] = await Promise.all([
-            api<Profile>("profile"),
-            api<Application[]>("applications"),
-            api<{ id: string; title: string }[]>("notifications"),
-          ]);
-          if (active) {
-            setProfile({ ...emptyProfile, ...p });
-            setApplications(a);
-            setNotices(n);
-          }
+          loads.push(
+            api<Profile>("profile").then((p) => { if (active) setProfile({ ...emptyProfile, ...p }); }),
+            api<Application[]>("applications").then((a) => { if (active) setApplications(a); }),
+            api<{ id: string; title: string }[]>("notifications").then((n) => { if (active) setNotices(n); }),
+          );
         }
+        const results = await Promise.allSettled(loads);
+        const failed = results.find((r) => r.status === "rejected");
+        if (active && failed?.status === "rejected") setMessage(failed.reason instanceof Error ? failed.reason.message : "Some dashboard data could not be loaded.");
       } catch (e) {
         if (active) setMessage((e as Error).message);
       }
@@ -687,15 +686,16 @@ export default function Home() {
               <div className="profile-side">
                 <CvUpload
                   disabled={!!busy}
+                  cvText={profile.cvText}
                   onBusyChange={(uploading) =>
                     setBusy(uploading ? "upload" : "")
                   }
-                  onImport={(text, persisted, warning) => {
-                    setProfile((p) => ({ ...p, cvText: text }));
+                  onImport={(result) => {
+                    setProfile((p) => ({ ...p, ...missingProfileFields(p, result.fields || {}), cvText: result.text }));
                     setMessage(
-                      persisted
-                        ? "CV imported and saved. Review the extracted text."
-                        : warning ||
+                      result.persisted
+                        ? "CV imported and saved. Review your profile details, save any edits, then prepare a job-specific résumé from Applications."
+                        : result.warning ||
                             "CV imported, but not saved yet. Connect storage before leaving this page.",
                     );
                   }}
@@ -710,7 +710,7 @@ export default function Home() {
                     connected={!!health?.database}
                   />
                   <Connection
-                    name="AI evidence ranking"
+                    name="OpenAI résumé assistant"
                     connected={!!health?.ai}
                   />
                   <Connection
@@ -727,6 +727,26 @@ export default function Home() {
                     Variables, then redeploy. For local development, use{" "}
                     <code>.env.local</code>. Never enter credentials in this
                     form.
+                  </p>
+                  <p>
+                    To enable AI, create an API key at{" "}
+                    <a href="https://platform.openai.com/api-keys" target="_blank" rel="noopener noreferrer">OpenAI</a>,
+                    add <code>OPENAI_API_KEY</code> in Vercel Environment Variables, and redeploy.
+                    API billing is separate from a ChatGPT subscription. One connection handles CV extraction and job-specific evidence ranking.
+                  </p>
+                  <button className="secondary" type="button" disabled={!!busy || !health?.ai} onClick={() => void task("ai-check", async () => {
+                    setAiCheck("");
+                    try {
+                      const result = await api<{ message: string }>("ai/check", "POST");
+                      setAiCheck(result.message);
+                    } catch (error) { setAiCheck((error as Error).message); }
+                  })}>
+                    {busy === "ai-check" ? "Checking AI…" : "Test AI connection"}
+                  </button>
+                  {aiCheck && <p role="status">{aiCheck}</p>}
+                  <p>
+                    When AI is configured, CV text and relevant job descriptions are sent to OpenAI for these actions. Review every imported field and tailored PDF.
+                    “Configured” means a setting exists; use the test button to verify AI access.
                   </p>
                   <p>
                     Scheduling requires deploying the cron configuration or
