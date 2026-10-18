@@ -16,7 +16,7 @@ npm run dev
 
 Set `MONGODB_URI` in `.env.local` before saving personal data. The default local MongoDB port binds only to loopback. Use an authenticated MongoDB connection for hosted deployments. Without MongoDB the finder can still fetch live jobs, but saving and preparation are disabled. This repository does not include your personal credentials or CV.
 
-For production, set a strong `APP_PASSWORD`, then run `npm run build && npm start` behind HTTPS. HTTP Basic auth accepts any username and requires that password. Production fails closed when it is unset. This is a single-owner tool, not a multi-user SaaS. Development is unprotected unless `APP_PASSWORD` is set. Protect database backups and restrict access to the deployment.
+For production, set a strong `APP_PASSWORD`, then run `npm run build && npm start` behind HTTPS. The sign-in page at `/login` asks for that password; no username is needed. A successful login creates an HTTP-only session cookie lasting eight hours (Secure in production, SameSite=Lax). Changing APP_PASSWORD invalidates existing sessions. Production keeps private pages and APIs locked when it is unset, while the sign-in page explains how to finish configuration. After setting or changing a Vercel environment variable, redeploy and open the newest deployment URL; Production and Preview variables have separate scopes. This is a single-owner tool, not a multi-user SaaS. Development is unprotected unless `APP_PASSWORD` is set. Protect database backups and restrict access to the deployment.
 
 ## What works in this stage
 
@@ -41,7 +41,7 @@ Monitoring specific accounts/groups/channels requires their verified public link
 
 ## Scheduling
 
-`GET /api/cron` requires `Authorization: Bearer <CRON_SECRET>`. Set a strong secret in the deployment environment. Unlike the dashboard, that endpoint uses only its bearer token so external schedulers can call it.
+`GET /api/cron` requires `Authorization: Bearer <CRON_SECRET>`. Set a strong secret in the deployment environment. That endpoint uses only its bearer token so external schedulers can call it.
 
 `vercel.json` uses a daily schedule (`0 6 * * *`, approximately 07:00 WAT), which is compatible with Vercel Hobby. Hobby execution can occur within the scheduled hour. Set `CRON_SECRET` in Vercel before deployment. Deploying configuration and adding a secret are separate steps; **the app does not install a live schedule itself**.
 
@@ -65,6 +65,7 @@ TEST_MONGODB_URI=mongodb://127.0.0.1:27017 npm test
 npm run build
 npx playwright install chromium
 npm run test:e2e
+npm run test:auth # requires a production build and Chromium
 # Or use a trusted system Chromium:
 PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/usr/bin/chromium npm run test:e2e
 ```

@@ -17,6 +17,7 @@ import {
   FileText,
   Globe2,
   LayoutGrid,
+  LogOut,
   MapPin,
   RefreshCw,
   Search,
@@ -262,6 +263,23 @@ export default function Home() {
               <Bell size={19} />
               {notices.length > 0 && <i />}
             </button>
+            {health?.protected && (
+              <button
+                className="icon-button"
+                aria-label="Sign out"
+                disabled={!!busy}
+                onClick={() =>
+                  void task("logout", async () => {
+                    await api("auth/logout", "POST");
+                    window.location.replace(
+                      new URL("/login", window.location.origin).href,
+                    );
+                  })
+                }
+              >
+                <LogOut size={18} />
+              </button>
+            )}
             <button
               className="avatar small"
               aria-label="Open profile"
