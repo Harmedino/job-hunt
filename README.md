@@ -20,14 +20,14 @@ For production, set a strong `APP_PASSWORD`, then run `npm run build && npm star
 
 ## What works in this stage
 
-- Responsive Job Finder, Applications, and My Profile navigation.
+- Responsive Job Finder, Applications, CV Builder, and My Profile navigation.
 - Real Remotive and Arbeitnow public feeds, Remote OK JSON, We Work Remotely frontend RSS, and Himalayas keyword search; source links, company, salary when provided, description, posting date, recency filters, and duplicate removal.
 - Worldwide employers and fully remote openings only; explicit onsite/hybrid title/location labels and office-work requirements are excluded. Hybrid-cloud technical skills are not confused with hybrid work. Junior/mid-level development and security title filtering. Source location evidence is checked for Nigeria: explicit global/Africa/Nigeria locations are candidates; ambiguous remote locations require review and are hidden by default. Some location restrictions are rejected automatically. **This is conservative text screening, not an immigration/work-authorization guarantee.** Confirm the employer's original posting.
 - Jobs older than 30 days are excluded. Successful source refreshes remove postings no longer present in that source's current feed; application history is retained. Feed pagination limitations can also remove still-open jobs from discovery, so always retain original application links. Preparation rechecks the current sources and blocks when the posting cannot be confirmed. Bounded Himalayas search results are not treated as an exhaustive feed: missing listings are retained until expiry or the 30-day cutoff, and source outages retain cached jobs.
 - Profile editing and PDF/DOCX/TXT CV text import (4 MB maximum, below Vercel’s function request-size limit; scanned PDFs need OCR). The picker opens even before storage is configured. Uploads populate empty contact, skills, experience, education, and project fields from recognised CV content, and retain the raw text. Existing profile entries and browser edits are preserved. For earlier uploads, use **Fill profile from saved CV**. Saved versus unsaved state is shown explicitly. MongoDB is still required for durable storage. Original file bytes are not retained. Review imported text before use.
 - Explainable skill-overlap match scores. These scores are a heuristic, **not AI suitability judgments**. Save skills and refresh discovery to update scores.
-- Optional OpenAI CV extraction and evidence ranking during application preparation. Extracted profile values must be exact excerpts from the CV; unsupported claims are discarded. AI can only select existing evidence blocks by index; generated factual claims are never accepted. PDFs and cover letters use these exact facts. Without `OPENAI_API_KEY`, preparation clearly uses a profile-based template. Provider errors are surfaced rather than silently pretending AI succeeded.
-- Per-application downloadable PDF, reviewable cover letter, and profile snapshot. Preparation is blocked after submission to preserve the submitted package. Basic PDF output uses built-in Latin fonts; unsupported Unicode characters are replaced with spaces. Check the downloaded PDF before submission.
+- Optional OpenAI CV extraction, job-specific CV writing and evidence ranking. Profile import requires exact excerpts. The CV Builder writes source-cited paragraphs, rejects unsupported numbers and dates, and uses a separate factual-checking request against the original evidence before accepting rewrites. Rejected rewrites are omitted or fall back to the original profile section, with visible feedback. Without `OPENAI_API_KEY`, an explicitly labelled profile-based builder still works. Provider errors are surfaced.
+- A CV Builder with editable contact details, summary, skills, experience, projects, education and additional qualifications; live preview; immutable saved versions; and formatted A4 PDF export. Embedded DejaVu fonts preserve supported accented characters and long CVs paginate. Legacy preparation PDFs retain their basic Latin font behavior. Saved builder versions can be linked to eligible, currently confirmed applications; linking is blocked after submission to preserve the submitted package.
 - Saved/Preparing/Ready for review/Submitted/Interview/Rejected/Offer tracking and follow-up notes. Submitted is a user-reported status, not proof that an employer received anything.
 - New strong matches posted within 72 hours generate a deduplicated in-app notification. Notifications are read when the dashboard opens or discovery finishes; email/push delivery is not implemented.
 
@@ -41,17 +41,28 @@ Himalayas searches six role keywords rather than scanning unrelated newest posti
 
 Outbound source fetches use Next.js caching: six hours for Remotive (whose public feed is delayed 24 hours and advises at most four calls daily), and 15 minutes for the other feeds. Sources are attributed on job cards and link to their original listing URLs. No first-day coverage or continuous availability is guaranteed.
 
+## Build a job-specific CV
+
+1. Import your CV in My Profile, review the extracted details and save your qualifications.
+2. Open **CV Builder** and paste a role title and job description, or choose **Build tailored CV** from a discovered job or saved application. Pasted descriptions do not become verified job listings or applications.
+3. Choose AI writing when connected, or create a profile-based draft. AI uses your saved qualifications, not assumed skills from the job description. The profile-based mode reorders existing sections and creates a summary from matching saved skills.
+4. Edit any CV section and check the live preview. Review source qualifications and any requirements marked for checking. Automated factual checks reduce unsupported claims but do not establish perfect accuracy; review the wording. Manual edits are your own assertions and are not automatically fact-checked.
+5. Save a new version or download the formatted PDF. Edits are saved as separate immutable versions. Existing profile details and older CVs remain unchanged; unsaved edits are preserved when generating or opening another version. The editor stays mounted when switching dashboard tabs, but refresh loses unsaved browser edits.
+6. When opened from a saved application, **Use this CV for application** links the selected saved version after checking the current job and location evidence. The application's PDF downloads that version. Once an application is marked submitted or later, its linked version cannot be replaced. No application is submitted by the builder.
+
+MongoDB is required for CV drafts and versions. Up to 50 recent versions appear in the history; saved records retain the target description, source profile snapshot and edited content. The bundled DejaVu font license is in `src/assets/fonts/LICENSE.txt`; no fonts are downloaded during PDF generation. The layout uses selectable text, clear headings and a single column; no ATS acceptance is guaranteed.
+
 ## Connect the AI résumé assistant
 
-One OpenAI API connection supports both CV-to-profile extraction and ranking your actual qualifications against a job description. The default model is `gpt-4o-mini`; override `OPENAI_MODEL` only with a compatible model supporting JSON chat completions.
+One OpenAI API connection supports CV-to-profile extraction, job-specific CV writing, factual verification and evidence ranking. The default model is `gpt-4o-mini`; override `OPENAI_MODEL` only with a compatible model supporting JSON chat completions.
 
 1. Create a private API key at https://platform.openai.com/api-keys and enable API billing/usage limits. A ChatGPT subscription does not include API credits.
 2. In Vercel → Project Settings → Environment Variables, add `OPENAI_API_KEY` for the deployment scope you use, then redeploy. Never use a `NEXT_PUBLIC_` variable or paste the key into the app or chat.
 3. In My Profile → Connections, click **Test AI connection**. This sends a small request without personal data; “Configured” alone only means the key is present. Authentication, quota, model and network errors are shown without exposing credentials or raw provider responses.
 4. Upload your CV or choose **Fill profile from saved CV**, review the imported fields and save edits. AI-enabled imports send extracted CV text to OpenAI. If the provider fails, clearly labelled section-based import still works.
-5. Save a suitable verified job, open Applications and choose **Prepare application**. The job description and saved profile evidence are sent to OpenAI. AI selects existing facts by index; the app creates a downloadable tailored PDF and cover-letter template, stores a snapshot, and requires your review before you apply.
+5. Open CV Builder or choose **Build tailored CV** from an application. Enable AI writing, then review the generated summary and sections, unsupported requirements, source evidence and PDF. Writing and factual verification use two provider calls; provider usage charges apply.
 
-The provider request uses `store: false`; provider retention policies still apply. Without a key, recognised CV sections still populate the profile and preparation uses an explicit factual template. This stage prioritizes existing evidence rather than accepting unrestricted AI rewrites or generated credentials. Automatic submission is not enabled.
+The provider request uses `store: false`; provider retention policies still apply. Without a key, recognised CV sections still populate the profile and preparation uses an explicit factual template. AI rewrites are grounded in cited profile evidence and checked separately; credentials and qualifications must not be invented. Automatic submission is not enabled.
 
 ## Social job posts
 
@@ -89,6 +100,7 @@ npx playwright install chromium
 npm run test:e2e
 npm run test:auth # requires a production build and Chromium
 npm run test:cv # actual production upload route and deployment tracing
+TEST_MONGODB_URI=mongodb://127.0.0.1:27017 npm run test:builder # authenticated builder and font tracing
 # Or use a trusted system Chromium:
 PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/usr/bin/chromium npm run test:e2e
 ```
@@ -97,6 +109,6 @@ Storage tests use a temporary `job_hunt_test_<pid>` database and drop it afterwa
 
 ## Next stages / deliberate limitations
 
-Direct company-career adapters, semantic AI job matching, email/push alerts, OCR, full Unicode PDF typography, and platform-specific browser form filling remain future stages. Current application actions open the original job page and prepare downloadable materials. No browser automation or automatic submission is enabled. A future adapter must verify platform permission, keep unknown answers pending, and stop for your review before any submission. It must not bypass CAPTCHAs, logins, or platform rules.
+Direct company-career adapters, semantic AI job matching, email/push alerts, OCR, additional PDF font coverage, and platform-specific browser form filling remain future stages. Current application actions open the original job page and prepare downloadable materials. No browser automation or automatic submission is enabled. A future adapter must verify platform permission, keep unknown answers pending, and stop for your review before any submission. It must not bypass CAPTCHAs, logins, or platform rules.
 
 For source research, allow HTTPS to remotive.com, weworkremotely.com, remoteok.com, himalayas.app, workingnomads.com (and their www variants for redirects), and www.reddit.com. Visiting discovered social pages may additionally require x.com, facebook.com, and whatsapp.com. The cloud draft includes these additions; it does not establish current connectivity.

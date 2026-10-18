@@ -1,4 +1,6 @@
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
+import { resumePdf } from "@/lib/resume-pdf";
+import type { ResumeDraft } from "@/lib/resume-types";
 import { db, errorResponse } from "@/lib/db";
 export async function GET(
   request: Request,
@@ -7,6 +9,11 @@ export async function GET(
   try {
     const { id } = await params;
     const app = await (await db()).collection("applications").findOne({ id });
+    if (app?.cvDraftId) {
+      const draft = await (await db()).collection<ResumeDraft>("resumes").findOne({ id: app.cvDraftId });
+      if (!draft) return Response.json({ error: "Saved CV version not found." }, { status: 404 });
+      return new Response(await resumePdf(draft.content, draft.target), { headers: { "Content-Type": "application/pdf", "Content-Disposition": 'attachment; filename="tailored-cv.pdf"', "Cache-Control": "no-store" } });
+    }
     if (!app?.profileSnapshot || !app.cvFacts)
       return Response.json(
         { error: "Prepare this application first." },

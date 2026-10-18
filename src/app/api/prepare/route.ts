@@ -30,6 +30,7 @@ export async function POST(request: Request) {
         },
         { status: 409 },
       );
+    if (application.cvDraftId) return Response.json({ error: "This application uses a saved CV Builder version. Open CV Builder to edit it." }, { status: 409 });
     const profile = (
       await database.collection("profile").findOne({ key: "owner" })
     )?.profile as Profile | undefined;

@@ -1781,3 +1781,64 @@ footer > span {
 .discovery-report summary span { display: block; color: #78846e; margin-top: 7px; font-size: 11px; }
 .discovery-report .source-error { border-color: #edd5cb; }
 @media (max-width: 600px) { .discovery-source-grid { grid-template-columns: minmax(0, 1fr); } .source-label { overflow-wrap: anywhere; } }
+
+/* CV builder */
+.builder-intro { display: flex; align-items: center; gap: 14px; margin: 0 0 20px; color: #58744b; }
+.builder-intro h2 { font-size: 20px; color: #283c25; margin: 0 0 6px; }
+.builder-intro p { color: #839078; font-size: 12px; margin: 0; line-height: 1.8; }
+.builder-layout { margin-top: 22px; }
+.builder-controls { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); gap: 22px; align-items: start; }
+.builder-target, .builder-editor, .builder-history { padding: 23px; min-width: 0; }
+.builder-target { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.builder-target > h3, .builder-target > p, .builder-target > button, .builder-target > label:first-of-type, .builder-target > label:has(textarea), .builder-target > .builder-ai { grid-column: 1 / -1; }
+.builder-target h3, .builder-editor h3, .builder-history h3 { font-size: 15px; color: #354b2c; margin: 0 0 9px; }
+.builder-target label, .builder-editor label { display: flex; flex-direction: column; gap: 8px; font-size: 11px; color: #5f7055; min-width: 0; }
+.builder-target input, .builder-target textarea, .builder-target select, .builder-editor input, .builder-editor textarea { border: 1px solid #dce5d6; background: #fff; border-radius: 6px; padding: 10px 11px; width: 100%; font: inherit; font-size: 12px; color: #33442e; min-width: 0; }
+.builder-target textarea, .builder-editor textarea { resize: vertical; line-height: 1.8; }
+.builder-target .builder-ai { flex-direction: row; align-items: center; }
+.builder-ai input { width: 15px; }
+.builder-help, .builder-editor p, .builder-history p, .builder-gaps p { color: #87937e; font-size: 11px; line-height: 1.9; }
+.builder-profile-link { background: none; color: #6b845b; text-decoration: underline; font-size: 11px; }
+.builder-history h3 { display: flex; align-items: center; gap: 8px; }
+.builder-history { max-height: 530px; overflow-y: auto; }
+.builder-history > button { display: block; text-align: left; border: 1px solid #e7ecdf; border-radius: 6px; padding: 11px; margin-top: 9px; background: #fff; width: 100%; overflow-wrap: anywhere; }
+.builder-history > button.selected { background: #f0f6eb; border-color: #b6c6aa; }
+.builder-history b, .builder-history span, .builder-history small { display: block; }
+.builder-history b { color: #4d6540; font-size: 12px; }
+.builder-history span, .builder-history small { color: #8b9781; font-size: 10px; margin-top: 6px; line-height: 1.7; }
+.builder-workspace { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 22px; align-items: start; margin-top: 23px; }
+.builder-empty { grid-column: 1 / -1; text-align: center; padding: 70px 24px; color: #93a187; }
+.builder-empty h3 { font-size: 18px; color: #536e44; }
+.builder-empty p { max-width: 430px; margin: auto; font-size: 12px; line-height: 2; }
+.builder-editor-heading { display: flex; align-items: flex-start; gap: 12px; justify-content: space-between; }
+.builder-editor-heading .pill { font-size: 9px; }
+.builder-editor .form-grid { margin: 18px 0; }
+.builder-editor > label { margin: 17px 0; }
+.builder-actions { display: flex; gap: 10px; flex-wrap: wrap; margin: 20px 0 14px; }
+.builder-evidence { margin-top: 20px; padding-top: 14px; border-top: 1px solid #e7ecdf; font-size: 11px; color: #6b7e5c; }
+.builder-evidence summary { cursor: pointer; }
+.builder-evidence p { white-space: pre-wrap; overflow-wrap: anywhere; }
+.builder-gaps { background: #fff8e9; border: 1px solid #eaddbf; border-radius: 6px; padding: 14px; font-size: 11px; color: #8a743e; }
+.builder-gaps h4 { margin: 0; }
+.builder-gaps ul { padding-left: 18px; line-height: 1.9; }
+.builder-preview { position: sticky; top: 18px; min-width: 0; }
+.builder-preview-label { color: #738365; font-size: 12px; font-weight: 600; margin: 5px 0 13px; }
+.resume-paper { background: #fff; border: 1px solid #e3e7dd; box-shadow: 0 6px 25px #354b2c0a; padding: 35px; color: #28343a; min-height: 650px; overflow-wrap: anywhere; }
+.resume-paper > h2 { margin: 0 0 12px; font-size: 23px; font-weight: 700; letter-spacing: -.5px; }
+.resume-contact, .resume-url { font-size: 10px; line-height: 1.7; margin: 4px 0; }
+.resume-target { font-size: 10px; color: #78838a; margin: 15px 0 22px; }
+.resume-paper section { margin-top: 23px; }
+.resume-paper section h3 { text-transform: uppercase; font-size: 11px; letter-spacing: .8px; border-bottom: 1px solid #d3dce0; padding-bottom: 7px; color: #35464d; }
+.resume-paper section > div { white-space: pre-wrap; font-size: 11px; line-height: 1.85; }
+@media (max-width: 1000px) {
+  .builder-controls, .builder-workspace { grid-template-columns: minmax(0, 1fr); }
+  .builder-preview { position: static; }
+  .builder-history { max-height: 250px; }
+}
+@media (max-width: 600px) {
+  .builder-target { grid-template-columns: minmax(0, 1fr); }
+  .builder-target, .builder-editor, .builder-history { padding: 18px; }
+  .builder-editor-heading { flex-direction: column; }
+  .resume-paper { padding: 23px; }
+  .builder-editor .form-grid { grid-template-columns: minmax(0, 1fr); }
+}
