@@ -1,4 +1,4 @@
-import { db } from "@/lib/db";
+import { importResume } from "@/lib/import-resume";
 import { CvInputError, extractCv } from "@/lib/cv";
 import { MAX_CV_BYTES } from "@/lib/cv-limits";
 export const runtime = "nodejs";
@@ -32,47 +32,9 @@ export async function POST(request: Request) {
         { status: 400 },
       );
     const text = await extractCv(file);
-    if (!process.env.MONGODB_URI)
-      return Response.json(
-        {
-          text,
-          persisted: false,
-          storage: "missing",
-          warning:
-            "CV read into the form, but not saved. Set MONGODB_URI in your Vercel project’s environment variables and redeploy to enable saving. Keep this page open until you save your profile.",
-        },
-        { headers: { "Cache-Control": "no-store" } },
-      );
-    try {
-      await (
-        await db()
-      )
-        .collection("profile")
-        .updateOne(
-          { key: "owner" },
-          { $set: { "profile.cvText": text } },
-          { upsert: true },
-        );
-    } catch (error) {
-      console.error(
-        "CV storage failed:",
-        error instanceof Error ? error.name : "UnknownError",
-      );
-      return Response.json(
-        {
-          text,
-          persisted: false,
-          storage: "unreachable",
-          warning:
-            "CV read into the form, but storage could not be reached. Check your MongoDB connection and Atlas access settings, then save your profile. Keep this page open so you don’t lose the imported text.",
-        },
-        { headers: { "Cache-Control": "no-store" } },
-      );
-    }
-    return Response.json(
-      { text, persisted: true },
-      { headers: { "Cache-Control": "no-store" } },
-    );
+    return Response.json(await importResume(text), {
+      headers: { "Cache-Control": "no-store" },
+    });
   } catch (error) {
     if (error instanceof CvInputError)
       return Response.json(

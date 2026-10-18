@@ -3,13 +3,17 @@ import { useRef, useState } from "react";
 import { Check, Upload } from "lucide-react";
 import Link from "next/link";
 import { CV_ACCEPT, cvFileProblem } from "@/lib/cv-limits";
+import type { ProfilePatch } from "@/lib/profile-import-fields";
+export type CvImportResult = { text: string; fields?: ProfilePatch; persisted: boolean; warning?: string; aiWarning?: string; method?: string };
 export default function CvUpload({
   disabled,
+  cvText,
   onImport,
   onBusyChange,
 }: {
   disabled: boolean;
-  onImport: (text: string, persisted: boolean, warning?: string) => void;
+  cvText: string;
+  onImport: (result: CvImportResult) => void;
   onBusyChange: (busy: boolean) => void;
 }) {
   const input = useRef<HTMLInputElement>(null);
@@ -18,11 +22,11 @@ export default function CvUpload({
   const [kind, setKind] = useState<"success" | "warning" | "error">("success");
   const [fileName, setFileName] = useState("");
   const [needsLogin, setNeedsLogin] = useState(false);
-  async function upload(file: File) {
+  async function upload(file?: File) {
     setFeedback("");
     setNeedsLogin(false);
-    setFileName(file.name);
-    const problem = cvFileProblem(file);
+    if (file) setFileName(file.name);
+    const problem = file ? cvFileProblem(file) : undefined;
     if (problem) {
       setKind("error");
       setFeedback(problem.message);
@@ -32,8 +36,10 @@ export default function CvUpload({
     onBusyChange(true);
     try {
       const form = new FormData();
-      form.set("file", file);
-      const response = await fetch("/api/cv", { method: "POST", body: form });
+      if (file) form.set("file", file);
+      const response = await fetch(file ? "/api/cv" : "/api/profile/import", file ? { method: "POST", body: form } : {
+        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text: cvText }),
+      });
       if (response.status === 401) {
         setNeedsLogin(true);
         throw new Error(
@@ -55,14 +61,14 @@ export default function CvUpload({
           "The upload did not return readable CV text. Please try again.",
         );
       const persisted = result.persisted === true;
-      setKind(persisted ? "success" : "warning");
+      setKind(persisted && !result.aiWarning ? "success" : "warning");
       setFeedback(
-        persisted
-          ? "CV imported and saved. Review the extracted text in your profile."
+        (persisted
+          ? "CV imported and saved. Empty profile fields filled where found; review your details before tailoring."
           : result.warning ||
-              "CV imported into this form, but not saved. Connect storage and save your profile before leaving this page.",
+              "CV imported into this form, but not saved. Connect storage and save your profile before leaving this page.") + (result.aiWarning ? ` ${result.aiWarning}` : ""),
       );
-      onImport(result.text, persisted, result.warning);
+      onImport(result);
     } catch (error) {
       setKind("error");
       setFeedback(
@@ -83,7 +89,8 @@ export default function CvUpload({
       </h3>
       <p id="cv-upload-help">
         Choose a text-based PDF, Word DOCX, or TXT file, up to 4 MB. You can
-        read your CV into the form before connecting storage.
+        fill empty profile fields from your CV. Existing entries are kept;
+        review imported details before preparing an application.
       </p>
       <div className="upload-box">
         <Upload size={25} />
@@ -111,6 +118,9 @@ export default function CvUpload({
           }}
         />
       </div>
+      <button className="secondary" type="button" disabled={busy || disabled || !cvText.trim()} onClick={() => void upload()}>
+        {busy ? "Reading your CV…" : "Fill profile from saved CV"}
+      </button>
       {fileName && (
         <p className="cv-file-name">
           {kind === "success" && feedback && <Check size={13} />} {fileName}

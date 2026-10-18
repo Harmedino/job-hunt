@@ -11,6 +11,8 @@ import { test, after } from "node:test";
 import assert from "node:assert/strict";
 import { MongoClient } from "mongodb";
 import { POST as uploadCV } from "../src/app/api/cv/route";
+import { GET as getProfile } from "../src/app/api/profile/route";
+import { POST as importSavedCV } from "../src/app/api/profile/import/route";
 import { PDFDocument } from "pdf-lib";
 import { emptyProfile } from "../src/lib/types";
 import { db, closeDb } from "../src/lib/db";
@@ -153,6 +155,56 @@ test("scheduled discovery rejects missing/incorrect authorization", async () => 
     (await cron(new Request("http://localhost/api/cron"))).status,
     401,
   );
+});
+
+test("CV-to-profile patch persists blank fields, preserves existing entries and prepares an AI-ranked PDF", { skip: !enabled, timeout: 30000 }, async () => {
+  delete process.env.OPENAI_API_KEY;
+  await saveProfile(request({ ...emptyProfile, name: "Existing chosen name", email: "", skills: "", experience: "", education: "", projects: "" }));
+  const cv = "CV Applicant\napplicant@example.org\nTechnical Skills\nReact, TypeScript\nExperience\nBuilt accessible React interfaces at Example Co, 2024\nEducation\nBSc Computer Science\nProjects\nReact dashboard";
+  const form = new FormData();
+  form.set("file", new File([cv], "resume.txt"));
+  const response = await uploadCV(new Request("http://localhost/api/cv", { method: "POST", body: form }));
+  const uploaded = await response.json();
+  assert.equal(uploaded.persisted, true);
+  assert.ok(uploaded.patchedFields.includes("skills"));
+  const profile = await (await getProfile()).json();
+  assert.equal(profile.name, "Existing chosen name");
+  assert.equal(profile.email, "applicant@example.org");
+  assert.equal(profile.skills, "React, TypeScript");
+  assert.equal(profile.experience, "Built accessible React interfaces at Example Co, 2024");
+  assert.equal(profile.education, "BSc Computer Science");
+  assert.equal(profile.projects, "React dashboard");
+  assert.equal(profile.cvText, cv);
+  assert.equal((await (await importSavedCV(request({}))).json()).persisted, true);
+  // Local source/API fixtures only. Verify the job description reaches the ranker and exact facts reach the PDF.
+  let aiCalled = false;
+  globalThis.fetch = async (input, init) => {
+    if (String(input).includes("api.openai.com")) {
+      aiCalled = true;
+      const data = JSON.parse(JSON.parse(String(init?.body)).messages[1].content);
+      assert.match(data.job, /React and TypeScript/);
+      assert.equal(data.evidence[0], "Skills: React, TypeScript");
+      return Response.json({ choices: [{ message: { content: '{"indices":[1,0,2,3]}' } }] });
+    }
+    return Response.json(String(input).includes("remotive") ? { jobs: [{ title: "Junior React Developer", company_name: "CV Integration Fixture", candidate_required_location: "Worldwide", description: "React and TypeScript. Fully remote.", url: "https://remotive.com/remote-jobs/cv-test-fixture", publication_date: new Date().toISOString() }] } : { data: [] });
+  };
+  const result = await (await discoverJobs()).json();
+  const application = await (await saveApplication(request({ jobId: result.jobs[0].id }))).json();
+  process.env.OPENAI_API_KEY = "test-only-not-a-real-key";
+  try {
+    assert.equal((await prepare(request({ id: application.id }))).status, 200);
+    assert.equal(aiCalled, true);
+    const saved = await (await db()).collection("applications").findOne({ id: application.id });
+    assert.equal(saved?.preparationMethod, "AI-ranked profile evidence");
+    assert.equal(saved?.cvFacts[0], "Experience: Built accessible React interfaces at Example Co, 2024");
+    assert.match(saved?.coverLetter, /Junior React Developer/);
+    const pdf = await document(new Request("http://localhost"), { params: Promise.resolve({ id: application.id }) });
+    assert.equal(pdf.headers.get("Content-Type"), "application/pdf");
+    assert.ok((await PDFDocument.load(await pdf.arrayBuffer())).getPageCount() > 0);
+  } finally {
+    delete process.env.OPENAI_API_KEY;
+    await (await db()).collection("jobs").deleteOne({ id: result.jobs[0].id });
+  }
 });
 
 test(
