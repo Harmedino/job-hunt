@@ -13,8 +13,16 @@ export async function POST(request: Request) {
     let text = "";
     if (file.name.toLowerCase().endsWith(".txt")) text = await file.text();
     else if (file.name.toLowerCase().endsWith(".pdf")) {
-      const pdf = (await import("pdf-parse/lib/pdf-parse.js")).default;
-      text = (await pdf(Buffer.from(await file.arrayBuffer()))).text;
+      const { PDFParse } = await import("pdf-parse");
+      const parser = new PDFParse({
+        data: new Uint8Array(await file.arrayBuffer()),
+        isEvalSupported: false,
+      });
+      try {
+        text = (await parser.getText()).text;
+      } finally {
+        await parser.destroy();
+      }
     } else
       return Response.json(
         { error: "Supported formats: PDF and plain text." },

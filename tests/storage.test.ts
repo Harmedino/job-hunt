@@ -1,6 +1,7 @@
 import { test, after } from "node:test";
 import assert from "node:assert/strict";
 import { MongoClient } from "mongodb";
+import { POST as uploadCV } from "../src/app/api/cv/route";
 import { PDFDocument } from "pdf-lib";
 import { emptyProfile } from "../src/lib/types";
 import { db, closeDb } from "../src/lib/db";
@@ -87,6 +88,16 @@ test(
     assert.equal(pdf.status, 200);
     const bytes = await pdf.arrayBuffer();
     assert.ok((await PDFDocument.load(bytes)).getPageCount() > 0);
+    const upload = new FormData();
+    upload.set(
+      "file",
+      new File([bytes], "cv.pdf", { type: "application/pdf" }),
+    );
+    const imported = await uploadCV(
+      new Request("http://localhost/api/cv", { method: "POST", body: upload }),
+    );
+    assert.equal(imported.status, 200);
+    assert.match((await imported.json()).text, /Test Applicant/);
     const saved = await (
       await db()
     )
