@@ -22,7 +22,7 @@ For production, set a strong `APP_PASSWORD`, then run `npm run build && npm star
 
 - Responsive Job Finder, Applications, and My Profile navigation.
 - Real Remotive and Arbeitnow public feeds; source links, company, salary when provided, description, posting date, recency filters, and duplicate removal.
-- Junior/mid-level development and security title filtering. Source location evidence is checked for Nigeria: explicit global/Africa/Nigeria locations are candidates; ambiguous remote locations require review and are hidden by default. Some location restrictions are rejected automatically. **This is conservative text screening, not an immigration/work-authorization guarantee.** Confirm the employer's original posting.
+- Worldwide employers and fully remote openings only; explicit onsite/hybrid title/location labels and office-work requirements are excluded. Hybrid-cloud technical skills are not confused with hybrid work. Junior/mid-level development and security title filtering. Source location evidence is checked for Nigeria: explicit global/Africa/Nigeria locations are candidates; ambiguous remote locations require review and are hidden by default. Some location restrictions are rejected automatically. **This is conservative text screening, not an immigration/work-authorization guarantee.** Confirm the employer's original posting.
 - Jobs older than 30 days are excluded. Successful source refreshes remove postings no longer present in that source's current feed; application history is retained. Feed pagination limitations can also remove still-open jobs from discovery, so always retain original application links. Preparation rechecks the current feed and blocks when the posting cannot be confirmed.
 - Profile editing and PDF/TXT CV text import (5 MB maximum; scanned PDFs need OCR). Original file bytes are not retained; extracted text is saved in MongoDB. Review imported text before use.
 - Explainable skill-overlap match scores. These scores are a heuristic, **not AI suitability judgments**. Save skills and refresh discovery to update scores.
@@ -31,11 +31,23 @@ For production, set a strong `APP_PASSWORD`, then run `npm run build && npm star
 - Saved/Preparing/Ready for review/Submitted/Interview/Rejected/Offer tracking and follow-up notes. Submitted is a user-reported status, not proof that an employer received anything.
 - New strong matches posted within 72 hours generate a deduplicated in-app notification. Notifications are read when the dashboard opens or discovery finishes; email/push delivery is not implemented.
 
+## Social job posts
+
+The Job Finder includes an inbox for individual job posts shared on X, Facebook, Reddit, and WhatsApp. Paste the source link and job text; MongoDB stores a deduplicated lead marked **Needs verification**. No social page, private group, or channel is scraped or fetched by the server. Posts never become verified jobs or submitted applications just because they were imported. Check the employer’s original listing, age, location eligibility, and application route first. Archive misleading, closed, or irrelevant posts.
+
+The source-directory panel researches worldwide remote-job publishers Remotive, We Work Remotely, Remote OK, Himalayas, and Working Nomads, plus candidate Reddit communities r/remotejobs, r/remotejs, and r/cybersecurity. These are research candidates, not guaranteed legitimate job feeds. Click **Find publisher social links** to inspect public publisher homepages: X/Facebook accounts and public WhatsApp channel URLs are added only if their exact links are present on the publisher page. Contact-only WhatsApp links and sharing buttons are excluded. Reddit checks confirm public community metadata only, not hiring activity or job legitimacy. Failed checks remain visibly unconfirmed; no social handles or channel IDs are guessed. Research can run without MongoDB; configured MongoDB retains source records. Source research does not scrape social timelines or automatically import their jobs.
+
+Monitoring specific accounts/groups/channels requires their verified public links and any necessary platform-authorized API access. Private content must be shared by the owner or connected through an authorized route. Do not upload unrelated conversations or third-party personal data. This inbox does not yet turn social-only posts into automated application packages.
+
 ## Scheduling
 
 `GET /api/cron` requires `Authorization: Bearer <CRON_SECRET>`. Set a strong secret in the deployment environment. Unlike the dashboard, that endpoint uses only its bearer token so external schedulers can call it.
 
-`vercel.json` requests discovery every six hours (UTC); this frequency requires a hosting plan that supports it. Deploying configuration and adding a secret are separate steps; **the app does not install a live schedule itself**. For another host, configure a scheduler to call `scripts/discover.sh` every six hours with `CRON_SECRET` and `JOB_HUNT_URL` supplied securely by the host. Do not paste secrets into committed crontabs or logs.
+`vercel.json` uses a daily schedule (`0 6 * * *`, approximately 07:00 WAT), which is compatible with Vercel Hobby. Hobby execution can occur within the scheduled hour. Set `CRON_SECRET` in Vercel before deployment. Deploying configuration and adding a secret are separate steps; **the app does not install a live schedule itself**.
+
+For discovery throughout the day without upgrading Vercel, the optional `.github/workflows/discover.yml` runs every six hours and can also be started manually in GitHub Actions. Enable it by adding repository Actions secrets `JOB_HUNT_URL` (your HTTPS deployment URL) and `CRON_SECRET` (the same value configured in Vercel). Without both secrets, it skips the request. GitHub schedules can be delayed and are not an exact-time guarantee; normal Actions usage limits apply. The daily Vercel run remains a fallback, and notification deduplication prevents repeat alerts. Do not paste secrets into workflow files, committed crontabs, logs, or chat.
+
+For another host, configure a scheduler to call `scripts/discover.sh` every six hours with those variables supplied securely by the host.
 
 Respect public source rate limits and terms. Manual discovery is available; do not repeatedly poll. The current sources may delay listings, omit eligible roles, or fail. No first-24-hours coverage is guaranteed.
 
@@ -62,3 +74,5 @@ Storage tests use a temporary `job_hunt_test_<pid>` database and drop it afterwa
 ## Next stages / deliberate limitations
 
 Direct company-career adapters, semantic AI job matching, email/push alerts, OCR/DOCX import, full Unicode PDF typography, and platform-specific browser form filling remain future stages. Current application actions open the original job page and prepare downloadable materials. No browser automation or automatic submission is enabled. A future adapter must verify platform permission, keep unknown answers pending, and stop for your review before any submission. It must not bypass CAPTCHAs, logins, or platform rules.
+
+For source research, allow HTTPS to remotive.com, weworkremotely.com, remoteok.com, himalayas.app, workingnomads.com (and their www variants for redirects), and www.reddit.com. Visiting discovered social pages may additionally require x.com, facebook.com, and whatsapp.com. The cloud draft includes these additions; it does not establish current connectivity.

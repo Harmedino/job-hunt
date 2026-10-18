@@ -1,6 +1,6 @@
 import { runDiscovery } from "@/lib/run-discovery";
 import { db, errorResponse } from "@/lib/db";
-import { match } from "@/lib/matching";
+import { match, fullyRemote } from "@/lib/matching";
 import { emptyProfile } from "@/lib/types";
 export async function POST() {
   try {
@@ -26,9 +26,9 @@ export async function GET() {
       .limit(500)
       .toArray();
     return Response.json({
-      jobs: jobs.map((j) =>
-        match(j as unknown as import("@/lib/types").Job, profile),
-      ),
+      jobs: jobs
+        .filter((j) => fullyRemote(j.title, j.location, j.description))
+        .map((j) => match(j as unknown as import("@/lib/types").Job, profile)),
       persisted: true,
     });
   } catch (e) {

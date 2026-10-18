@@ -44,7 +44,8 @@ export const emptyProfile: Profile = {
   projects: "",
   roles:
     "Frontend Developer, React Developer, Next.js Developer, Cybersecurity Intern, SOC Analyst Intern",
-  preferences: "Remote, Nigeria eligible",
+  preferences:
+    "Fully remote only; employers worldwide; respect applicant-location restrictions",
   cvText: "",
 };
 export const statuses = [

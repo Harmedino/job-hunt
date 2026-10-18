@@ -86,3 +86,15 @@ export function facts(profile: Profile) {
     profile.cvText && `Existing CV: ${profile.cvText}`,
   ].filter(Boolean) as string[];
 }
+
+export function fullyRemote(
+  title: string,
+  location: string,
+  description: string,
+) {
+  if (/\b(?:hybrid|on[ -]?site|in[ -]?office)\b/i.test(title + " " + location))
+    return false;
+  return !/\bhybrid (?:work(?:ing)?|role|position|arrangement|schedule|model)\b|\b(?:must|required to|expected to) (?:work|be|attend|report) (?:on[ -]?site|in (?:the )?office)\b|\b(?:work|working) on[ -]?site\b|\b(?:office attendance|in[ -]?office attendance) (?:is )?(?:required|mandatory)\b/i.test(
+    description,
+  );
+}
