@@ -8,6 +8,7 @@ export type Job = {
   url: string;
   postedAt: string;
   discoveredAt: string;
+  expiresAt?: string;
   source: string;
   eligibility: "eligible" | "review";
   eligibilityReason: string;

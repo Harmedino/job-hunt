@@ -762,6 +762,7 @@ select {
 }
 .empty-sources {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: center;
   gap: 10px;
@@ -1772,3 +1773,11 @@ footer > span {
 .cv-upload .upload-box span {
   text-align: center;
 }
+.discovery-report { margin: 16px 0; padding: 18px; }
+.discovery-report > p, .discovery-report details p { font-size: 12px; line-height: 1.7; color: #78846e; }
+.discovery-source-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.discovery-report details { padding: 12px; border: 1px solid #e9eee4; border-radius: 8px; min-width: 0; }
+.discovery-report summary { cursor: pointer; font-size: 12px; overflow-wrap: anywhere; }
+.discovery-report summary span { display: block; color: #78846e; margin-top: 7px; font-size: 11px; }
+.discovery-report .source-error { border-color: #edd5cb; }
+@media (max-width: 600px) { .discovery-source-grid { grid-template-columns: minmax(0, 1fr); } .source-label { overflow-wrap: anywhere; } }
