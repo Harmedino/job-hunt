@@ -6,6 +6,7 @@ import {
   resumeSections,
   type ResumeContent,
   type ResumeTarget,
+  type ResumeTemplate,
 } from "./resume-types";
 const regularPath = path.join(process.cwd(), "src/assets/fonts/DejaVuSans.ttf");
 const boldPath = path.join(
@@ -13,7 +14,12 @@ const boldPath = path.join(
   "src/assets/fonts/DejaVuSans-Bold.ttf",
 );
 let fontBytes: Promise<[Buffer, Buffer]> | undefined;
-export async function resumePdf(content: ResumeContent, target: ResumeTarget) {
+export async function resumePdf(
+  content: ResumeContent,
+  target: ResumeTarget,
+  template: ResumeTemplate = "classic",
+  coverLetter?: string,
+) {
   const pdf = await PDFDocument.create();
   pdf.registerFontkit(fontkit);
   fontBytes ??= Promise.all([readFile(regularPath), readFile(boldPath)]);
@@ -25,7 +31,11 @@ export async function resumePdf(content: ResumeContent, target: ResumeTarget) {
     [...text.replace(/\t/g, " ")]
       .filter((c) => c === "\n" || alphabet.has(c.codePointAt(0)!))
       .join("");
-  const margin = 46,
+  const compact = template === "compact";
+  const accent =
+    template === "modern" ? rgb(0.12, 0.37, 0.37) : rgb(0.13, 0.17, 0.2);
+  const lineHeight = compact ? 1.35 : 1.5;
+  const margin = compact ? 40 : 48,
     pageWidth = 595.28,
     pageHeight = 841.89,
     width = pageWidth - margin * 2;
@@ -63,12 +73,12 @@ export async function resumePdf(content: ResumeContent, target: ResumeTarget) {
       lines.push(line);
     }
     for (const row of lines) {
-      need(size * 1.5);
+      need(size * lineHeight);
       page.drawText(row, { x: margin, y: y - size, size, font, color });
-      y -= size * 1.5;
+      y -= size * lineHeight;
     }
   }
-  draw(content.name, 23, bold);
+  draw(content.name, compact ? 21 : 25, bold, accent);
   y -= 5;
   draw(
     [content.email, content.phone, content.location]
@@ -82,29 +92,35 @@ export async function resumePdf(content: ResumeContent, target: ResumeTarget) {
     content.portfolio,
   ].filter(Boolean))
     draw(url, 8.5);
-  y -= 9;
-  draw(
-    `Application: ${target.title}${target.company ? " · " + target.company : ""}`,
-    9,
-    regular,
-    rgb(0.36, 0.41, 0.43),
-  );
-  for (const key of Object.keys(
-    resumeSections,
-  ) as (keyof typeof resumeSections)[]) {
-    if (!content[key].trim()) continue;
-    need(60);
-    y -= 17;
-    draw(resumeSections[key].toUpperCase(), 10, bold);
-    y -= 3;
-    page.drawLine({
-      start: { x: margin, y },
-      end: { x: pageWidth - margin, y },
-      thickness: 0.5,
-      color: rgb(0.78, 0.82, 0.83),
-    });
-    y -= 9;
-    draw(content[key]);
+  y -= 12;
+  if (coverLetter !== undefined) {
+    draw(
+      `Re: ${target.title}${target.company ? " · " + target.company : ""}`,
+      11,
+      bold,
+      accent,
+    );
+    y -= 18;
+    draw(coverLetter, 10.5);
+  } else {
+    draw(target.title, 11, regular, accent);
+    for (const key of Object.keys(
+      resumeSections,
+    ) as (keyof typeof resumeSections)[]) {
+      if (!content[key].trim()) continue;
+      need(60);
+      y -= compact ? 12 : 17;
+      draw(resumeSections[key].toUpperCase(), 10, bold, accent);
+      y -= 3;
+      page.drawLine({
+        start: { x: margin, y },
+        end: { x: pageWidth - margin, y },
+        thickness: 0.5,
+        color: rgb(0.78, 0.82, 0.83),
+      });
+      y -= 9;
+      draw(content[key]);
+    }
   }
   pdf.setTitle(`${content.name} — ${target.title}`);
   pdf.setAuthor(content.name);

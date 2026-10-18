@@ -1,3 +1,4 @@
+export const DISCOVERY_REVISION = 2;
 import type { Job } from "./types";
 export type SourceReport = {
   source: string;

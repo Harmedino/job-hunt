@@ -2,6 +2,7 @@ import { AiError, aiJson } from "./ai";
 import { facts } from "./matching";
 import {
   resumeSections,
+  profileCoverLetter,
   type ResumeContent,
   type ResumeEvidence,
   type ResumeSection,
@@ -64,10 +65,14 @@ export function profileResume(
       (s) => s && target.description.toLowerCase().includes(s.toLowerCase()),
     );
   if (matchedSkills.length)
-    result.summary = `Relevant skills: ${matchedSkills.join(", ")}.`;
+    result.summary = `Skills include ${matchedSkills.join(", ")}.`;
   return result;
 }
-type Claim = { section: ResumeSection; text: string; sources: number[] };
+type Claim = {
+  section: ResumeSection | "coverLetter";
+  text: string;
+  sources: number[];
+};
 export function parseResumeClaims(
   value: unknown,
   evidence: ResumeEvidence[],
@@ -85,7 +90,8 @@ export function parseResumeClaims(
       !item ||
       typeof item !== "object" ||
       typeof item.section !== "string" ||
-      !Object.hasOwn(resumeSections, item.section) ||
+      (!Object.hasOwn(resumeSections, item.section) &&
+        item.section !== "coverLetter") ||
       typeof item.text !== "string" ||
       !item.text.trim() ||
       item.text.length > 5000 ||
@@ -120,13 +126,14 @@ export async function buildResume(
   if (!useAi)
     return {
       content,
+      coverLetter: profileCoverLetter(content, target),
       evidence,
       method: "Profile-based CV builder",
       warnings,
       requirementsToReview: [] as string[],
     };
   const generated = await aiJson(
-    'Write a professional, concise CV tailored to the supplied job. Return {"items":[{"section":"summary|skills|experience|projects|education|additional","text":"draft paragraph or bullet","sources":[0]}],"requirementsToReview":["verbatim requirement from job description not supported by evidence"]}. Use real existing candidate evidence only. Rephrase and prioritize relevant accomplishments and keywords while preserving employers, dates, scope and context. Every paragraph must cite the zero-based evidence indices that support ALL its claims. Do not invent skills, tools, degrees, certifications, job titles, employers, years, numbers or achievements. Job requirements are not candidate qualifications. Do not infer proficiency, leadership or years from a list of skills. Keep employer and date context with experience. Include education and relevant projects when available. Summary must describe actual qualifications, never claim the candidate already holds the target title. Use at most 24 items. Unknown requirements belong in requirementsToReview, never in the CV.',
+    'Write a professional, concise CV and cover-letter body tailored to the supplied job. Include two short coverLetter paragraphs (at most 200 words combined), each citing evidence. Connect concrete candidate work to the relevant job tasks, without repeating the CV verbatim. Do not include greetings, closings, promises, generic enthusiasm or claims of being a perfect fit. Use clear active language. For CV experience, use concise accomplishment bullets while keeping employer/title/date context. Avoid buzzwords, clichés and inflated proficiency. Return {"items":[{"section":"summary|skills|experience|projects|education|additional|coverLetter","text":"draft paragraph or bullet","sources":[0]}],"requirementsToReview":["verbatim requirement from job description not supported by evidence"]}. Use real existing candidate evidence only. Rephrase and prioritize relevant accomplishments and keywords while preserving employers, dates, scope and context. Every paragraph must cite the zero-based evidence indices that support ALL its claims. Do not invent skills, tools, degrees, certifications, job titles, employers, years, numbers or achievements. Job requirements are not candidate qualifications. Do not infer proficiency, leadership or years from a list of skills. Keep employer and date context with experience. Include education and relevant projects when available. Summary must describe actual qualifications, never claim the candidate already holds the target title. Use at most 24 items. Unknown requirements belong in requirementsToReview, never in the CV.',
     {
       target: {
         title: target.title,
@@ -202,8 +209,14 @@ export async function buildResume(
         ),
       ].slice(0, 15)
     : [];
+  const letterBody = claims
+    .filter((c, i) => c.section === "coverLetter" && supported.has(i))
+    .map((c) => c.text)
+    .join("\n\n");
+  if (!letterBody) warnings.push("No AI cover-letter paragraph passed factual checks. The letter uses your CV facts; edit it before applying.");
   return {
     content,
+    coverLetter: profileCoverLetter(content, target, letterBody || undefined),
     evidence,
     method: supported.size
       ? "AI-tailored CV · factual checks completed"

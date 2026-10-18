@@ -5,6 +5,8 @@ import { buildResume, resumeEvidence } from "@/lib/resume-builder";
 import {
   ResumeInputError,
   validateResumeContent,
+  validateCoverLetter,
+  validateTemplate,
   type ResumeDraft,
 } from "@/lib/resume-types";
 import {
@@ -60,6 +62,14 @@ export async function POST(request: Request) {
         previousId: original.id,
         createdAt: new Date().toISOString(),
         content: validateResumeContent(body.content),
+        coverLetter:
+          body.coverLetter === undefined
+            ? original.coverLetter
+            : validateCoverLetter(body.coverLetter),
+        template:
+          body.template === undefined
+            ? original.template
+            : validateTemplate(body.template),
         manualEdits: true,
       };
     } else if (body.action === "generate") {
@@ -87,6 +97,10 @@ export async function POST(request: Request) {
         createdAt: new Date().toISOString(),
         target,
         ...built,
+        template:
+          body.template === undefined
+            ? "classic"
+            : validateTemplate(body.template),
         content: validateResumeContent(built.content),
         profileSnapshot: profile,
         manualEdits: false,

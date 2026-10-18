@@ -70,7 +70,7 @@ test("rewrites require real source references and cannot introduce dates, metric
           },
           { section: "skills", text: "React", sources: [99] },
           { section: "invented", text: "CEO", sources: [0] },
-        { section: { toString: "invalid" }, text: "CEO", sources: [0] },
+          { section: { toString: "invalid" }, text: "CEO", sources: [0] },
           {
             section: "summary",
             text: "Skills include React and TypeScript.",
@@ -118,6 +118,16 @@ test("AI writes a job-specific draft and a separate check rejects unsupported qu
                     text: "Built accessible React interfaces at Example Co (2023–2024).",
                     sources: [1],
                   },
+                  {
+                    section: "coverLetter",
+                    text: "I built accessible React interfaces at Example Co (2023–2024).",
+                    sources: [1],
+                  },
+                  {
+                    section: "coverLetter",
+                    text: "I have Kubernetes expertise.",
+                    sources: [0],
+                  },
                 ],
                 requirementsToReview: [
                   "TypeScript and Kubernetes experience required.",
@@ -130,9 +140,9 @@ test("AI writes a job-specific draft and a separate check rejects unsupported qu
       });
     }
     assert.equal(data.target, undefined);
-    assert.equal(data.claims.length, 3);
+    assert.equal(data.claims.length, 5);
     return Response.json({
-      choices: [{ message: { content: '{"supported":[0,2]}' } }],
+      choices: [{ message: { content: '{"supported":[0,2,3]}' } }],
     });
   };
   const draft = await buildResume(profile, target, true);
@@ -144,6 +154,11 @@ test("AI writes a job-specific draft and a separate check rejects unsupported qu
     "TypeScript and Kubernetes experience required.",
   ]);
   assert.equal(draft.warnings.length, 1);
+  assert.match(
+    draft.coverLetter,
+    /I built accessible React interfaces at Example Co/,
+  );
+  assert.doesNotMatch(draft.coverLetter, /Kubernetes/);
 });
 test("formatted PDF embeds fonts, preserves accented names and paginates long CVs", async () => {
   const content = profileResume(profile, target);
@@ -161,4 +176,31 @@ test("formatted PDF embeds fonts, preserves accented names and paginates long CV
   assert.match(extracted, /PROFESSIONAL SUMMARY/);
   assert.match(extracted, /Project 80/);
   assert.match(extracted, /Example University/);
+});
+
+test("CV and cover letter export as editable Word documents and styled PDFs without losing text", async () => {
+  const { resumeDocx } = await import("../src/lib/resume-docx");
+  const { profileCoverLetter, validateCoverLetter, validateTemplate } =
+    await import("../src/lib/resume-types");
+  const content = profileResume(profile, target);
+  const letter = profileCoverLetter(content, target);
+  assert.doesNotMatch(letter, /Kubernetes/);
+  assert.match(letter, /Frontend Developer position at Fixture Company/);
+  for (const template of ["classic", "modern", "compact"] as const) {
+    for (const body of [undefined, letter]) {
+      const word = await resumeDocx(content, target, template, body);
+      const text = await extractCv(
+        new File([new Uint8Array(word)], "application.docx"),
+      );
+      assert.match(text, /Ṣọlá Adébáyọ̀/);
+      assert.match(text, body ? /Dear Hiring Team/ : /PROFESSIONAL SUMMARY/);
+      const pdf = await resumePdf(content, target, template, body);
+      assert.ok((await PDFDocument.load(pdf)).getPageCount() >= 1);
+    }
+  }
+  assert.throws(
+    () => validateCoverLetter({ text: "injected" }),
+    /cover letter/,
+  );
+  assert.throws(() => validateTemplate("invalid"), /style/);
 });

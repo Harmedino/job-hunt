@@ -110,6 +110,8 @@ test("CV builder creates an editable draft, saves a separate version and downloa
         id: "cv-version-2",
         previousId: first.id,
         content: body.content,
+        coverLetter: body.coverLetter,
+        template: body.template,
         manualEdits: true,
       },
     });
@@ -241,4 +243,95 @@ test("AI drafting shows evidence gaps and keeps provider errors actionable", asy
   await expect(builder.getByLabel("Skills", { exact: true })).not.toHaveValue(
     /Kubernetes/,
   );
+});
+
+test("cover letter and style edits persist before PDF and Word downloads", async ({
+  page,
+}, testInfo) => {
+  let current = {
+    ...first,
+    coverLetter: "Dear Hiring Team,\n\nOriginal profile-based letter.",
+    template: "classic" as const,
+  } as ResumeDraft;
+  let saves = 0;
+  const exported: string[] = [];
+  await page.route("**/api/resumes", (r) => {
+    if (r.request().method() === "GET")
+      return r.fulfill({ json: { drafts: [] } });
+    const body = r.request().postDataJSON();
+    if (body.action === "save") {
+      saves++;
+      current = {
+        ...current,
+        id: "letter-version-2",
+        content: body.content,
+        coverLetter: body.coverLetter,
+        template: body.template,
+        manualEdits: true,
+      };
+    }
+    return r.fulfill({ json: current });
+  });
+  await page.route("**/api/resumes/*/export?*", (r) => {
+    const url = new URL(r.request().url());
+    expect(url.pathname).toContain("letter-version-2");
+    expect(current.coverLetter).toContain("My edited letter");
+    expect(current.template).toBe("modern");
+    exported.push(
+      `${url.searchParams.get("document")}:${url.searchParams.get("format")}`,
+    );
+    return r.fulfill({
+      contentType: "application/octet-stream",
+      body: Buffer.from("export fixture"),
+    });
+  });
+  await open(page);
+  await page.getByRole("button", { name: "CV Builder", exact: true }).click();
+  const builder = page.getByRole("region", { name: "CV builder", exact: true });
+  await builder.getByLabel("Job to tailor for").selectOption(job.id);
+  await builder
+    .getByRole("button", { name: "Create profile-based CV" })
+    .click();
+  await builder
+    .getByRole("button", { name: "Cover letter", exact: true })
+    .click();
+  await builder
+    .getByLabel("Cover letter text", { exact: true })
+    .fill(
+      "Dear Hiring Team,\n\nMy edited letter about accessible React work.\n\nKind regards,\nCV Builder Test",
+    );
+  await builder.getByLabel("Document style").selectOption("modern");
+  await expect(
+    builder.getByRole("region", { name: "Cover letter preview" }),
+  ).toContainText("My edited letter");
+  let download = page.waitForEvent("download");
+  await builder
+    .getByRole("button", { name: "Download editable Word (.docx)" })
+    .click();
+  expect((await download).suggestedFilename()).toBe("cover-letter.docx");
+  download = page.waitForEvent("download");
+  await builder
+    .getByRole("button", { name: "Download cover letter PDF" })
+    .click();
+  expect((await download).suggestedFilename()).toBe("cover-letter.pdf");
+  await builder.getByRole("button", { name: "CV", exact: true }).click();
+  await expect(
+    builder.getByLabel("Professional summary", { exact: true }),
+  ).toHaveValue(first.content.summary);
+  download = page.waitForEvent("download");
+  await builder
+    .getByRole("button", { name: "Download editable Word (.docx)" })
+    .click();
+  expect((await download).suggestedFilename()).toBe("tailored-cv.docx");
+  expect(saves).toBe(1);
+  expect(exported).toEqual(["letter:docx", "letter:pdf", "cv:docx"]);
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= window.innerWidth,
+    ),
+  ).toBe(true);
+  if (testInfo.project.name === "desktop")
+    await builder
+      .getByRole("region", { name: "CV preview" })
+      .screenshot({ path: "/tmp/job-hunt-cv-preview.png" });
 });

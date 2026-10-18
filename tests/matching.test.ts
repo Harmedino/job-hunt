@@ -42,6 +42,12 @@ test("roles exclude senior and unrelated work", () => {
   assert.equal(relevant("SOC Analyst Intern"), true);
   assert.equal(relevant("Senior Frontend Developer"), false);
   assert.equal(relevant("Sales Executive"), false);
+  assert.equal(relevant("Sales Account Executive - Cybersecurity"), false);
+  assert.equal(relevant("React Native Engineer"), false);
+  assert.equal(relevant("Junior Frontend Developer - Future Position"), false);
+  assert.equal(relevant("Salesforce Frontend Developer"), true);
+  assert.equal(relevant("Security Operations Analyst"), true);
+
   assert.equal(relevant("Software Engineer", "Build React frontend features."), true);
   assert.equal(relevant("Senior Software Engineer", "Build React frontend features."), false);
   assert.equal(relevant("Software Engineer", "Build Rust database internals."), false);
