@@ -25,4 +25,5 @@ jobs:
           TEST_MONGODB_URI: mongodb://127.0.0.1:27017
       - run: npm run build
       - run: npx playwright install --with-deps chromium
+      - run: npm run test:auth
       - run: npm run test:e2e
