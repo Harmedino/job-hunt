@@ -1,4 +1,6 @@
 "use client";
+import { cleanResumeLayout } from "@/lib/resume-layout";
+import ResumeSectionBody from "@/components/resume-section-body";
 import { useEffect, useRef, useState } from "react";
 import { Download, FileText, History, Save, Sparkles } from "lucide-react";
 import {
@@ -139,7 +141,11 @@ export default function CvBuilder({
   }
   function remember(value: ResumeDraft) {
     setDraft(value);
-    setContent(value.content);
+    setContent(
+      value.layoutVersion === 2
+        ? value.content
+        : cleanResumeLayout(value.content),
+    );
     setCoverLetter(
       value.coverLetter ?? profileCoverLetter(value.content, value.target),
     );
@@ -485,6 +491,14 @@ export default function CvBuilder({
                   submitted applications. Manual edits are not automatically
                   fact-checked.
                 </p>
+                {draft.layoutVersion !== 2 && (
+                  <p className="builder-layout-notice" role="note">
+                    This editor has removed the old catch-all section and
+                    separated recognised project sections. Save or download to
+                    keep the cleaned copy as a new version. Earlier versions are
+                    preserved.
+                  </p>
+                )}
                 <div
                   className="builder-document-tabs"
                   role="group"
@@ -547,11 +561,18 @@ export default function CvBuilder({
                   ).map((key) => (
                     <label key={key}>
                       {resumeSections[key]}
+                      {key === "projects" && (
+                        <span className="builder-field-help">
+                          Separate projects with a blank line. Put the project
+                          name first, technologies next, then one bullet per
+                          achievement.
+                        </span>
+                      )}
                       <textarea
                         aria-label={resumeSections[key]}
                         rows={key === "summary" || key === "skills" ? 3 : 6}
                         maxLength={20000}
-                        value={content[key]}
+                        value={content[key] || ""}
                         disabled={!!busy}
                         onChange={(e) =>
                           setContent({ ...content, [key]: e.target.value })
@@ -597,7 +618,13 @@ export default function CvBuilder({
                   <summary>Source qualifications used for this draft</summary>
                   {draft.evidence.map((evidence, index) => (
                     <p key={index}>
-                      <b>{resumeSections[evidence.section]}</b>
+                      <b>
+                        {evidence.section in resumeSections
+                          ? resumeSections[
+                              evidence.section as keyof typeof resumeSections
+                            ]
+                          : "Original CV evidence"}
+                      </b>
                       <br />
                       {evidence.text}
                     </p>
@@ -716,10 +743,13 @@ export default function CvBuilder({
                         ) as (keyof typeof resumeSections)[]
                       ).map(
                         (key) =>
-                          content[key].trim() && (
+                          content[key]?.trim() && (
                             <section key={key}>
                               <h3>{resumeSections[key]}</h3>
-                              <div>{content[key]}</div>
+                              <ResumeSectionBody
+                                section={key}
+                                text={content[key] || ""}
+                              />
                             </section>
                           ),
                       )}

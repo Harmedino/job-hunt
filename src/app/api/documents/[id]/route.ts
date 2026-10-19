@@ -12,7 +12,7 @@ export async function GET(
     if (app?.cvDraftId) {
       const draft = await (await db()).collection<ResumeDraft>("resumes").findOne({ id: app.cvDraftId });
       if (!draft) return Response.json({ error: "Saved CV version not found." }, { status: 404 });
-      return new Response(await resumePdf(draft.content, draft.target, draft.template), { headers: { "Content-Type": "application/pdf", "Content-Disposition": 'attachment; filename="tailored-cv.pdf"', "Cache-Control": "no-store" } });
+      return new Response(await resumePdf(draft.content, draft.target, draft.template, undefined, draft.layoutVersion !== 2), { headers: { "Content-Type": "application/pdf", "Content-Disposition": 'attachment; filename="tailored-cv.pdf"', "Cache-Control": "no-store" } });
     }
     if (!app?.profileSnapshot || !app.cvFacts)
       return Response.json(

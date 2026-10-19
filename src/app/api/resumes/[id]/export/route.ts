@@ -35,8 +35,8 @@ export async function GET(
         .slice(0, 100) || "application";
     const bytes =
       format === "pdf"
-        ? await resumePdf(draft.content, draft.target, draft.template, letter)
-        : await resumeDocx(draft.content, draft.target, draft.template, letter);
+        ? await resumePdf(draft.content, draft.target, draft.template, letter, draft.layoutVersion !== 2)
+        : await resumeDocx(draft.content, draft.target, draft.template, letter, draft.layoutVersion !== 2);
     return new Response(new Uint8Array(bytes), {
       headers: {
         ...privateHeaders,

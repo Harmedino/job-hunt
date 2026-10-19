@@ -30,6 +30,7 @@ const job = {
   matchedSkills: ["React"],
 };
 const first: ResumeDraft = {
+  layoutVersion: 2,
   id: "cv-version-1",
   familyId: "cv-version-1",
   createdAt: new Date().toISOString(),
@@ -334,4 +335,101 @@ test("cover letter and style edits persist before PDF and Word downloads", async
     await builder
       .getByRole("region", { name: "CV preview" })
       .screenshot({ path: "/tmp/job-hunt-cv-preview.png" });
+});
+
+test("old CV opens as a clean copy with project entries and named sections, then saves a new version", async ({
+  page,
+}, testInfo) => {
+  const { projects, extras, sectionCv } = await import("../helpers/section-cv");
+  const legacy = {
+    ...first,
+    layoutVersion: undefined,
+    id: "legacy-layout",
+    content: {
+      ...first.content,
+      projects: projects + "\n" + extras,
+      additional: sectionCv,
+    },
+  };
+  let saved = false;
+  await page.route("**/api/resumes", (r) => {
+    if (r.request().method() === "GET")
+      return r.fulfill({ json: { drafts: [legacy] } });
+    const body = r.request().postDataJSON();
+    expect(body.action).toBe("save");
+    expect(body.draftId).toBe(legacy.id);
+    expect(body.content.additional).toBeUndefined();
+    expect(body.content.projects).not.toContain("OPEN-SOURCE");
+    expect(body.content.contributions).toContain("Community Code Event");
+    saved = true;
+    return r.fulfill({
+      json: {
+        ...legacy,
+        id: "layout-cleaned-version",
+        layoutVersion: 2,
+        content: body.content,
+      },
+    });
+  });
+  await page.route("**/api/resumes/legacy-layout", (r) =>
+    r.fulfill({ json: legacy }),
+  );
+  await open(page);
+  await page.getByRole("button", { name: "CV Builder", exact: true }).click();
+  const builder = page.getByRole("region", { name: "CV builder", exact: true });
+  await builder.locator(".builder-history").getByRole("button").click();
+  await expect(builder.getByRole("note")).toContainText(
+    "removed the old catch-all section",
+  );
+  await expect(
+    builder.getByLabel("Additional qualifications", { exact: true }),
+  ).toHaveCount(0);
+  const preview = builder.getByRole("region", {
+    name: "CV preview",
+    exact: true,
+  });
+  await expect(
+    preview.getByRole("heading", {
+      name: "Savings Portal — Full-Stack Savings Platform",
+      exact: true,
+    }),
+  ).toBeVisible();
+  await expect(
+    preview.getByRole("heading", { name: "Pharmacy Application", exact: true }),
+  ).toBeVisible();
+  await expect(
+    preview.getByRole("heading", {
+      name: "Open-source contributions",
+      exact: true,
+    }),
+  ).toBeVisible();
+  await expect(
+    preview.getByRole("heading", { name: "Training & community", exact: true }),
+  ).toBeVisible();
+  await expect(
+    preview.getByRole("heading", {
+      name: "Additional qualifications",
+      exact: true,
+    }),
+  ).toHaveCount(0);
+  await expect(
+    preview
+      .getByRole("listitem")
+      .filter({
+        hasText: "Built savings workflows for individuals and groups.",
+      }),
+  ).toHaveCount(1);
+  await expect(
+    preview.getByRole("heading", { name: "Certifications", exact: true }),
+  ).toHaveCount(0);
+  await builder.getByRole("button", { name: "Save new version" }).click();
+  await expect(builder.getByRole("note")).toHaveCount(0);
+  expect(saved).toBe(true);
+  if (testInfo.project.name === "desktop")
+    await preview.screenshot({ path: "/tmp/clean-resume-projects.png" });
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= window.innerWidth,
+    ),
+  ).toBe(true);
 });

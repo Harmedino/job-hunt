@@ -1,9 +1,15 @@
+import {
+  resumeEntries,
+  isEntrySection,
+  type ResumeEntry,
+} from "./resume-layout";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { PDFDocument, rgb, type PDFFont } from "pdf-lib";
 import fontkit from "@pdf-lib/fontkit";
 import {
   resumeSections,
+  legacyResumeSections,
   type ResumeContent,
   type ResumeTarget,
   type ResumeTemplate,
@@ -19,6 +25,7 @@ export async function resumePdf(
   target: ResumeTarget,
   template: ResumeTemplate = "classic",
   coverLetter?: string,
+  legacy = false,
 ) {
   const pdf = await PDFDocument.create();
   pdf.registerFontkit(fontkit);
@@ -52,13 +59,18 @@ export async function resumePdf(
     size = 10,
     font: PDFFont = regular,
     color = rgb(0.13, 0.17, 0.2),
+    indent = 0,
+    hanging = 0,
   ) {
     const lines: string[] = [];
     for (const paragraph of clean(text).split("\n")) {
       let line = "";
       // Break long URLs/words at character boundaries to prevent clipping.
       for (const character of paragraph) {
-        if (font.widthOfTextAtSize(line + character, size) > width) {
+        if (
+          font.widthOfTextAtSize(line + character, size) >
+          width - indent - hanging
+        ) {
           const space = line.lastIndexOf(" ");
           if (space > line.length / 2) {
             lines.push(line.slice(0, space));
@@ -72,11 +84,37 @@ export async function resumePdf(
       }
       lines.push(line);
     }
-    for (const row of lines) {
+    for (const [rowIndex, row] of lines.entries()) {
       need(size * lineHeight);
-      page.drawText(row, { x: margin, y: y - size, size, font, color });
+      page.drawText(row, {
+        x: margin + indent + (rowIndex ? hanging : 0),
+        y: y - size,
+        size,
+        font,
+        color,
+      });
       y -= size * lineHeight;
     }
+  }
+  function entryHeight(entry: ResumeEntry) {
+    const lines = (text: string, size: number, font: PDFFont) =>
+      Math.max(
+        1,
+        Math.ceil(font.widthOfTextAtSize(clean(text), size) / (width - 18)),
+      );
+    let height = entry.title
+      ? lines(entry.title, 10.5, bold) * 10.5 * lineHeight + 3
+      : 0;
+    for (const part of entry.parts) {
+      if (part.kind === "meta")
+        height += lines(part.text, 9, regular) * 9 * lineHeight + 4;
+      else {
+        height +=
+          Math.min(2, lines(part.text, 10, regular)) * 10 * lineHeight + 3;
+        break;
+      }
+    }
+    return Math.max(35, height + 5);
   }
   draw(content.name, compact ? 21 : 25, bold, accent);
   y -= 5;
@@ -104,13 +142,20 @@ export async function resumePdf(
     draw(coverLetter, 10.5);
   } else {
     draw(target.title, 11, regular, accent);
-    for (const key of Object.keys(
-      resumeSections,
-    ) as (keyof typeof resumeSections)[]) {
-      if (!content[key].trim()) continue;
-      need(60);
+    const sections = legacy ? legacyResumeSections : resumeSections;
+    for (const key of Object.keys(sections) as (keyof ResumeContent)[]) {
+      const text = content[key] || "";
+      if (!text.trim()) continue;
+      const entries =
+        !legacy && isEntrySection(key) ? resumeEntries(text) : undefined;
+      need(entries?.length ? 44 + entryHeight(entries[0]) : 60);
       y -= compact ? 12 : 17;
-      draw(resumeSections[key].toUpperCase(), 10, bold, accent);
+      draw(
+        sections[key as keyof typeof sections].toUpperCase(),
+        10,
+        bold,
+        accent,
+      );
       y -= 3;
       page.drawLine({
         start: { x: margin, y },
@@ -119,7 +164,32 @@ export async function resumePdf(
         color: rgb(0.78, 0.82, 0.83),
       });
       y -= 9;
-      draw(content[key]);
+      if (entries) {
+        for (const [index, entry] of entries.entries()) {
+          if (index) y -= compact ? 9 : 14;
+          need(entryHeight(entry));
+          if (entry.title) {
+            draw(entry.title, 10.5, bold);
+            y -= 3;
+          }
+          for (const part of entry.parts) {
+            if (part.kind === "meta") {
+              draw(part.text, 9, regular, rgb(0.33, 0.39, 0.42));
+              y -= 4;
+            } else {
+              draw(
+                part.kind === "bullet" ? "• " + part.text : part.text,
+                10,
+                regular,
+                rgb(0.13, 0.17, 0.2),
+                part.kind === "bullet" ? 8 : 0,
+                part.kind === "bullet" ? 10 : 0,
+              );
+              y -= 3;
+            }
+          }
+        }
+      } else draw(text);
     }
   }
   pdf.setTitle(`${content.name} — ${target.title}`);

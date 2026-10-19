@@ -247,7 +247,16 @@ test(
     ).json();
     assert.equal(original.content.summary, draft.content.summary);
     assert.equal(original.coverLetter, draft.coverLetter);
-    assert.equal((await (await db()).collection("applications").findOne({ id: application.id }))?.coverLetter, draft.coverLetter);
+    assert.equal(
+      (
+        await (
+          await db()
+        )
+          .collection("applications")
+          .findOne({ id: application.id })
+      )?.coverLetter,
+      draft.coverLetter,
+    );
   },
 );
 test(
@@ -272,5 +281,87 @@ test(
     assert.equal(response.status, 503);
     assert.match((await response.json()).error, /OPENAI_API_KEY/);
     assert.equal(await collection.countDocuments(), before);
+  },
+);
+
+test(
+  "cleaned legacy CV saves a new layout while historical exports keep the original version",
+  { skip: !enabled, timeout: 30000 },
+  async () => {
+    const { profileResume } = await import("../src/lib/resume-builder");
+    const { cleanResumeLayout } = await import("../src/lib/resume-layout");
+    const { projects, extras } = await import("./helpers/section-cv");
+    const target = {
+      title: "Frontend Developer",
+      company: "Fixture",
+      description: "Build accessible React interfaces for a remote team.",
+      url: "",
+    };
+    const profile = {
+      ...emptyProfile,
+      name: "Legacy Layout Test",
+      email: "layout@example.org",
+      skills: "React",
+    };
+    const content = {
+      ...profileResume(profile, target),
+      projects: projects + "\n" + extras,
+      additional: "LEGACY SOURCE HEADER\nRepeated source text.",
+    };
+    const database = await db();
+    await database
+      .collection("resumes")
+      .insertOne({
+        id: "legacy-layout-fixture",
+        familyId: "legacy-layout-fixture",
+        createdAt: new Date().toISOString(),
+        content,
+        target,
+        profileSnapshot: profile,
+        evidence: [],
+        method: "Legacy fixture",
+        warnings: [],
+        requirementsToReview: [],
+        manualEdits: false,
+      });
+    const cleaned = await createResume(
+      request({
+        action: "save",
+        draftId: "legacy-layout-fixture",
+        content: cleanResumeLayout(content),
+      }),
+    );
+    assert.equal(cleaned.status, 200);
+    const version = await cleaned.json();
+    assert.equal(version.layoutVersion, 2);
+    assert.equal(version.previousId, "legacy-layout-fixture");
+    assert.equal(version.content.additional, undefined);
+    assert.doesNotMatch(version.content.projects, /OPEN.SOURCE|TRAINING/);
+    assert.match(version.content.contributions, /Community Code Event/);
+    const original = await (
+      await readResume(
+        new Request("http://localhost"),
+        params("legacy-layout-fixture"),
+      )
+    ).json();
+    assert.equal(original.content.additional, content.additional);
+    for (const [id, legacy] of [
+      ["legacy-layout-fixture", true],
+      [version.id, false],
+    ] as const) {
+      const pdf = await exportResume(
+        new Request("http://localhost"),
+        params(id),
+      );
+      const text = await extractCv(
+        new File([new Uint8Array(await pdf.arrayBuffer())], "cv.pdf"),
+      );
+      if (legacy) assert.match(text, /LEGACY SOURCE HEADER/);
+      else
+        assert.doesNotMatch(
+          text,
+          /LEGACY SOURCE HEADER|ADDITIONAL QUALIFICATIONS/,
+        );
+    }
   },
 );
