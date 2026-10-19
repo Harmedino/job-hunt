@@ -3,6 +3,7 @@ import { useMemo, useState } from "react";
 import {
   bountyEarnings,
   filterBounties,
+  hasFundingEvidence,
   type BountyFilters,
 } from "@/lib/modules/bounties-client";
 import {
@@ -92,7 +93,7 @@ export default function BountyWorkspace({
                     }>("bounties/discover", { query: f.query });
                     w.setMessage(
                       result.failures.join(" ") ||
-                        `Checked ${result.count} candidates. Payment remains unverified unless you record evidence.`,
+                        `Checked ${result.count} source tasks. Only tasks with recorded funding evidence appear by default; unverified tasks are hidden.`,
                     );
                   },
                   true,
@@ -174,12 +175,29 @@ export default function BountyWorkspace({
             </details>
           </Section>
           <Section title="Filter candidates">
+            <p>
+              Showing tasks with funding and past payout evidence you have checked. Open the
+              evidence and confirm the reward and acceptance terms before working.
+              This is not an independent escrow check or a payout guarantee.
+            </p>
+            <label>
+              <input
+                type="checkbox"
+                checked={!!filters.includeUnverified}
+                onChange={(e) => {
+                  setFilters((old) => ({ ...old, includeUnverified: e.target.checked }));
+                  setPage(0);
+                }}
+              />{" "}
+              Include unverified tasks for review
+            </label>
             <form
               className="module-form module-filters"
               onSubmit={(e) => {
                 e.preventDefault();
                 const f = fields(e.currentTarget);
                 setFilters({
+                  includeUnverified: filters.includeUnverified,
                   keyword: f.keyword,
                   language: f.language,
                   difficulty: f.difficulty,
@@ -266,11 +284,17 @@ export default function BountyWorkspace({
                 <p>
                   {b.repository} · {b.language}
                 </p>
-                <p className={b.reward ? "module-good" : "module-risk"}>
-                  {b.reward
+                <p className={hasFundingEvidence(b) ? "module-good" : "module-risk"}>
+                  {hasFundingEvidence(b) && b.reward
                     ? `${b.reward.currency} ${b.reward.amount} · owner-verified evidence`
                     : "Funding unverified"}
                 </p>
+                {hasFundingEvidence(b) && b.reward && (
+                  <p>
+                    <LinkOut url={b.reward.evidenceUrl}>View funding evidence</LinkOut>{" "}
+                    <LinkOut url={b.reward.payoutEvidenceUrl!}>View past payout proof</LinkOut>
+                  </p>
+                )}
                 {!b.reward && b.rewardMention && (
                   <small>Unverified mention: {b.rewardMention}</small>
                 )}
@@ -304,8 +328,9 @@ export default function BountyWorkspace({
           </div>
           {!results.length && (
             <Empty>
-              No matching bounty candidates. Refresh the official GitHub search
-              or import a task URL. No opportunities are fabricated.
+              {filters.includeUnverified
+                ? "No matching bounty candidates. Refresh the official GitHub search or import a task URL."
+                : "No matching tasks with recorded funding evidence and past payout proof. Unverified tasks are hidden. You can include them for review, but a bounty label or promised amount is not proof of funding."}
             </Empty>
           )}
           <Pages count={results.length} page={page} setPage={setPage} />
@@ -610,6 +635,8 @@ export default function BountyWorkspace({
             </div>
             {selected.analysis && (
               <>
+                {selected.analysis.aiWarning && <p role="status" className="module-risk">{selected.analysis.aiWarning}</p>}
+                <p>Basic analysis uses task metadata and your skills; no repository code has been inspected.</p>
                 <h3>Explainable score: {selected.analysis.score}/100</h3>
                 <p>{selected.analysis.confidence}</p>
                 <p className="module-risk">{selected.analysis.paymentRisk}</p>
@@ -663,6 +690,17 @@ export default function BountyWorkspace({
                   type="url"
                   required
                 />
+                <Select
+                  label="Funding proof type"
+                  name="fundingType"
+                  options={["", "escrow", "deposit"]}
+                />
+                <Field
+                  label="Sponsor’s completed payout evidence URL"
+                  name="payoutEvidenceUrl"
+                  type="url"
+                  required
+                />
                 <Field
                   label="Verified payment conditions"
                   name="conditions"
@@ -683,7 +721,7 @@ export default function BountyWorkspace({
                 />
                 <label>
                   <input type="checkbox" name="confirmed" required /> I checked
-                  the funding evidence and conditions.
+                  the escrow or deposited funds, past payout proof and conditions.
                 </label>
                 <button className="primary" disabled={!!w.busy}>
                   Save funding evidence

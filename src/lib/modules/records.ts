@@ -143,10 +143,14 @@ export async function saveRecord(kind: string, input: unknown, skills: string) {
       const bounty = await get<Bounty>("bounties", id(o.bountyId));
       if (o.confirmed !== true)
         throw new ModuleError("Confirm that you checked funding evidence.");
-      const reward = {
+      if (o.fundingType !== "escrow" && o.fundingType !== "deposit")
+        throw new ModuleError("Confirm escrow or deposited funding; a promised reward is not funded.");
+      const reward: NonNullable<Bounty["reward"]> = {
         ...money(o.amount, o.currency),
         verification: "user-verified" as const,
         evidenceUrl: httpsUrl(o.evidenceUrl, true),
+        fundingType: o.fundingType,
+        payoutEvidenceUrl: httpsUrl(o.payoutEvidenceUrl, true),
         conditions: text(o.conditions, "payment conditions", 4000, true),
         eligibility: text(
           o.eligibility || "Unverified for Nigeria",

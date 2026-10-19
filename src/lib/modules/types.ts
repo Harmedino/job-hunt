@@ -25,6 +25,8 @@ export type Money = { amount: string; currency: string };
 export type Reward = Money & {
   verification: "user-verified";
   evidenceUrl: string;
+  fundingType?: "escrow" | "deposit";
+  payoutEvidenceUrl?: string;
   conditions: string;
   eligibility: string;
   verifiedAt: string;
@@ -69,6 +71,7 @@ export type BountyAnalysis = {
   eligibility: string;
   generatedAt: string;
   ai?: TaskPlan;
+  aiWarning?: string;
 };
 export type TaskPlan = {
   explanation: string;

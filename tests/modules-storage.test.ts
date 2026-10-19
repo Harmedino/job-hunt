@@ -103,6 +103,8 @@ test(
         currency: "USD",
         evidenceUrl: bounty.url,
         confirmed: true,
+        fundingType: "escrow",
+        payoutEvidenceUrl: "https://example.com/payout/123",
         conditions: "Payment on approved PR",
         eligibility: "Unverified for Nigeria",
       },

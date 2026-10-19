@@ -4,7 +4,6 @@ import { NextResponse } from "next/server";
 import { sameOrigin } from "@/lib/auth";
 import { db } from "@/lib/db";
 import {
-  analyzeBounty,
   discoverBounties,
   fetchIssue,
   importBounty,
@@ -18,7 +17,6 @@ import {
   klingPrompt,
   learningRecommendations,
   researchVideo,
-  taskPlan,
 } from "@/lib/modules/creative";
 import {
   beginOAuth,
@@ -51,6 +49,7 @@ import {
   videoId,
 } from "@/lib/modules/validation";
 import { ownerSkills, snapshot } from "@/lib/modules/workspace";
+import { taskAnalysis } from "@/lib/modules/task-analysis";
 import {
   discoverVideos,
   fetchChannel,
@@ -151,8 +150,7 @@ export async function POST(request: Request, context: Context) {
             await fetchIssue(bounty.issueUrl, bounty.manual),
             skills,
           );
-        const analysis = analyzeBounty(bounty, skills);
-        if (body.ai === true) analysis.ai = await taskPlan(bounty, skills);
+        const analysis = await taskAnalysis(bounty, skills, body.ai === true);
         const result = { ...bounty, analysis };
         await put("bounties", result);
         return json(result);

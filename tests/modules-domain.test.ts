@@ -31,6 +31,8 @@ import { providerJson } from "../src/lib/modules/http";
 import { proxy } from "../src/proxy";
 import { createSession, SESSION_COOKIE } from "../src/lib/auth";
 import type { Bounty, Payment, TrackedBounty } from "../src/lib/modules/types";
+import { taskAnalysis } from "../src/lib/modules/task-analysis";
+import { AiError } from "../src/lib/ai";
 const initialFetch = globalThis.fetch;
 const encryption = process.env.OAUTH_ENCRYPTION_KEY;
 const password = process.env.APP_PASSWORD;
@@ -60,6 +62,18 @@ export function issue(overrides = {}) {
     ...overrides,
   };
 }
+test("task analysis remains available when Gemini cannot be reached without inventing an AI plan", async () => {
+  const bounty = normalizeIssue(issue());
+  const analysis = await taskAnalysis(bounty, "React", true, async () => {
+    throw new AiError("Google Gemini could not be reached.", 504);
+  });
+  assert.equal(analysis.score, analyzeBounty(bounty, "React").score);
+  assert.equal(analysis.ai, undefined);
+  assert.match(analysis.aiWarning!, /could not be reached.*Basic task analysis/);
+  await assert.rejects(taskAnalysis(bounty, "React", true, async () => {
+    throw new Error("Unexpected storage failure");
+  }), /Unexpected storage failure/);
+});
 test("bounty normalization keeps money mentions unverified and source evidence distinct", () => {
   const b = normalizeIssue(issue(), {
     language: "TypeScript",
@@ -95,6 +109,8 @@ test("canonical IDs deduplicate GitHub imports and reward filtering never mixes 
       ...money("100.00", "USD"),
       verification: "user-verified",
       evidenceUrl: a.url,
+      fundingType: "escrow",
+      payoutEvidenceUrl: "https://example.com/payout/123",
       conditions: "On approved submission",
       eligibility: "Unknown",
       verifiedAt: new Date().toISOString(),
@@ -107,6 +123,17 @@ test("canonical IDs deduplicate GitHub imports and reward filtering never mixes 
     reward: { ...b.reward!, amount: "9000", currency: "NGN" },
   };
   assert.equal(deduplicateBounties([a, b]).length, 1);
+  assert.deepEqual(filterBounties([a, b], {}).map((v) => v.reward?.amount), ["100.00"]);
+  assert.equal(filterBounties([a], { includeUnverified: true }).length, 1);
+  for (const reward of [
+    { ...b.reward!, evidenceUrl: "" },
+    { ...b.reward!, amount: "0" },
+    { ...b.reward!, conditions: "" },
+    { ...b.reward!, fundingType: undefined },
+    { ...b.reward!, payoutEvidenceUrl: "" },
+  ]) {
+    assert.equal(filterBounties([{ ...b, reward }], {}).length, 0);
+  }
   assert.equal(filterBounties([a, b, c], { min: 50 }).length, 0);
   assert.deepEqual(
     filterBounties([a, b, c], {
