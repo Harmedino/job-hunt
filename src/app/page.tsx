@@ -256,23 +256,6 @@ export default function Home() {
             </button>
           ))}
         </nav>
-        <div className="sidebar-card">
-          <span className="small-spark">
-            <Sparkles size={19} />
-          </span>
-          <h3>
-            Your next chapter
-            <br />
-            starts here.
-          </h3>
-          <p>
-            A little preparation.
-            <br />A world of possibilities.
-          </p>
-          <button onClick={() => setTab("My Profile")}>
-            Complete your profile <ArrowUpRight size={15} />
-          </button>
-        </div>
         <div className="sidebar-bottom">
           <div className="private">
             <ShieldCheck size={16} />
