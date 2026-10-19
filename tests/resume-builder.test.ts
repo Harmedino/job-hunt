@@ -1,3 +1,5 @@
+import { isolateAiEnv } from "./helpers/ai-env";
+isolateAiEnv();
 import { test, afterEach } from "node:test";
 import assert from "node:assert/strict";
 import { PDFDocument } from "pdf-lib";

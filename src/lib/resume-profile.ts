@@ -1,4 +1,4 @@
-import { aiJson } from "./ai";
+import { aiJson, aiConfigured } from "./ai";
 
 import { importFields, type ImportField, type ProfilePatch } from "./profile-import-fields";
 const normalize = (value: string) => value.replace(/\s+/g, " ").trim();
@@ -67,7 +67,7 @@ export function quotedResumeProfile(text: string, result: unknown): ProfilePatch
 }
 export async function extractResumeProfile(text: string) {
   const basic = basicResumeProfile(text);
-  if (!process.env.OPENAI_API_KEY) return { fields: basic, method: "CV section import", warning: undefined as string | undefined };
+  if (!aiConfigured()) return { fields: basic, method: "CV section import", warning: undefined as string | undefined };
   try {
     const result = await aiJson(
       'Extract the candidate’s profile from this CV. Return {"fields":{"name":["exact quote"],"email":[],"phone":[],"location":[],"github":[],"linkedin":[],"portfolio":[],"skills":[],"experience":[],"education":[],"projects":[]}}. Each item MUST be a verbatim excerpt from the CV. Extract actual qualifications only, preserving employers, dates and context. Never treat desired job skills as possessed skills. Omit unknown fields, never infer or invent. Contact fields have at most one excerpt. Do not include section headings in values.',

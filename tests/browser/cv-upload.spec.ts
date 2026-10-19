@@ -1,8 +1,8 @@
 import { test, expect } from "@playwright/test";
-async function openProfile(page: import("@playwright/test").Page, ai = false) {
+async function openProfile(page: import("@playwright/test").Page, ai = false, aiLabel?: string) {
   await page.route("**/api/status", (r) =>
     r.fulfill({
-      json: { database: false, ai, scheduler: false, protected: false },
+      json: { database: false, ai, aiLabel, scheduler: false, protected: false },
     }),
   );
   await page.route("**/api/discover", (r) =>
@@ -100,4 +100,15 @@ test("host payload errors are readable and selecting the same file can retry", a
   await input.setInputFiles(file);
   await expect(region.getByRole("status")).toContainText("saved");
   expect(calls).toBe(2);
+});
+
+test("Gemini settings and a successful connection check identify the selected provider", async ({ page }) => {
+  await page.route("**/api/ai/check", (r) => r.fulfill({ json: { ok: true, provider: "gemini", model: "gemini-flash-latest", message: "Google Gemini connection verified. CV and cover-letter writing are available." } }));
+  await openProfile(page, true, "Google Gemini");
+  await expect(page.getByText("Google Gemini résumé assistant", { exact: true })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Google Gemini", exact: true })).toHaveAttribute("href", "https://aistudio.google.com/apikey");
+  await page.getByRole("button", { name: "Test AI connection" }).click();
+  await expect(page.getByText("Google Gemini connection verified. CV and cover-letter writing are available.", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "CV Builder", exact: true }).click();
+  await expect(page.getByText(/Your profile and this description are sent to Google Gemini/)).toBeVisible();
 });

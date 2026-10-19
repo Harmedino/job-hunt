@@ -50,6 +50,7 @@ export default function CvBuilder({
   active,
   connected,
   ai,
+  aiLabel,
   jobs,
   initialJob,
   onProfile,
@@ -58,6 +59,7 @@ export default function CvBuilder({
   active: boolean;
   connected: boolean;
   ai: boolean;
+  aiLabel?: string;
   jobs: BuilderJob[];
   initialJob?: BuilderJob;
   onProfile: () => void;
@@ -385,9 +387,14 @@ export default function CvBuilder({
             </label>
             <p className="builder-help">
               {ai
-                ? "AI drafts are checked against your saved evidence. Your profile and this description are sent to OpenAI when enabled."
-                : "AI is not connected. The profile-based builder still works; connect OPENAI_API_KEY in Vercel to enable AI writing."}
+                ? `AI drafts are checked against your saved evidence. Your profile and this description are sent to ${aiLabel || "your selected AI provider"} when enabled.`
+                : "AI writing needs an API key. Set up Google Gemini or OpenAI in My Profile → Connections. You can still create, edit and download a profile-based CV."}
             </p>
+            {!ai && (
+              <button type="button" className="secondary" onClick={onProfile}>
+                Set up AI writing
+              </button>
+            )}
             <button className="primary" disabled={!!busy || !connected}>
               <Sparkles size={16} />
               {busy === "generate"

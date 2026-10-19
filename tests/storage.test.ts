@@ -1,3 +1,5 @@
+import { isolateAiEnv } from "./helpers/ai-env";
+isolateAiEnv();
 import {
   GET as listLeads,
   POST as addLead,
