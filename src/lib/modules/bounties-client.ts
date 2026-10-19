@@ -1,5 +1,6 @@
 import type { Bounty, TrackedBounty, Payment } from "./types";
 export type BountyFilters = {
+  includeUnverified?: boolean;
   keyword?: string;
   language?: string;
   difficulty?: string;
@@ -13,9 +14,24 @@ export type BountyFilters = {
   since?: string;
   sort?: string;
 };
+export function hasFundingEvidence(b: Bounty) {
+  const r = b.reward;
+  return !!(
+    r &&
+    r.verification === "user-verified" &&
+    Number.isFinite(Number(r.amount)) &&
+    Number(r.amount) > 0 &&
+    /^https:\/\//i.test(r.evidenceUrl) &&
+    (r.fundingType === "escrow" || r.fundingType === "deposit") &&
+    /^https:\/\//i.test(r.payoutEvidenceUrl || "") &&
+    r.conditions.trim() &&
+    Number.isFinite(Date.parse(r.verifiedAt))
+  );
+}
 export function filterBounties(values: Bounty[], f: BountyFilters) {
   const result = values.filter(
     (b) =>
+      (f.includeUnverified || hasFundingEvidence(b)) &&
       (!f.keyword ||
         `${b.title} ${b.description}`
           .toLowerCase()
@@ -95,7 +111,7 @@ export function bountyEarnings(
   return {
     available: currencyTotals(
       bounties
-        .filter((b) => b.reward && b.status === "open")
+        .filter((b) => hasFundingEvidence(b) && b.status === "open")
         .map((b) => b.reward!),
     ),
     received: currencyTotals(payments),

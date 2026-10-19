@@ -4,23 +4,8 @@ import { XMLParser } from "fast-xml-parser";
 import { eligibility, plainText, relevant, fullyRemote } from "./matching";
 import type { Job } from "./types";
 import type { SourceReport } from "./discovery-types";
-type Raw = {
-  title: string;
-  company: string;
-  location: string;
-  salary: string;
-  description: string;
-  url: string;
-  date: string;
-  source: string;
-  remote?: boolean;
-  expiresAt?: string;
-  countries?: string[];
-  timezones?: number[];
-  seniority?: string[];
-  employmentType?: string;
-};
-type Feed = { jobs: Raw[]; partial?: boolean };
+import type { RawJob as Raw, JobAdapter } from "./discovery-feed";
+import { additionalJobAdapters } from "./extended-job-feeds";
 const string = (value: unknown) => (typeof value === "string" ? value : "");
 const timestamp = (value: unknown) => {
   const date = new Date(Number(value) * 1000);
@@ -36,7 +21,7 @@ async function json(url: string, signal = AbortSignal.timeout(15000)) {
   if (!response.ok) throw new Error(`HTTP ${response.status}`);
   return response.json();
 }
-const adapters: { name: string; read: () => Promise<Feed> }[] = [
+const adapters: JobAdapter[] = [
   {
     name: "We Work Remotely",
     read: async () => {
@@ -248,12 +233,13 @@ const adapters: { name: string; read: () => Promise<Feed> }[] = [
       return { jobs, partial: true };
     },
   },
+  ...additionalJobAdapters,
 ];
 export async function discover() {
   const failures: string[] = [];
   const successfulSources: string[] = [];
   const results = await Promise.allSettled(
-    adapters.map((source) => source.read()),
+    adapters.map((source) => source.requiredEnv?.some(key => !process.env[key]?.trim()) ? Promise.resolve(null) : source.read()),
   );
   const jobs: Job[] = [];
   const reports: SourceReport[] = [];
@@ -286,6 +272,11 @@ export async function discover() {
           ? result.reason.message
           : "Request failed or timed out";
       failures.push(`${source} unavailable: ${report.error}`);
+      return;
+    }
+    if (result.value === null) {
+      report.status = "not_configured";
+      report.error = `Needs ${adapters[index].requiredEnv?.join(", ")} in server settings.`;
       return;
     }
     successfulSources.push(source);

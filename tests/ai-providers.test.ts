@@ -208,3 +208,38 @@ test("Gemini errors, blocked or truncated output and invalid model names fail wi
   };
   await assert.rejects(() => aiJson("JSON", {}), /valid AI model/);
 });
+
+test("Gemini retries transient overload once on the same provider and reports persistent outages accurately", async () => {
+  process.env.AI_PROVIDER = "gemini";
+  process.env.GEMINI_API_KEY = "private-retry-key";
+  let calls = 0;
+  globalThis.fetch = async (url) => {
+    assert.match(String(url), /generativelanguage.googleapis.com/);
+    calls++;
+    return calls === 1
+      ? new Response("private-retry-key", { status: 503 })
+      : response({ ok: true });
+  };
+  assert.deepEqual(await aiJson("JSON", {}), { ok: true });
+  assert.equal(calls, 2);
+  calls = 0;
+  globalThis.fetch = async () => {
+    calls++;
+    return new Response("private-retry-key", { status: 503 });
+  };
+  await assert.rejects(
+    () => aiJson("JSON", {}),
+    (error) =>
+      error instanceof Error &&
+      /temporarily overloaded/.test(error.message) &&
+      !error.message.includes("private-retry-key"),
+  );
+  assert.equal(calls, 2);
+  calls = 0;
+  globalThis.fetch = async () => {
+    calls++;
+    return new Response("private", { status: 429 });
+  };
+  await assert.rejects(() => aiJson("JSON", {}), /rate limit/);
+  assert.equal(calls, 1);
+});

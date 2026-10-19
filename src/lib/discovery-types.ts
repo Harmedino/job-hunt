@@ -1,8 +1,8 @@
-export const DISCOVERY_REVISION = 3;
+export const DISCOVERY_REVISION = 4;
 import type { Job } from "./types";
 export type SourceReport = {
   source: string;
-  status: "ok" | "partial" | "error";
+  status: "ok" | "partial" | "error" | "not_configured";
   fetched: number;
   accepted: number;
   eligible: number;
