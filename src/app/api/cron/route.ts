@@ -1,3 +1,4 @@
+import { runModuleSchedule } from "@/lib/modules/workspace";
 import { runDiscovery } from "@/lib/run-discovery";
 import { errorResponse } from "@/lib/db";
 export const maxDuration = 60;
@@ -8,7 +9,17 @@ export async function GET(request: Request) {
   )
     return Response.json({ error: "Unauthorized" }, { status: 401 });
   try {
-    return Response.json(await runDiscovery());
+    const [jobs, modules] = await Promise.allSettled([
+      runDiscovery(),
+      runModuleSchedule(),
+    ]);
+    if (jobs.status === "rejected") return errorResponse(jobs.reason);
+    return Response.json({
+      ...jobs.value,
+      modules: modules.status === "fulfilled"
+        ? modules.value
+        : { error: "Module schedule failed. Check the source diagnostics." },
+    });
   } catch (e) {
     return errorResponse(e);
   }

@@ -136,3 +136,9 @@ AI generation first identifies literal job requirements and maps them to source 
 Saved AI drafts include provider/model metadata and an expandable job-requirement/evidence analysis. Manual edits are not automatically rechecked. Existing drafts and PDFs remain editable/downloadable regardless of AI connectivity. AI calls may consume provider quota or incur charges under the user's plan.
 
 Job Finder has a hard 72-hour publication window, with an optional narrower 24-hour filter. The cache is purged of older discovery listings while application snapshots remain available. Re-fetching a posting never changes its publication date. Manual search reports when there are no newly added listings. An active dashboard checks for stale searches; closed-browser discovery still depends on a configured host scheduler. Source caches and publication delays still apply, and new matching jobs cannot be guaranteed on every refresh.
+
+## Coding Bounties and YouTube Research
+
+Two independent sidebar tabs extend the existing workspace. Coding Bounties adds official GitHub discovery, manual Algora/IssueHunt imports, explainable matching, AI task plans, work tracking and a separate received-payment ledger. YouTube Research adds official Data API searches, optional read-only owned-channel OAuth analytics, editable content profiles (including Bruno), original ideas, versioned Kling prompts, captions, a calendar/Kanban planner and a learning journal.
+
+Read [module setup and limitations](docs/modules-setup.md) for provider configuration, database indexes, APIs, privacy controls, scheduling and verification commands. The [architecture notes](docs/modules-architecture.md) record existing integration points and provider-policy decisions. Run `npm run db:migrate:modules` after configuring MongoDB; the migration adds indexes without changing legacy data.
