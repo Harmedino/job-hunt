@@ -74,7 +74,7 @@ test("AI extraction and ranking use private API credentials and validated existi
 });
 test("provider failures keep CV extraction usable and explain key, billing and network errors", async () => {
   process.env.OPENAI_API_KEY = "test-only-not-a-real-key";
-  for (const [status, message] of [[401, /API key/], [429, /billing/], [500, /could not complete/]] as const) {
+  for (const [status, message] of [[401, /API key/], [429, /billing/], [500, /internal provider error.*HTTP 500/]] as const) {
     globalThis.fetch = async () => new Response("do not expose provider raw response", { status });
     await assert.rejects(() => aiJson("Return JSON", {}), message);
     const fallback = await extractResumeProfile(cv);

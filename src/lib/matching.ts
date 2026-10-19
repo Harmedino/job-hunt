@@ -32,6 +32,8 @@ export function eligibility(
   )
     return null;
   const loc = location.toLowerCase().trim();
+  // "Anywhere in the US" is not worldwide applicant eligibility.
+  if (/\banywhere (?:in|within) (?:the )?(?:u\.?s\.?a?\.?|united states|canada|united kingdom|uk|europe|eu|india|australia)\b/i.test(loc)) return null;
   if (
     /nigeria|worldwide|anywhere|global|africa/.test(loc) &&
     !/south africa|north africa/.test(loc)

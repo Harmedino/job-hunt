@@ -142,3 +142,7 @@ Job Finder has a hard 72-hour publication window, with an optional narrower 24-h
 Two independent sidebar tabs extend the existing workspace. Coding Bounties adds official GitHub discovery, manual Algora/IssueHunt imports, explainable matching, AI task plans, work tracking and a separate received-payment ledger. YouTube Research adds official Data API searches, optional read-only owned-channel OAuth analytics, editable content profiles (including Bruno), original ideas, versioned Kling prompts, captions, a calendar/Kanban planner and a learning journal.
 
 Read [module setup and limitations](docs/modules-setup.md) for provider configuration, database indexes, APIs, privacy controls, scheduling and verification commands. The [architecture notes](docs/modules-architecture.md) record existing integration points and provider-policy decisions. Run `npm run db:migrate:modules` after configuring MongoDB; the migration adds indexes without changing legacy data.
+
+## Expanded job platforms
+
+Job Finder includes 33 platform entries and 22 automatic search connectors: 11 public API/feed sources, seven optional credential-based providers, and four configurable public employer-board networks. Direct-browsing sites and unconfigured sources are labeled and excluded from the completed-search count. See [platform setup and provider references](docs/job-platforms.md). Gemini requests now retry transient server failures once within the original deadline and show HTTP-specific error guidance.

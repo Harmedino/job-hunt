@@ -51,19 +51,32 @@ async function providerRequest(
   timeoutMs = 20000,
 ) {
   const label = provider === "gemini" ? "Google Gemini" : "OpenAI";
-  let response: Response;
-  try {
-    response = await fetch(url, {
-      ...init,
-      signal: AbortSignal.timeout(timeoutMs),
-      cache: "no-store",
-      redirect: "error",
-    });
-  } catch {
-    throw new AiError(
-      `${label} could not be reached. Check network access and try again.`,
-    );
+  const deadline = Date.now() + timeoutMs;
+  let response: Response | undefined;
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const remaining = deadline - Date.now();
+    if (remaining <= 0) break;
+    response = undefined;
+    try {
+      response = await fetch(url, {
+        ...init,
+        signal: AbortSignal.timeout(remaining),
+        cache: "no-store",
+        redirect: "error",
+      });
+    } catch {
+      if (attempt || deadline - Date.now() < 750) break;
+    }
+    if (response && ![408, 500, 502, 503, 504].includes(response.status)) break;
+    if (attempt || deadline - Date.now() < 750) break;
+    await new Promise((resolve) => setTimeout(resolve, 500));
   }
+  if (!response)
+    throw new AiError(
+      `${label} could not be reached before the request deadline. Retry with a shorter input or check network access.`,
+      504,
+    );
+
   if (!response.ok) {
     if (response.status === 401 || response.status === 403)
       throw new AiError(
@@ -81,8 +94,24 @@ async function providerRequest(
       throw new AiError(
         "The selected Gemini model is unavailable. Set GEMINI_MODEL to auto or an available text model and redeploy.",
       );
+    if (response.status === 503 || response.status === 502)
+      throw new AiError(
+        `${label} is temporarily overloaded or unavailable (HTTP ${response.status}). A retry was attempted. Please try again shortly; this does not necessarily mean your API key or model is wrong.`,
+        503,
+      );
+    if (response.status === 504 || response.status === 408)
+      throw new AiError(
+        `${label} timed out (HTTP ${response.status}). Try again with a shorter description or fewer requested ideas.`,
+        504,
+      );
+    if (response.status === 500)
+      throw new AiError(
+        `${label} returned an internal provider error (HTTP 500) after a retry. Try again shortly; if it persists, reduce the input size or choose another available model in settings.`,
+        502,
+      );
     throw new AiError(
-      `${label} could not complete this request. Check the configured model and retry.`,
+      `${label} rejected the request (HTTP ${response.status}). Check project access and the configured model.`,
+      502,
     );
   }
   return response;

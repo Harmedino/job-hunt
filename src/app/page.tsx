@@ -12,6 +12,8 @@ import DiscoveryReport from "@/components/discovery-report";
 import type { DiscoveryResponse, SourceReport } from "@/lib/discovery-types";
 import { missingProfileFields } from "@/lib/profile-import-fields";
 import SourceDirectory from "@/components/source-directory";
+import JobPlatformDirectory from "@/components/job-platform-directory";
+import { jobPlatforms } from "@/lib/job-platforms";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Code2,
@@ -241,7 +243,7 @@ export default function Home() {
       j.eligibility === "eligible",
   ).length;
   const reviewCount = jobs.filter((j) => recentPosting(j.postedAt, now) && j.eligibility === "review").length;
-  const sourcesUnavailable = sourceReports.length > 0 && sourceReports.every((s) => s.status === "error");
+  const sourcesUnavailable = sourceReports.length > 0 && sourceReports.filter(s => s.status !== "not_configured").every((s) => s.status === "error");
   return (
     <div className="app-shell">
       <aside className="sidebar">
@@ -459,6 +461,7 @@ export default function Home() {
                     : "On-demand discovery"}
                 </span>
               </section>
+              <JobPlatformDirectory />
               <SourceDirectory />
               <SocialIntake connected={!!health?.database} />
               <DiscoveryReport sources={sourceReports} storageWarning={storageWarning} />
@@ -474,7 +477,7 @@ export default function Home() {
                   </p>
                 </div>
                 <span className="source-label">
-                  5 public feeds <ExternalLink size={13} />
+                  {sourceReports.length ? `${sourceReports.filter(s => s.status === "ok" || s.status === "partial").length} sources checked` : `${jobPlatforms.filter(p => p.access !== "manual").length} search connectors`} <ExternalLink size={13} />
                 </span>
               </div>
               <div className="filter-bar">

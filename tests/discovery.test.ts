@@ -1,5 +1,6 @@
 import { test, afterEach } from "node:test";
 import assert from "node:assert/strict";
+import { jobPlatforms } from "../src/lib/job-platforms";
 import { discover } from "../src/lib/discovery";
 import { runDiscovery } from "../src/lib/run-discovery";
 import { closeDb } from "../src/lib/db";
@@ -181,7 +182,15 @@ test("an unavailable source is distinct from a successful search with no matches
   const result = await discover();
   assert.equal(result.jobs.length, 0);
   assert.equal(result.successfulSources.length, 0);
-  assert.ok(result.sources.every((s) => s.status === "error"));
+  assert.ok(
+    result.sources.every(
+      (s) => s.status === "error" || s.status === "not_configured",
+    ),
+  );
+  assert.equal(
+    result.sources.filter((s) => s.status === "error").length,
+    jobPlatforms.filter((p) => p.access === "public").length,
+  );
   assert.doesNotMatch(JSON.stringify(result), /private upstream/);
 });
 test("MongoDB failure does not discard real live search results", async () => {

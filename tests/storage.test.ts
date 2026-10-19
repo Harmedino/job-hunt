@@ -1,3 +1,4 @@
+import { jobPlatforms } from "../src/lib/job-platforms";
 import { isolateAiEnv } from "./helpers/ai-env";
 isolateAiEnv();
 import {
@@ -375,7 +376,7 @@ test(
     assert.equal(discovered.persisted, true);
     const cached = await (await cachedJobs()).json();
     assert.equal(cached.refreshRecommended, false);
-    assert.equal(cached.sources.length, 5);
+    assert.equal(cached.sources.length, jobPlatforms.filter(p => p.access !== "manual").length);
     await database
       .collection("discovery_state")
       .updateOne({ key: "latest" }, { $unset: { revision: "" } });
@@ -403,7 +404,7 @@ test(
       (await (await cachedJobs()).json()).sources.filter(
         (s: { status: string }) => s.status === "error",
       ).length,
-      5,
+      jobPlatforms.filter(p => p.access === "public").length,
     );
     await database
       .collection("discovery_state")
