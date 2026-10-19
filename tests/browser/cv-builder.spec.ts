@@ -129,8 +129,9 @@ test("CV builder creates an editable draft, saves a separate version and downloa
     .getByLabel("Job description", { exact: true })
     .fill(description);
   await builder
-    .getByRole("button", { name: "Create profile-based CV" })
-    .click();
+    .getByRole("radio", { name: "Basic layout only (no AI)", exact: true })
+    .check();
+  await builder.getByRole("button", { name: "Create basic layout" }).click();
   await expect(
     builder.getByLabel("Professional summary", { exact: true }),
   ).toHaveValue(first.content.summary);
@@ -190,8 +191,9 @@ test("applications open the correct job in CV builder and link an explicit saved
     builder.getByLabel("Job description", { exact: true }),
   ).toHaveValue(description);
   await builder
-    .getByRole("button", { name: "Create profile-based CV" })
-    .click();
+    .getByRole("radio", { name: "Basic layout only (no AI)", exact: true })
+    .check();
+  await builder.getByRole("button", { name: "Create basic layout" }).click();
   await builder
     .getByRole("button", { name: "Use this CV for application" })
     .click();
@@ -219,7 +221,12 @@ test("AI drafting shows evidence gaps and keeps provider errors actionable", asy
       : r.fulfill({
           json: {
             ...first,
-            method: "AI-tailored CV · factual checks completed",
+            method: "AI-written CV · job analysis and factual checks completed",
+            aiGeneration: { provider: "Google Gemini", model: "fixture-model", verifiedAt: new Date().toISOString() },
+            analysis: {
+              priorities: [{ requirement: "Kubernetes is a desirable skill.", evidence: [] }],
+              selectedEvidence: [],
+            },
             requirementsToReview: ["Kubernetes is a desirable skill."],
           },
         });
@@ -239,11 +246,14 @@ test("AI drafting shows evidence gaps and keeps provider errors actionable", asy
     builder.getByRole("heading", { name: "Requirements to check" }),
   ).toBeVisible();
   await expect(
-    builder.getByText("Kubernetes is a desirable skill.", { exact: true }),
+    builder.locator(".builder-gaps").getByText("Kubernetes is a desirable skill.", { exact: true }),
   ).toBeVisible();
   await expect(builder.getByLabel("Skills", { exact: true })).not.toHaveValue(
     /Kubernetes/,
   );
+  await expect(builder.locator(".builder-ai-proof")).toContainText("Written with Google Gemini");
+  await builder.getByText("How this CV addresses the job", { exact: true }).click();
+  await expect(builder.getByText("No supporting qualification established.", { exact: false })).toBeVisible();
 });
 
 test("cover letter and style edits persist before PDF and Word downloads", async ({
@@ -291,8 +301,9 @@ test("cover letter and style edits persist before PDF and Word downloads", async
   const builder = page.getByRole("region", { name: "CV builder", exact: true });
   await builder.getByLabel("Job to tailor for").selectOption(job.id);
   await builder
-    .getByRole("button", { name: "Create profile-based CV" })
-    .click();
+    .getByRole("radio", { name: "Basic layout only (no AI)", exact: true })
+    .check();
+  await builder.getByRole("button", { name: "Create basic layout" }).click();
   await builder
     .getByRole("button", { name: "Cover letter", exact: true })
     .click();
@@ -413,11 +424,9 @@ test("old CV opens as a clean copy with project entries and named sections, then
     }),
   ).toHaveCount(0);
   await expect(
-    preview
-      .getByRole("listitem")
-      .filter({
-        hasText: "Built savings workflows for individuals and groups.",
-      }),
+    preview.getByRole("listitem").filter({
+      hasText: "Built savings workflows for individuals and groups.",
+    }),
   ).toHaveCount(1);
   await expect(
     preview.getByRole("heading", { name: "Certifications", exact: true }),
@@ -432,4 +441,36 @@ test("old CV opens as a clean copy with project entries and named sections, then
       () => document.documentElement.scrollWidth <= window.innerWidth,
     ),
   ).toBe(true);
+});
+
+test("AI is the default and a missing key cannot silently create a basic CV", async ({
+  page,
+}) => {
+  let generated = false;
+  await page.route("**/api/resumes", (r) => {
+    if (r.request().method() === "POST") generated = true;
+    return r.fulfill({ json: { drafts: [] } });
+  });
+  await open(page);
+  await page.getByRole("button", { name: "CV Builder", exact: true }).click();
+  const builder = page.getByRole("region", { name: "CV builder", exact: true });
+  await expect(
+    builder.getByRole("radio", {
+      name: "AI job analysis & writing",
+      exact: true,
+    }),
+  ).toBeChecked();
+  await expect(
+    builder.getByRole("button", { name: "Build tailored CV", exact: true }),
+  ).toBeDisabled();
+  await expect(
+    builder.getByRole("button", { name: "Set up AI writing" }),
+  ).toBeVisible();
+  expect(generated).toBe(false);
+  await builder
+    .getByRole("radio", { name: "Basic layout only (no AI)", exact: true })
+    .check();
+  await expect(
+    builder.getByRole("button", { name: "Create basic layout" }),
+  ).toBeEnabled();
 });

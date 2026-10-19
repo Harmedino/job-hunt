@@ -48,13 +48,14 @@ async function providerRequest(
   url: string,
   provider: AiProvider,
   init: RequestInit,
+  timeoutMs = 20000,
 ) {
   const label = provider === "gemini" ? "Google Gemini" : "OpenAI";
   let response: Response;
   try {
     response = await fetch(url, {
       ...init,
-      signal: AbortSignal.timeout(20000),
+      signal: AbortSignal.timeout(timeoutMs),
       cache: "no-store",
       redirect: "error",
     });
@@ -89,6 +90,7 @@ async function providerRequest(
 export async function aiJson(
   instructions: string,
   data: unknown,
+  options: { timeoutMs?: number } = {},
 ): Promise<unknown> {
   const connection = aiConnection();
   if (connection.configurationError)
@@ -130,6 +132,7 @@ export async function aiJson(
               },
             }),
           },
+          options.timeoutMs,
         )
       : await providerRequest(
           "https://api.openai.com/v1/chat/completions",
@@ -152,6 +155,7 @@ export async function aiJson(
               ],
             }),
           },
+          options.timeoutMs,
         );
   try {
     const body = await response.json();

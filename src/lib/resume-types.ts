@@ -52,6 +52,11 @@ export type ResumeTarget = {
 export type ResumeEvidence = {
   section: ResumeSection | "source" | "additional";
   text: string;
+  label?: string;
+};
+export type ResumeAnalysis = {
+  priorities: { requirement: string; evidence: number[] }[];
+  selectedEvidence: number[];
 };
 export const resumeTemplates = {
   classic: "Clean professional",
@@ -60,6 +65,8 @@ export const resumeTemplates = {
 } as const;
 export type ResumeTemplate = keyof typeof resumeTemplates;
 export type ResumeDraft = {
+  analysis?: ResumeAnalysis;
+  aiGeneration?: { provider: string; model: string; verifiedAt: string };
   layoutVersion?: 2;
   coverLetter?: string;
   template?: ResumeTemplate;
