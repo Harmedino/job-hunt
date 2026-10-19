@@ -44,6 +44,9 @@ import {
 type Health = {
   database: boolean;
   ai: boolean;
+  aiLabel?: string;
+  aiModel?: string;
+  aiConfigurationError?: string;
   scheduler: boolean;
   protected: boolean;
 };
@@ -611,7 +614,7 @@ export default function Home() {
             </>
           )}
           <div hidden={tab !== "CV Builder"}>
-            <CvBuilder active={tab === "CV Builder"} connected={!!health?.database} ai={!!health?.ai} jobs={builderJobs} initialJob={builderJob} onProfile={() => setTab("My Profile")} onAttached={refreshApplications} />
+            <CvBuilder active={tab === "CV Builder"} connected={!!health?.database} ai={!!health?.ai} aiLabel={health?.aiLabel} jobs={builderJobs} initialJob={builderJob} onProfile={() => setTab("My Profile")} onAttached={refreshApplications} />
           </div>
           {tab === "My Profile" && (
             <div className="profile-layout">
@@ -742,7 +745,7 @@ export default function Home() {
                     connected={!!health?.database}
                   />
                   <Connection
-                    name="OpenAI résumé assistant"
+                    name={health?.ai ? `${health.aiLabel || "AI"} résumé assistant` : "AI résumé assistant"}
                     connected={!!health?.ai}
                   />
                   <Connection
@@ -761,11 +764,14 @@ export default function Home() {
                     form.
                   </p>
                   <p>
-                    To enable AI, create an API key at{" "}
-                    <a href="https://platform.openai.com/api-keys" target="_blank" rel="noopener noreferrer">OpenAI</a>,
-                    add <code>OPENAI_API_KEY</code> in Vercel Environment Variables, and redeploy.
-                    API billing is separate from a ChatGPT subscription. One connection handles CV extraction, CV writing and job-specific evidence ranking.
+                    Choose <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener noreferrer">Google Gemini</a> or <a href="https://platform.openai.com/api-keys" target="_blank" rel="noopener noreferrer">OpenAI</a> for CV and cover-letter writing.
+                    Create a key in your provider account, add <code>GEMINI_API_KEY</code> or <code>OPENAI_API_KEY</code> in Vercel → Project Settings → Environment Variables for Production, then redeploy.
+                    Keys stay on the server. Do not paste them into this page or chat.
                   </p>
+                  <p>
+                    With just a Gemini key, provider selection is automatic. To choose Gemini when both keys exist, set <code>AI_PROVIDER=gemini</code>. Gemini uses Google’s latest Flash text model alias; <code>GEMINI_MODEL</code> can override it. Provider quotas, billing and data-use terms apply. A ChatGPT or Gemini app subscription does not supply an API key.
+                  </p>
+                  {health?.aiConfigurationError && <p role="alert">{health.aiConfigurationError}</p>}
                   <button className="secondary" type="button" disabled={!!busy || !health?.ai} onClick={() => void task("ai-check", async () => {
                     setAiCheck("");
                     try {
@@ -777,7 +783,7 @@ export default function Home() {
                   </button>
                   {aiCheck && <p role="status">{aiCheck}</p>}
                   <p>
-                    When AI is configured, CV text and relevant job descriptions are sent to OpenAI for these actions. Review every imported field and tailored PDF.
+                    When you use AI, CV text and relevant job descriptions are sent to your selected provider. Review its data-use terms before sending personal information, and check every imported field and tailored document.
                     “Configured” means a setting exists; use the test button to verify AI access.
                   </p>
                   <p>

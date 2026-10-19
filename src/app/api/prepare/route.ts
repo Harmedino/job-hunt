@@ -1,5 +1,5 @@
 import { db, errorResponse } from "@/lib/db";
-import { AiError, rankEvidence } from "@/lib/ai";
+import { AiError, rankEvidence, aiConfigured } from "@/lib/ai";
 import { facts } from "@/lib/matching";
 import { discover } from "@/lib/discovery";
 import type { Profile } from "@/lib/types";
@@ -62,7 +62,7 @@ export async function POST(request: Request) {
     const evidence = facts(profile);
     let chosen = evidence;
     let method = "Profile-based template";
-    if (process.env.OPENAI_API_KEY) {
+    if (aiConfigured()) {
       chosen = await rankEvidence(application.job.description, evidence);
       method = "AI-ranked profile evidence";
     }
