@@ -11,7 +11,9 @@
     "test:e2e": "playwright test",
     "test:auth": "node tests/production/auth.mjs",
     "test:cv": "node tests/production/cv-upload.mjs",
-    "test:builder": "node tests/production/cv-builder.mjs"
+    "test:builder": "node tests/production/cv-builder.mjs",
+    "typecheck": "tsc --noEmit",
+    "db:migrate:modules": "node --env-file-if-exists=.env.local --import tsx scripts/migrate-modules.ts"
   },
   "dependencies": {
     "@pdf-lib/fontkit": "^1.1.1",

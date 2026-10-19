@@ -1,5 +1,8 @@
 "use client";
 import Link from "next/link";
+import BountyWorkspace from "@/components/modules/bounty-workspace";
+import YoutubeWorkspace from "@/components/modules/youtube-workspace";
+import WorkspaceOverview from "@/components/modules/workspace-overview";
 import { DISCOVERY_REFRESH_MS, recentPosting } from "@/lib/job-freshness";
 import SocialIntake from "@/components/social-intake";
 import CvUpload from "@/components/cv-upload";
@@ -11,6 +14,8 @@ import { missingProfileFields } from "@/lib/profile-import-fields";
 import SourceDirectory from "@/components/source-directory";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
+  Code2,
+  Clapperboard,
   ArrowUpRight,
   Bell,
   Bookmark,
@@ -74,6 +79,17 @@ const ago = (value: string, now: number) => {
 export default function Home() {
   const [now, setNow] = useState(() => Date.now());
   const [tab, setTab] = useState("Job Finder");
+  useEffect(() => {
+    const update = () => {
+      if (window.location.hash === "#youtube") setTab("YouTube Research");
+    };
+    const timer = window.setTimeout(update, 0);
+    window.addEventListener("hashchange", update);
+    return () => {
+      clearTimeout(timer);
+      window.removeEventListener("hashchange", update);
+    };
+  }, []);
   const [jobs, setJobs] = useState<Job[]>([]);
   const [applications, setApplications] = useState<Application[]>([]);
   const [profile, setProfile] = useState<Profile>(emptyProfile);
@@ -242,9 +258,12 @@ export default function Home() {
             { name: "Applications", icon: BriefcaseBusiness },
             { name: "CV Builder", icon: FileText },
             { name: "My Profile", icon: UserRound },
+            { name: "Coding Bounties", icon: Code2 },
+            { name: "YouTube Research", icon: Clapperboard },
           ].map(({ name, icon: Icon }) => (
             <button
               key={name}
+              title={name}
               className={`nav-item ${tab === name ? "active" : ""}`}
               onClick={() => setTab(name)}
             >
@@ -327,6 +346,8 @@ export default function Home() {
                   ? "Find your next opportunity."
                   : tab === "Applications"
                     ? "Every application. One place."
+                    : tab === "Coding Bounties" ? "Turn your skills into paid contributions."
+                    : tab === "YouTube Research" ? "Research. Create. Plan your next video."
                     : tab === "CV Builder" ? "Your experience. Tailored to the role." : "Let your experience shine."}
               </h1>
               <p>
@@ -334,6 +355,8 @@ export default function Home() {
                   ? "Remote-only roles from employers worldwide. Find your next move early."
                   : tab === "Applications"
                     ? "Keep your momentum, from the first save to the final offer."
+                    : tab === "Coding Bounties" ? "Find real tasks, verify funding and track your work and receipts."
+                    : tab === "YouTube Research" ? "Original concepts and content planning, supported by official YouTube data."
                     : tab === "CV Builder" ? "Build, edit and download a CV for any job description." : "Your real skills and experience power every match and application."}
               </p>
             </div>
@@ -373,8 +396,11 @@ export default function Home() {
               </button>
             </div>
           )}
+          {tab === "Coding Bounties" && <BountyWorkspace openProfile={() => setTab("My Profile")} />}
+          {tab === "YouTube Research" && <YoutubeWorkspace />}
           {tab === "Job Finder" && (
             <>
+              <WorkspaceOverview jobs={jobs.length} navigate={setTab} />
               <section className="stats-grid">
                 <Stat
                   label="Open opportunities"

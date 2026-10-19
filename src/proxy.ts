@@ -10,6 +10,7 @@ export function proxy(request: NextRequest) {
   if (
     path === "/api/cron" ||
     path === "/login" ||
+    path === "/privacy" ||
     path === "/api/auth/login" ||
     path === "/api/auth/logout"
   )
