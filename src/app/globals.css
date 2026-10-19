@@ -1850,3 +1850,13 @@ footer > span {
 .resume-compact { padding: 28px; }
 .resume-compact section { margin-top: 16px; }
 .resume-compact section > div, .resume-compact .letter-body { line-height: 1.5; }
+
+.builder-field-help { display: block; font-size: 12px; font-weight: 400; line-height: 1.6; color: #60715d; margin: 5px 0; }
+.builder-layout-notice { background: #edf5e8; border: 1px solid #cbdcbd; padding: 12px; border-radius: 8px; font-size: 13px; }
+.resume-paper .resume-entries { white-space: normal; }
+.resume-entry + .resume-entry { margin-top: 21px; padding-top: 4px; }
+.resume-paper .resume-entry h4 { margin: 0 0 5px; font-weight: 700; font-size: 12px; color: #24333a; line-height: 1.5; }
+.resume-paper .resume-entry p { margin: 5px 0; white-space: pre-wrap; }
+.resume-paper .resume-technologies { color: #52626a; font-size: 10px; margin-bottom: 9px; }
+.resume-paper .resume-entry ul { padding-left: 18px; margin: 8px 0 0; list-style: disc; }
+.resume-paper .resume-entry li { margin: 5px 0; padding-left: 2px; }

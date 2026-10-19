@@ -1,6 +1,8 @@
+import { resumeEntries, isEntrySection } from "./resume-layout";
 import { Document, Packer, Paragraph, TextRun, HeadingLevel } from "docx";
 import {
   resumeSections,
+  legacyResumeSections,
   type ResumeContent,
   type ResumeTarget,
   type ResumeTemplate,
@@ -12,6 +14,7 @@ export async function resumeDocx(
   target: ResumeTarget,
   template: ResumeTemplate = "classic",
   coverLetter?: string,
+  legacy = false,
 ) {
   const compact = template === "compact";
   const accent = template === "modern" ? "1F5E5E" : "222D33";
@@ -62,23 +65,57 @@ export async function resumeDocx(
     children.push(
       ...coverLetter.split(/\n\s*\n/).map((text) => paragraph(text, 180)),
     );
-  } else
-    for (const key of Object.keys(
-      resumeSections,
-    ) as (keyof typeof resumeSections)[]) {
-      if (!content[key].trim()) continue;
+  } else {
+    const sections = legacy ? legacyResumeSections : resumeSections;
+    for (const key of Object.keys(sections) as (keyof ResumeContent)[]) {
+      const text = content[key] || "";
+      if (!text.trim()) continue;
       children.push(
         new Paragraph({
-          text: resumeSections[key].toUpperCase(),
+          text: sections[key as keyof typeof sections].toUpperCase(),
           heading: HeadingLevel.HEADING_1,
           keepNext: true,
           spacing: { before: compact ? 180 : 260, after: 100 },
         }),
       );
-      children.push(
-        ...content[key].split(/\n\s*\n/).map((text) => paragraph(text)),
-      );
+      if (!legacy && isEntrySection(key)) {
+        for (const [index, entry] of resumeEntries(text).entries()) {
+          if (entry.title)
+            children.push(
+              new Paragraph({
+                children: [
+                  new TextRun({ text: entry.title, bold: true, size: 23 }),
+                ],
+                keepNext: true,
+                spacing: { before: index ? 220 : 40, after: 70 },
+              }),
+            );
+          for (const part of entry.parts) {
+            if (part.kind === "bullet")
+              children.push(
+                new Paragraph({
+                  text: part.text,
+                  bullet: { level: 0 },
+                  spacing: { after: 90, line: 290 },
+                }),
+              );
+            else if (part.kind === "meta")
+              children.push(
+                new Paragraph({
+                  children: [
+                    new TextRun({ text: part.text, size: 20, color: "52626A" }),
+                  ],
+                  keepNext: true,
+                  spacing: { after: 100 },
+                }),
+              );
+            else children.push(paragraph(part.text));
+          }
+        }
+      } else
+        children.push(...text.split(/\n\s*\n/).map((text) => paragraph(text)));
     }
+  }
   const document = new Document({
     creator: content.name,
     title: `${content.name} — ${coverLetter !== undefined ? "Cover letter" : "CV"} — ${target.title}`,

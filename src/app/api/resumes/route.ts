@@ -1,3 +1,4 @@
+import { cleanResumeLayout } from "@/lib/resume-layout";
 import { randomUUID } from "node:crypto";
 import { db } from "@/lib/db";
 import { emptyProfile } from "@/lib/types";
@@ -61,7 +62,8 @@ export async function POST(request: Request) {
         id,
         previousId: original.id,
         createdAt: new Date().toISOString(),
-        content: validateResumeContent(body.content),
+        content: cleanResumeLayout(validateResumeContent(body.content)),
+        layoutVersion: 2,
         coverLetter:
           body.coverLetter === undefined
             ? original.coverLetter
@@ -101,7 +103,8 @@ export async function POST(request: Request) {
           body.template === undefined
             ? "classic"
             : validateTemplate(body.template),
-        content: validateResumeContent(built.content),
+        content: cleanResumeLayout(validateResumeContent(built.content)),
+        layoutVersion: 2,
         profileSnapshot: profile,
         manualEdits: false,
       };

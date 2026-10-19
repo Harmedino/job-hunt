@@ -5,6 +5,16 @@ export const resumeSections = {
   experience: "Experience",
   projects: "Projects",
   education: "Education",
+  contributions: "Open-source contributions",
+  training: "Training & community",
+  certifications: "Certifications",
+} as const;
+export const legacyResumeSections = {
+  summary: "Professional summary",
+  skills: "Skills",
+  experience: "Experience",
+  projects: "Projects",
+  education: "Education",
   additional: "Additional qualifications",
 } as const;
 export type ResumeSection = keyof typeof resumeSections;
@@ -21,7 +31,16 @@ export type ResumeContent = Pick<
   Profile,
   (typeof resumeContactFields)[number]
 > &
-  Record<ResumeSection, string>;
+  Record<
+    "summary" | "skills" | "experience" | "projects" | "education",
+    string
+  > &
+  Partial<
+    Record<
+      "contributions" | "training" | "certifications" | "additional",
+      string
+    >
+  >;
 export type ResumeTarget = {
   title: string;
   company: string;
@@ -30,7 +49,10 @@ export type ResumeTarget = {
   jobId?: string;
   applicationId?: string;
 };
-export type ResumeEvidence = { section: ResumeSection; text: string };
+export type ResumeEvidence = {
+  section: ResumeSection | "source" | "additional";
+  text: string;
+};
 export const resumeTemplates = {
   classic: "Clean professional",
   modern: "Modern accent",
@@ -38,6 +60,7 @@ export const resumeTemplates = {
 } as const;
 export type ResumeTemplate = keyof typeof resumeTemplates;
 export type ResumeDraft = {
+  layoutVersion?: 2;
   coverLetter?: string;
   template?: ResumeTemplate;
   id: string;
@@ -85,6 +108,13 @@ export function validateResumeContent(value: unknown): ResumeContent {
     ...resumeContactFields,
     ...(Object.keys(resumeSections) as ResumeSection[]),
   ]) {
+    if (
+      ["contributions", "training", "certifications"].includes(key) &&
+      body[key] === undefined
+    ) {
+      result[key] = "";
+      continue;
+    }
     if (typeof body[key] !== "string" || body[key].length > 20000)
       throw new ResumeInputError(`Invalid CV field: ${key}.`);
     result[key] = body[key].trim();
