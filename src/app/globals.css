@@ -1860,3 +1860,8 @@ footer > span {
 .resume-paper .resume-technologies { color: #52626a; font-size: 10px; margin-bottom: 9px; }
 .resume-paper .resume-entry ul { padding-left: 18px; margin: 8px 0 0; list-style: disc; }
 .resume-paper .resume-entry li { margin: 5px 0; padding-left: 2px; }
+.builder-mode { border: 1px solid #d3ddcd; border-radius: 9px; padding: 12px; margin: 14px 0; }
+.builder-mode legend { font-size: 13px; font-weight: 600; padding: 0 5px; }
+.builder-mode label { display: flex; gap: 8px; align-items: center; font-size: 13px; margin: 6px 0; }
+.builder-mode input { width: auto; }
+.builder-ai-proof { font-size: 12px; background: #eef5e8; padding: 10px; border-radius: 8px; }

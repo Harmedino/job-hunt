@@ -69,7 +69,7 @@ export default function CvBuilder({
 }) {
   const [target, setTarget] = useState<TargetForm>(blankTarget);
   const [choice, setChoice] = useState("manual");
-  const [mode, setMode] = useState<"auto" | "ai" | "profile">("auto");
+  const [mode, setMode] = useState<"ai" | "profile">("ai");
   const [draft, setDraft] = useState<ResumeDraft>();
   const [content, setContent] = useState<ResumeContent>();
   const [coverLetter, setCoverLetter] = useState("");
@@ -80,7 +80,7 @@ export default function CvBuilder({
   const [feedback, setFeedback] = useState("");
   const [error, setError] = useState("");
   const revealEditor = useRef(false);
-  const useAi = ai && mode !== "profile";
+  const useAi = mode === "ai";
   const dirty =
     !!draft &&
     !!content &&
@@ -382,32 +382,49 @@ export default function CvBuilder({
                 />
               </label>
             )}
-            <label className="builder-ai">
-              <input
-                type="checkbox"
-                checked={useAi}
-                disabled={!ai || !!busy}
-                onChange={(e) => setMode(e.target.checked ? "ai" : "profile")}
-              />
-              Use AI to write and tailor this CV
-            </label>
+            <fieldset className="builder-mode">
+              <legend>Writing mode</legend>
+              <label>
+                <input
+                  type="radio"
+                  name="writing-mode"
+                  checked={useAi}
+                  disabled={!!busy}
+                  onChange={() => setMode("ai")}
+                />
+                AI job analysis & writing
+              </label>
+              <label>
+                <input
+                  type="radio"
+                  name="writing-mode"
+                  checked={!useAi}
+                  disabled={!!busy}
+                  onChange={() => setMode("profile")}
+                />
+                Basic layout only (no AI)
+              </label>
+            </fieldset>
             <p className="builder-help">
               {ai
                 ? `AI drafts are checked against your saved evidence. Your profile and this description are sent to ${aiLabel || "your selected AI provider"} when enabled.`
-                : "AI writing needs an API key. Set up Google Gemini or OpenAI in My Profile → Connections. You can still create, edit and download a profile-based CV."}
+                : "AI writing needs an API key. Set up Google Gemini or OpenAI in My Profile → Connections. AI generation stays unavailable until a key is configured. Basic layout only is a separate option and does not analyse the job."}
             </p>
             {!ai && (
               <button type="button" className="secondary" onClick={onProfile}>
                 Set up AI writing
               </button>
             )}
-            <button className="primary" disabled={!!busy || !connected}>
+            <button
+              className="primary"
+              disabled={!!busy || !connected || (useAi && !ai)}
+            >
               <Sparkles size={16} />
               {busy === "generate"
-                ? "Building your CV…"
+                ? "Analysing, writing and checking…"
                 : useAi
                   ? "Build tailored CV"
-                  : "Create profile-based CV"}
+                  : "Create basic layout"}
             </button>
             <button
               type="button"
@@ -593,6 +610,38 @@ export default function CvBuilder({
                       onChange={(e) => setCoverLetter(e.target.value)}
                     />
                   </label>
+                )}
+                {draft.aiGeneration && (
+                  <p className="builder-ai-proof">
+                    Written with {draft.aiGeneration.provider} ·{" "}
+                    {draft.aiGeneration.model} ·{" "}
+                    {draft.manualEdits
+                      ? "original draft checked; manual edits have not been rechecked"
+                      : "job analysis and factual checks completed"}
+                  </p>
+                )}
+                {draft.analysis && (
+                  <details className="builder-evidence">
+                    <summary>How this CV addresses the job</summary>
+                    {draft.analysis.priorities.map((priority, index) => (
+                      <div key={index}>
+                        <b>{priority.requirement}</b>
+                        <p>
+                          {priority.evidence.length
+                            ? "Relevant source evidence: " +
+                              priority.evidence
+                                .map(
+                                  (id) =>
+                                    draft.evidence[id]?.label ||
+                                    draft.evidence[id]?.section ||
+                                    "profile",
+                                )
+                                .join(", ")
+                            : "No supporting qualification established. Check this requirement before applying."}
+                        </p>
+                      </div>
+                    ))}
+                  </details>
                 )}
                 {draft.warnings.map((warning) => (
                   <p key={warning} className="location-warning">

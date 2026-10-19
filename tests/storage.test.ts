@@ -19,7 +19,10 @@ import { PDFDocument } from "pdf-lib";
 import { emptyProfile } from "../src/lib/types";
 import { db, closeDb } from "../src/lib/db";
 import { PUT as saveProfile } from "../src/app/api/profile/route";
-import { GET as cachedJobs, POST as discoverJobs } from "../src/app/api/discover/route";
+import {
+  GET as cachedJobs,
+  POST as discoverJobs,
+} from "../src/app/api/discover/route";
 import {
   POST as saveApplication,
   PATCH as updateApplication,
@@ -159,55 +162,117 @@ test("scheduled discovery rejects missing/incorrect authorization", async () => 
   );
 });
 
-test("CV-to-profile patch persists blank fields, preserves existing entries and prepares an AI-ranked PDF", { skip: !enabled, timeout: 30000 }, async () => {
-  delete process.env.OPENAI_API_KEY;
-  await saveProfile(request({ ...emptyProfile, name: "Existing chosen name", email: "", skills: "", experience: "", education: "", projects: "" }));
-  const cv = "CV Applicant\napplicant@example.org\nTechnical Skills\nReact, TypeScript\nExperience\nBuilt accessible React interfaces at Example Co, 2024\nEducation\nBSc Computer Science\nProjects\nReact dashboard";
-  const form = new FormData();
-  form.set("file", new File([cv], "resume.txt"));
-  const response = await uploadCV(new Request("http://localhost/api/cv", { method: "POST", body: form }));
-  const uploaded = await response.json();
-  assert.equal(uploaded.persisted, true);
-  assert.ok(uploaded.patchedFields.includes("skills"));
-  const profile = await (await getProfile()).json();
-  assert.equal(profile.name, "Existing chosen name");
-  assert.equal(profile.email, "applicant@example.org");
-  assert.equal(profile.skills, "React, TypeScript");
-  assert.equal(profile.experience, "Built accessible React interfaces at Example Co, 2024");
-  assert.equal(profile.education, "BSc Computer Science");
-  assert.equal(profile.projects, "React dashboard");
-  assert.equal(profile.cvText, cv);
-  assert.equal((await (await importSavedCV(request({}))).json()).persisted, true);
-  // Local source/API fixtures only. Verify the job description reaches the ranker and exact facts reach the PDF.
-  let aiCalled = false;
-  globalThis.fetch = async (input, init) => {
-    if (String(input).includes("api.openai.com")) {
-      aiCalled = true;
-      const data = JSON.parse(JSON.parse(String(init?.body)).messages[1].content);
-      assert.match(data.job, /React and TypeScript/);
-      assert.equal(data.evidence[0], "Skills: React, TypeScript");
-      return Response.json({ choices: [{ message: { content: '{"indices":[1,0,2,3]}' } }] });
-    }
-    return Response.json(String(input).includes("remotive") ? { jobs: [{ title: "Junior React Developer", company_name: "CV Integration Fixture", candidate_required_location: "Worldwide", description: "React and TypeScript. Fully remote.", url: "https://remotive.com/remote-jobs/cv-test-fixture", publication_date: new Date().toISOString() }] } : { data: [] });
-  };
-  const result = await (await discoverJobs()).json();
-  const application = await (await saveApplication(request({ jobId: result.jobs[0].id }))).json();
-  process.env.OPENAI_API_KEY = "test-only-not-a-real-key";
-  try {
-    assert.equal((await prepare(request({ id: application.id }))).status, 200);
-    assert.equal(aiCalled, true);
-    const saved = await (await db()).collection("applications").findOne({ id: application.id });
-    assert.equal(saved?.preparationMethod, "AI-ranked profile evidence");
-    assert.equal(saved?.cvFacts[0], "Experience: Built accessible React interfaces at Example Co, 2024");
-    assert.match(saved?.coverLetter, /Junior React Developer/);
-    const pdf = await document(new Request("http://localhost"), { params: Promise.resolve({ id: application.id }) });
-    assert.equal(pdf.headers.get("Content-Type"), "application/pdf");
-    assert.ok((await PDFDocument.load(await pdf.arrayBuffer())).getPageCount() > 0);
-  } finally {
+test(
+  "CV-to-profile patch persists blank fields, preserves existing entries and prepares an AI-ranked PDF",
+  { skip: !enabled, timeout: 30000 },
+  async () => {
     delete process.env.OPENAI_API_KEY;
-    await (await db()).collection("jobs").deleteOne({ id: result.jobs[0].id });
-  }
-});
+    await saveProfile(
+      request({
+        ...emptyProfile,
+        name: "Existing chosen name",
+        email: "",
+        skills: "",
+        experience: "",
+        education: "",
+        projects: "",
+      }),
+    );
+    const cv =
+      "CV Applicant\napplicant@example.org\nTechnical Skills\nReact, TypeScript\nExperience\nBuilt accessible React interfaces at Example Co, 2024\nEducation\nBSc Computer Science\nProjects\nReact dashboard";
+    const form = new FormData();
+    form.set("file", new File([cv], "resume.txt"));
+    const response = await uploadCV(
+      new Request("http://localhost/api/cv", { method: "POST", body: form }),
+    );
+    const uploaded = await response.json();
+    assert.equal(uploaded.persisted, true);
+    assert.ok(uploaded.patchedFields.includes("skills"));
+    const profile = await (await getProfile()).json();
+    assert.equal(profile.name, "Existing chosen name");
+    assert.equal(profile.email, "applicant@example.org");
+    assert.equal(profile.skills, "React, TypeScript");
+    assert.equal(
+      profile.experience,
+      "Built accessible React interfaces at Example Co, 2024",
+    );
+    assert.equal(profile.education, "BSc Computer Science");
+    assert.equal(profile.projects, "React dashboard");
+    assert.equal(profile.cvText, cv);
+    assert.equal(
+      (await (await importSavedCV(request({}))).json()).persisted,
+      true,
+    );
+    // Local source/API fixtures only. Verify the job description reaches the ranker and exact facts reach the PDF.
+    let aiCalled = false;
+    globalThis.fetch = async (input, init) => {
+      if (String(input).includes("api.openai.com")) {
+        aiCalled = true;
+        const data = JSON.parse(
+          JSON.parse(String(init?.body)).messages[1].content,
+        );
+        assert.match(data.job, /React and TypeScript/);
+        assert.equal(data.evidence[0], "Skills: React, TypeScript");
+        return Response.json({
+          choices: [{ message: { content: '{"indices":[1,0,2,3]}' } }],
+        });
+      }
+      return Response.json(
+        String(input).includes("remotive")
+          ? {
+              jobs: [
+                {
+                  title: "Junior React Developer",
+                  company_name: "CV Integration Fixture",
+                  candidate_required_location: "Worldwide",
+                  description: "React and TypeScript. Fully remote.",
+                  url: "https://remotive.com/remote-jobs/cv-test-fixture",
+                  publication_date: new Date().toISOString(),
+                },
+              ],
+            }
+          : { data: [] },
+      );
+    };
+    const result = await (await discoverJobs()).json();
+    const application = await (
+      await saveApplication(request({ jobId: result.jobs[0].id }))
+    ).json();
+    process.env.OPENAI_API_KEY = "test-only-not-a-real-key";
+    try {
+      assert.equal(
+        (await prepare(request({ id: application.id }))).status,
+        200,
+      );
+      assert.equal(aiCalled, true);
+      const saved = await (
+        await db()
+      )
+        .collection("applications")
+        .findOne({ id: application.id });
+      assert.equal(saved?.preparationMethod, "AI-ranked profile evidence");
+      assert.equal(
+        saved?.cvFacts[0],
+        "Experience: Built accessible React interfaces at Example Co, 2024",
+      );
+      assert.match(saved?.coverLetter, /Junior React Developer/);
+      const pdf = await document(new Request("http://localhost"), {
+        params: Promise.resolve({ id: application.id }),
+      });
+      assert.equal(pdf.headers.get("Content-Type"), "application/pdf");
+      assert.ok(
+        (await PDFDocument.load(await pdf.arrayBuffer())).getPageCount() > 0,
+      );
+    } finally {
+      delete process.env.OPENAI_API_KEY;
+      await (
+        await db()
+      )
+        .collection("jobs")
+        .deleteOne({ id: result.jobs[0].id });
+    }
+  },
+);
 
 test(
   "social inbox persists unverified posts, deduplicates them, and archives without creating jobs",
@@ -284,26 +349,119 @@ test(
   },
 );
 
-test("discovery remembers source diagnostics, requests an initial refresh and keeps cached jobs during outages", { skip: !enabled, timeout: 30000 }, async () => {
-  const database = await db();
-  await database.collection("discovery_state").deleteMany({});
-  assert.equal((await (await cachedJobs()).json()).refreshRecommended, true);
-  globalThis.fetch = async (url) => String(url).includes("remotive.com") ? Response.json({ jobs: [{ title: "React Developer", company_name: "Cache Outage Fixture", candidate_required_location: "Worldwide", publication_date: new Date().toISOString(), url: "https://remotive.com/remote-jobs/cache-fixture", description: "React frontend" }] }) : new Response("", { status: 503 });
-  const discovered = await (await discoverJobs()).json();
-  assert.equal(discovered.persisted, true);
-  const cached = await (await cachedJobs()).json();
-  assert.equal(cached.refreshRecommended, false);
-  assert.equal(cached.sources.length, 5);
-  await database.collection("discovery_state").updateOne({ key: "latest" }, { $unset: { revision: "" } });
-  assert.equal((await (await cachedJobs()).json()).refreshRecommended, true);
+test(
+  "discovery remembers source diagnostics, requests an initial refresh and keeps cached jobs during outages",
+  { skip: !enabled, timeout: 30000 },
+  async () => {
+    const database = await db();
+    await database.collection("discovery_state").deleteMany({});
+    assert.equal((await (await cachedJobs()).json()).refreshRecommended, true);
+    globalThis.fetch = async (url) =>
+      String(url).includes("remotive.com")
+        ? Response.json({
+            jobs: [
+              {
+                title: "React Developer",
+                company_name: "Cache Outage Fixture",
+                candidate_required_location: "Worldwide",
+                publication_date: new Date().toISOString(),
+                url: "https://remotive.com/remote-jobs/cache-fixture",
+                description: "React frontend",
+              },
+            ],
+          })
+        : new Response("", { status: 503 });
+    const discovered = await (await discoverJobs()).json();
+    assert.equal(discovered.persisted, true);
+    const cached = await (await cachedJobs()).json();
+    assert.equal(cached.refreshRecommended, false);
+    assert.equal(cached.sources.length, 5);
+    await database
+      .collection("discovery_state")
+      .updateOne({ key: "latest" }, { $unset: { revision: "" } });
+    assert.equal((await (await cachedJobs()).json()).refreshRecommended, true);
 
-  assert.equal(cached.sources.find((s: { source: string }) => s.source === "Remote OK").status, "error");
-  assert.ok(cached.jobs.some((j: { company: string }) => j.company === "Cache Outage Fixture"));
-  globalThis.fetch = async () => new Response("", { status: 503 });
-  const outage = await (await discoverJobs()).json();
-  assert.equal(outage.successfulSources.length, 0);
-  assert.ok(outage.jobs.some((j: { company: string }) => j.company === "Cache Outage Fixture"));
-  assert.equal((await (await cachedJobs()).json()).sources.filter((s: { status: string }) => s.status === "error").length, 5);
-  await database.collection("discovery_state").updateOne({ key: "latest" }, { $set: { checkedAt: new Date(Date.now() - 20 * 60000).toISOString() } });
-  assert.equal((await (await cachedJobs()).json()).refreshRecommended, true);
-});
+    assert.equal(
+      cached.sources.find((s: { source: string }) => s.source === "Remote OK")
+        .status,
+      "error",
+    );
+    assert.ok(
+      cached.jobs.some(
+        (j: { company: string }) => j.company === "Cache Outage Fixture",
+      ),
+    );
+    globalThis.fetch = async () => new Response("", { status: 503 });
+    const outage = await (await discoverJobs()).json();
+    assert.equal(outage.successfulSources.length, 0);
+    assert.ok(
+      outage.jobs.some(
+        (j: { company: string }) => j.company === "Cache Outage Fixture",
+      ),
+    );
+    assert.equal(
+      (await (await cachedJobs()).json()).sources.filter(
+        (s: { status: string }) => s.status === "error",
+      ).length,
+      5,
+    );
+    await database
+      .collection("discovery_state")
+      .updateOne(
+        { key: "latest" },
+        {
+          $set: { checkedAt: new Date(Date.now() - 20 * 60000).toISOString() },
+        },
+      );
+    assert.equal((await (await cachedJobs()).json()).refreshRecommended, true);
+  },
+);
+
+test(
+  "discovery cache removes postings older than 72 hours while preserving application history",
+  { skip: !enabled, timeout: 30000 },
+  async () => {
+    const database = await db();
+    const old = {
+      id: "old-window-fixture",
+      title: "React Developer",
+      company: "Old Window Fixture",
+      location: "Worldwide",
+      description: "React interfaces",
+      url: "https://remotive.com/remote-jobs/old-window-fixture",
+      source: "Remotive",
+      postedAt: new Date(Date.now() - 80 * 3600000).toISOString(),
+      discoveredAt: new Date().toISOString(),
+      eligibility: "eligible",
+      eligibilityReason: "Fixture",
+      salary: "",
+      score: 0,
+      matchedSkills: [],
+    };
+    await database.collection("jobs").insertOne({ ...old });
+    await database
+      .collection("applications")
+      .insertOne({
+        id: "tracked-old-window-fixture",
+        job: old,
+        status: "Submitted",
+        createdAt: old.postedAt,
+        updatedAt: old.postedAt,
+      });
+    const cached = await (await cachedJobs()).json();
+    assert.ok(!cached.jobs.some((job: { id: string }) => job.id === old.id));
+    globalThis.fetch = async () => new Response("", { status: 503 });
+    const searched = await (await discoverJobs()).json();
+    assert.ok(!searched.jobs.some((job: { id: string }) => job.id === old.id));
+    assert.equal(
+      await database.collection("jobs").countDocuments({ id: old.id }),
+      0,
+    );
+    assert.equal(
+      await database
+        .collection("applications")
+        .countDocuments({ id: "tracked-old-window-fixture" }),
+      1,
+    );
+  },
+);

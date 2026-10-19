@@ -45,7 +45,7 @@ test("a complete profile-based CV is editable without an AI key and never import
   assert.match(result.content.experience, /Example Co/);
   assert.match(result.content.education, /BSc Computer Science/);
   assert.doesNotMatch(JSON.stringify(result.content), /Kubernetes/);
-  assert.equal(result.method, "Profile-based CV builder");
+  assert.equal(result.method, "Basic layout only · no AI writing");
   assert.throws(
     () => validateResumeContent({ ...result.content, name: { $ne: null } }),
     /Invalid CV field/,
@@ -97,58 +97,80 @@ test("AI writes a job-specific draft and a separate check rejects unsupported qu
   globalThis.fetch = async (_input, init) => {
     const request = JSON.parse(String(init?.body));
     const data = JSON.parse(request.messages[1].content);
+    let value;
     if (++calls === 1) {
       assert.match(data.target.description, /Kubernetes/);
-      return Response.json({
-        choices: [
+      value = {
+        priorities: [
           {
-            message: {
-              content: JSON.stringify({
-                items: [
-                  {
-                    section: "summary",
-                    text: "Frontend skills include React and TypeScript.",
-                    sources: [0],
-                  },
-                  {
-                    section: "experience",
-                    text: "Managed Kubernetes production deployments.",
-                    sources: [1],
-                  },
-                  {
-                    section: "experience",
-                    text: "Built accessible React interfaces at Example Co (2023–2024).",
-                    sources: [1],
-                  },
-                  {
-                    section: "coverLetter",
-                    text: "I built accessible React interfaces at Example Co (2023–2024).",
-                    sources: [1],
-                  },
-                  {
-                    section: "coverLetter",
-                    text: "I have Kubernetes expertise.",
-                    sources: [0],
-                  },
-                ],
-                requirementsToReview: [
-                  "TypeScript and Kubernetes experience required.",
-                  "Invented requirement",
-                ],
-              }),
-            },
+            requirement: "Build accessible React interfaces.",
+            evidence: [0, 1, 2],
+          },
+          {
+            requirement: "TypeScript and Kubernetes experience required.",
+            evidence: [],
           },
         ],
-      });
+        selectedEvidence: [0, 1, 2, 3],
+      };
+    } else if (calls === 2) {
+      assert.equal(data.evidence[0].id, 0);
+      value = {
+        items: [
+          {
+            section: "summary",
+            text: "Frontend skills include React and TypeScript, with experience building accessible interfaces.",
+            sources: [0, 1],
+          },
+          { section: "skills", text: "React, TypeScript", sources: [0] },
+          {
+            section: "experience",
+            text: "Managed Kubernetes production deployments.",
+            sources: [1],
+          },
+          {
+            section: "experience",
+            text: "Built accessible React interfaces at Example Co (2023–2024).",
+            sources: [1],
+          },
+          {
+            section: "projects",
+            text: "Built a TypeScript portfolio.",
+            sources: [2],
+          },
+          {
+            section: "education",
+            text: "BSc Computer Science, Example University",
+            sources: [3],
+          },
+          {
+            section: "coverLetter",
+            text: "I built accessible React interfaces at Example Co (2023–2024).",
+            sources: [1],
+          },
+          {
+            section: "coverLetter",
+            text: "My frontend skills include React and TypeScript for interface development.",
+            sources: [0],
+          },
+          {
+            section: "coverLetter",
+            text: "I have Kubernetes expertise from production work.",
+            sources: [0],
+          },
+        ],
+      };
+    } else {
+      assert.equal(data.target, undefined);
+      assert.equal(data.claims.length, 9);
+      value = { supported: [0, 1, 3, 4, 5, 6, 7] };
     }
-    assert.equal(data.target, undefined);
-    assert.equal(data.claims.length, 5);
     return Response.json({
-      choices: [{ message: { content: '{"supported":[0,2,3]}' } }],
+      choices: [{ message: { content: JSON.stringify(value) } }],
     });
   };
   const draft = await buildResume(profile, target, true);
-  assert.equal(calls, 2);
+  assert.equal(calls, 3);
   assert.match(draft.content.summary, /Frontend skills/);
   assert.match(draft.content.experience, /Example Co \(2023–2024\)/);
   assert.doesNotMatch(draft.content.experience, /Kubernetes/);

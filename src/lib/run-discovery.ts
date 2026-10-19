@@ -1,3 +1,4 @@
+import { JOB_WINDOW_MS, recentPosting } from "./job-freshness";
 import { db } from "./db";
 import { discover } from "./discovery";
 import { match, relevant, fullyRemote } from "./matching";
@@ -73,7 +74,7 @@ export async function runDiscovery(): Promise<
     await database.collection("jobs").deleteMany({
       $or: [
         {
-          postedAt: { $lt: new Date(Date.now() - 30 * 86400000).toISOString() },
+          postedAt: { $lt: new Date(Date.now() - JOB_WINDOW_MS).toISOString() },
         },
         { expiresAt: { $lt: new Date().toISOString() } },
       ],
@@ -99,6 +100,7 @@ export async function runDiscovery(): Promise<
       jobs: cached
         .filter(
           (j) =>
+            recentPosting(j.postedAt) &&
             relevant(j.title, j.description) &&
             fullyRemote(j.title, j.location, j.description),
         )

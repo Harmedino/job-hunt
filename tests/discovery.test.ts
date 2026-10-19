@@ -240,3 +240,30 @@ test("search follows short pages, adds role variants, bounds concurrency and kee
     "partial",
   );
 });
+
+test("only real publication dates within 72 hours qualify; re-seeing a job does not make it new", async () => {
+  globalThis.fetch = async (input) =>
+    String(input).includes("remotive.com")
+      ? Response.json({
+          jobs: [2, 71, 73, 120, -2].map((hours) => ({
+            title: "React Developer",
+            company_name: `Age ${hours} Fixture`,
+            candidate_required_location: "Worldwide",
+            publication_date: new Date(
+              Date.now() - hours * 3600000,
+            ).toISOString(),
+            url: `https://remotive.com/remote-jobs/age-${hours}`,
+            description: "React interfaces",
+          })),
+        })
+      : new Response("", { status: 503 });
+  const result = await discover();
+  assert.deepEqual(
+    result.jobs.map((job) => job.company),
+    ["Age 2 Fixture", "Age 71 Fixture"],
+  );
+  assert.equal(
+    result.sources.find((source) => source.source === "Remotive")?.excluded.age,
+    3,
+  );
+});

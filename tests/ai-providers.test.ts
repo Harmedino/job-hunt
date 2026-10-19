@@ -102,21 +102,46 @@ test("Gemini CV import and tailoring preserve evidence checks, including cover l
       });
     if (calls === 2)
       return response({
+        priorities: [
+          {
+            requirement: "Build React interfaces with Kubernetes.",
+            evidence: [0, 1],
+          },
+        ],
+        selectedEvidence: [0, 1],
+      });
+    if (calls === 3)
+      return response({
         items: [
-          { section: "summary", text: "Skills include React.", sources: [0] },
+          {
+            section: "summary",
+            text: "Frontend skills include React and experience building accessible interfaces.",
+            sources: [0, 1],
+          },
+          { section: "skills", text: "React", sources: [0] },
+          {
+            section: "experience",
+            text: "Built accessible React interfaces at Example Co.",
+            sources: [1],
+          },
           {
             section: "coverLetter",
-            text: "My skills include React.",
+            text: "My skills include React for developing frontend interfaces.",
             sources: [0],
+          },
+          {
+            section: "coverLetter",
+            text: "I built accessible React interfaces at Example Co.",
+            sources: [1],
           },
           {
             section: "experience",
             text: "Led Kubernetes operations.",
-            sources: [0],
+            sources: [1],
           },
         ],
       });
-    return response({ supported: [0, 1] });
+    return response({ supported: [0, 1, 2, 3, 4] });
   };
   const imported = await extractResumeProfile(
     "Test Applicant\ntest@example.org\nSkills\nReact",
@@ -129,6 +154,7 @@ test("Gemini CV import and tailoring preserve evidence checks, including cover l
       name: "Test Applicant",
       email: "test@example.org",
       skills: "React",
+      experience: "Built accessible React interfaces at Example Co.",
     },
     {
       title: "Frontend Developer",
@@ -138,7 +164,7 @@ test("Gemini CV import and tailoring preserve evidence checks, including cover l
     },
     true,
   );
-  assert.equal(calls, 3);
+  assert.equal(calls, 4);
   assert.match(draft.content.summary, /React/);
   assert.match(draft.coverLetter, /My skills include React/);
   assert.doesNotMatch(

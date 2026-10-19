@@ -1,3 +1,4 @@
+import { JOB_WINDOW_MS, DISCOVERY_REFRESH_MS } from "@/lib/job-freshness";
 import { runDiscovery } from "@/lib/run-discovery";
 import { db, errorResponse } from "@/lib/db";
 import { match, fullyRemote, relevant } from "@/lib/matching";
@@ -29,7 +30,10 @@ export async function GET() {
     const jobs = await database
       .collection("jobs")
       .find({
-        postedAt: { $gte: new Date(Date.now() - 30 * 86400000).toISOString() },
+        postedAt: {
+          $gte: new Date(Date.now() - JOB_WINDOW_MS).toISOString(),
+          $lte: new Date().toISOString(),
+        },
         $or: [
           { expiresAt: { $exists: false } },
           { expiresAt: { $gte: new Date().toISOString() } },
@@ -47,7 +51,9 @@ export async function GET() {
         latest?.revision !== DISCOVERY_REVISION ||
         !latest?.checkedAt ||
         Date.now() - Date.parse(latest.checkedAt) >
-          (latest.successfulSources?.length ? 6 * 3600000 : 15 * 60000),
+          (latest.successfulSources?.length
+            ? DISCOVERY_REFRESH_MS
+            : 15 * 60000),
       jobs: jobs
         .filter(
           (j) =>

@@ -49,7 +49,7 @@ test("profile-based CV never dumps residual source text, while genuine sections 
   const built = await buildResume(profile, target, false);
   const content = built.content;
   assert.equal(content.additional, undefined);
-  assert.equal(content.projects, projects);
+  assert.deepEqual(resumeEntries(content.projects), resumeEntries(projects));
   assert.match(content.summary, /^Software developer building/);
   assert.match(content.contributions!, /Community Code Event/);
   assert.match(content.training!, /Security Labs/);
@@ -84,7 +84,7 @@ test("legacy cleanup creates a separate copy and keeps named qualifications out 
   const cleaned = cleanResumeLayout(legacy);
   assert.deepEqual(legacy, original);
   assert.equal(cleaned.additional, undefined);
-  assert.equal(cleaned.projects, projects);
+  assert.deepEqual(resumeEntries(cleaned.projects), resumeEntries(projects));
   assert.match(cleaned.contributions!, /2 editions/);
   assert.match(cleaned.training!, /practice exercises/);
 });

@@ -1,3 +1,4 @@
+import { JOB_WINDOW_MS } from "./job-freshness";
 import { createHash } from "node:crypto";
 import { XMLParser } from "fast-xml-parser";
 import { eligibility, plainText, relevant, fullyRemote } from "./matching";
@@ -331,8 +332,8 @@ export async function discover() {
       const age = Date.now() - Date.parse(j.date);
       if (
         !Number.isFinite(age) ||
-        age < -86400000 ||
-        age > 30 * 86400000 ||
+        age < 0 ||
+        age > JOB_WINDOW_MS ||
         (j.expiresAt && Date.parse(j.expiresAt) < Date.now())
       ) {
         report.excluded.age++;

@@ -1,5 +1,6 @@
 "use client";
 import Link from "next/link";
+import { DISCOVERY_REFRESH_MS, recentPosting } from "@/lib/job-freshness";
 import SocialIntake from "@/components/social-intake";
 import CvUpload from "@/components/cv-upload";
 import CvBuilder from "@/components/cv-builder";
@@ -71,7 +72,7 @@ const ago = (value: string, now: number) => {
     : `${Math.floor(hours / 24)}d ago`;
 };
 export default function Home() {
-  const [now] = useState(() => Date.now());
+  const [now, setNow] = useState(() => Date.now());
   const [tab, setTab] = useState("Job Finder");
   const [jobs, setJobs] = useState<Job[]>([]);
   const [applications, setApplications] = useState<Application[]>([]);
@@ -81,7 +82,7 @@ export default function Home() {
   const [message, setMessage] = useState("");
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState("All opportunities");
-  const [fresh, setFresh] = useState("30");
+  const [fresh, setFresh] = useState("3");
   const [review, setReview] = useState(false);
   const [selected, setSelected] = useState<Job>();
   const [notices, setNotices] = useState<{ id: string; title: string }[]>([]);
@@ -143,6 +144,24 @@ export default function Home() {
       active = false;
     };
   }, [receiveDiscovery]);
+  const backgroundSearch = useRef(false);
+  const lastBackgroundAttempt = useRef(0);
+  useEffect(() => {
+    const tick = () => {
+      const current = Date.now();
+      setNow(current);
+      if (document.visibilityState !== "visible" || !checked || busy || backgroundSearch.current || current - Date.parse(checked) < DISCOVERY_REFRESH_MS || current - lastBackgroundAttempt.current < 15 * 60000) return;
+      backgroundSearch.current = true;
+      lastBackgroundAttempt.current = current;
+      void api<DiscoveryResponse>("discover", "POST").then((data) => {
+        receiveDiscovery(data);
+        if (data.failures?.length) setMessage(data.failures.join(" · "));
+      }).catch((error) => setMessage(error instanceof Error ? error.message : "Automatic search could not be completed.")).finally(() => { backgroundSearch.current = false; });
+    };
+    const timer = setInterval(tick, 60000);
+    document.addEventListener("visibilitychange", tick);
+    return () => { clearInterval(timer); document.removeEventListener("visibilitychange", tick); };
+  }, [checked, busy, receiveDiscovery]);
   async function task(name: string, work: () => Promise<void>) {
     setBusy(name);
     setMessage("");
@@ -157,12 +176,14 @@ export default function Home() {
   async function findJobs() {
     autoSearched.current = true;
     await task("discovery", async () => {
+      const previous = new Set(jobs.map((job) => job.id));
       const data = await api<DiscoveryResponse>("discover", "POST");
       receiveDiscovery(data);
+      const added = data.jobs.filter((job) => !previous.has(job.id)).length;
       setMessage(
         data.failures?.length
           ? data.failures.join(" · ")
-          : `Discovery complete. ${data.jobs.length} relevant openings found.${data.persisted ? "" : " Connect MongoDB to save jobs."}`,
+          : `Search checked: ${data.jobs.length} openings posted within 72 hours. ${added ? `${added} added since the previous check.` : "No new listings since the previous check."}${data.persisted ? "" : " Connect MongoDB to save jobs."}`,
       );
       if (health?.database && data.persisted) setNotices(await api("notifications"));
     });
@@ -194,16 +215,16 @@ export default function Home() {
             (category === "Development"
               ? !/security|soc/i.test(j.title)
               : /security|soc/i.test(j.title))) &&
-          now - Date.parse(j.postedAt) <= Number(fresh) * 86400000,
+          recentPosting(j.postedAt, now) && now - Date.parse(j.postedAt) <= Number(fresh) * 86400000,
       ),
     [jobs, query, category, review, fresh, now],
   );
   const freshCount = jobs.filter(
     (j) =>
-      now - Date.parse(j.postedAt) < 72 * 3600000 &&
+      recentPosting(j.postedAt, now) &&
       j.eligibility === "eligible",
   ).length;
-  const reviewCount = jobs.filter((j) => j.eligibility === "review").length;
+  const reviewCount = jobs.filter((j) => recentPosting(j.postedAt, now) && j.eligibility === "review").length;
   const sourcesUnavailable = sourceReports.length > 0 && sourceReports.every((s) => s.status === "error");
   return (
     <div className="app-shell">
@@ -462,7 +483,6 @@ export default function Home() {
                   value={fresh}
                   onChange={(e) => setFresh(e.target.value)}
                 >
-                  <option value="30">Last 30 days</option>
                   <option value="3">Last 72 hours</option>
                   <option value="1">Last 24 hours</option>
                 </select>
