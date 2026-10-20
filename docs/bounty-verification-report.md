@@ -54,5 +54,6 @@ All eight attempted query pages succeeded. The run was intentionally bounded by 
 - All 50 desktop/mobile browser checks passed after scoping an existing ambiguous Remotive selector to its source article. The other 48 checks passed in the full run; both dashboard checks passed on the targeted rerun.
 - A separate live-data Chromium check passed for discovery → MongoDB → snapshot → dashboard filtering.
 - Production webpack build passed. Deployment uses the existing default build configuration.
+- The first GitHub run exposed an infrastructure failure: MongoDB 8 refused the moving runner kernel (Linux >= 6.19), causing database connection failures. CI now pins the documented Ubuntu 22.04 / Linux 6.8 runner image and checks MongoDB health before executing tests. No database test was removed or skipped.
 
 Job Finder and YouTube behavior were preserved. Remaining limitation: there is no working authorized source for independent automatic funding confirmation, and no verified-funded live result was manufactured to fill the list.
