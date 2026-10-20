@@ -89,7 +89,7 @@ test("bounty normalization keeps money mentions unverified and source evidence d
     analyzeBounty(b, "React, TypeScript").criteria.find(
       (c) => c.label === "Payment evidence",
     )?.points,
-    0,
+    undefined,
   );
   assert.equal(
     normalizeIssue(issue({ assignees: [{ login: "contributor" }] })).status,
@@ -110,7 +110,7 @@ test("canonical IDs deduplicate GitHub imports and reward filtering never mixes 
       verification: "user-verified",
       evidenceUrl: a.url,
       fundingType: "escrow",
-      payoutEvidenceUrl: "https://example.com/payout/123",
+      authoritativeConfirmation: { authority: "Test escrow provider", taskUrl: a.issueUrl || a.url, validUntil: new Date(Date.now() + 86400000).toISOString() },
       conditions: "On approved submission",
       eligibility: "Unknown",
       verifiedAt: new Date().toISOString(),
@@ -124,13 +124,13 @@ test("canonical IDs deduplicate GitHub imports and reward filtering never mixes 
   };
   assert.equal(deduplicateBounties([a, b]).length, 1);
   assert.deepEqual(filterBounties([a, b], {}).map((v) => v.reward?.amount), ["100.00"]);
-  assert.equal(filterBounties([a], { includeUnverified: true }).length, 1);
+  assert.equal(filterBounties([a], { verification: "All paid or potentially paid" }).length, 1);
   for (const reward of [
     { ...b.reward!, evidenceUrl: "" },
     { ...b.reward!, amount: "0" },
     { ...b.reward!, conditions: "" },
     { ...b.reward!, fundingType: undefined },
-    { ...b.reward!, payoutEvidenceUrl: "" },
+    { ...b.reward!, authoritativeConfirmation: undefined },
   ]) {
     assert.equal(filterBounties([{ ...b, reward }], {}).length, 0);
   }

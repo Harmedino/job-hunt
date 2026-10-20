@@ -1,5 +1,8 @@
 "use client";
 import { useMemo, useState } from "react";
+import { BountyDiagnostics } from "./bounty-diagnostics";
+import { bountyClassification, fundingStatus, fundingStatuses, opportunityReward, paymentRisk } from "@/lib/modules/bounty-verification";
+import { bountyEmptyReason } from "@/lib/modules/bounties-client";
 import {
   bountyEarnings,
   filterBounties,
@@ -34,6 +37,7 @@ export default function BountyWorkspace({
   const [view, setView] = useState("Discover");
   const [filters, setFilters] = useState<BountyFilters>({});
   const [page, setPage] = useState(0);
+  const [filterVersion, setFilterVersion] = useState(0);
   const [selectedId, setSelectedId] = useState("");
   const data = w.data;
   const selected = data?.bounties.find((b) => b.id === selectedId);
@@ -93,7 +97,7 @@ export default function BountyWorkspace({
                     }>("bounties/discover", { query: f.query });
                     w.setMessage(
                       result.failures.join(" ") ||
-                        `Checked ${result.count} source tasks. Only tasks with recorded funding evidence appear by default; unverified tasks are hidden.`,
+                        `Saved ${result.count} unique source tasks. Verified Funded is your default view; see diagnostics for classifications and source failures.`,
                     );
                   },
                   true,
@@ -175,29 +179,24 @@ export default function BountyWorkspace({
             </details>
           </Section>
           <Section title="Filter candidates">
-            <p>
-              Showing tasks with funding and past payout evidence you have checked. Open the
-              evidence and confirm the reward and acceptance terms before working.
-              This is not an independent escrow check or a payout guarantee.
-            </p>
-            <label>
-              <input
-                type="checkbox"
-                checked={!!filters.includeUnverified}
-                onChange={(e) => {
-                  setFilters((old) => ({ ...old, includeUnverified: e.target.checked }));
-                  setPage(0);
-                }}
-              />{" "}
-              Include unverified tasks for review
+            <p>Verified Funded is the default. Current authoritative funding evidence is required; previous payout history is optional. Evidence is manually checked and expires after seven days. No payout is guaranteed.</p>
+            <label className="module-field">
+              <span>Funding verification</span>
+              <select
+                value={filters.verification || "Verified Funded"}
+                onChange={(e) => { setFilters((old) => ({ ...old, verification: e.target.value })); setPage(0); }}
+              >
+                {["Verified Funded", "All paid or potentially paid", ...fundingStatuses.slice(1), "Inactive"].map((status) => <option key={status}>{status}</option>)}
+              </select>
             </label>
             <form
+              key={filterVersion}
               className="module-form module-filters"
               onSubmit={(e) => {
                 e.preventDefault();
                 const f = fields(e.currentTarget);
                 setFilters({
-                  includeUnverified: filters.includeUnverified,
+                  verification: filters.verification,
                   keyword: f.keyword,
                   language: f.language,
                   difficulty: f.difficulty,
@@ -243,14 +242,14 @@ export default function BountyWorkspace({
                   "unknown",
                 ]}
               />
-              <Field label="Relevant skill" name="skill" />
+              <Select label="Relevant technology" name="skill" options={["", "React", "Next.js", "Angular", "JavaScript", "TypeScript", "Node.js", "Python", "PHP", "Laravel", "Express", "MongoDB", "Firebase"]} />
               <Field
                 label="Currency for reward filtering"
                 name="currency"
                 placeholder="USD"
               />
-              <Field label="Minimum verified reward" name="min" type="number" />
-              <Field label="Maximum verified reward" name="max" type="number" />
+              <Field label="Minimum confirmed or advertised reward" name="min" type="number" />
+              <Field label="Maximum confirmed or advertised reward" name="max" type="number" />
               <Field
                 label="Updated or published since"
                 name="since"
@@ -259,14 +258,15 @@ export default function BountyWorkspace({
               <Select
                 label="Sort by"
                 name="sort"
-                options={["newest", "reward", "match", "effort"]}
+                options={["relevance", "newest", "reward", "effort", "payment risk"]}
               />
               <button className="secondary">Apply filters</button>
+              <button type="button" className="secondary" onClick={() => { setFilters({}); setPage(0); setFilterVersion((v) => v + 1); }}>Reset filters</button>
             </form>
             <small>
-              Reward ranges require a currency. Currencies are never converted
+              {results.length} displayed · {(data?.bounties.length || 0) - results.length} excluded by active filters. Reward ranges require a currency. Currencies are never converted
               or added together. Effort sorts by AI’s uncertain lower-hour
-              estimate when available, then source difficulty. Use Analyze Task
+              estimate when available, when available; unknown effort stays unknown. Use Analyze Task
               to request an estimate.
             </small>
           </Section>
@@ -285,22 +285,18 @@ export default function BountyWorkspace({
                   {b.repository} · {b.language}
                 </p>
                 <p className={hasFundingEvidence(b) ? "module-good" : "module-risk"}>
-                  {hasFundingEvidence(b) && b.reward
-                    ? `${b.reward.currency} ${b.reward.amount} · owner-verified evidence`
-                    : "Funding unverified"}
+                  {bountyClassification(b)}{bountyClassification(b) === "Inactive" ? ` · ${fundingStatus(b)}` : ""}
                 </p>
-                {hasFundingEvidence(b) && b.reward && (
-                  <p>
-                    <LinkOut url={b.reward.evidenceUrl}>View funding evidence</LinkOut>{" "}
-                    <LinkOut url={b.reward.payoutEvidenceUrl!}>View past payout proof</LinkOut>
-                  </p>
-                )}
-                {!b.reward && b.rewardMention && (
-                  <small>Unverified mention: {b.rewardMention}</small>
-                )}
+                <p>{opportunityReward(b) ? `${opportunityReward(b)!.currency} ${opportunityReward(b)!.amount} · ${hasFundingEvidence(b) ? "confirmed funding, manually checked" : "advertised; unconfirmed funding"}` : "Reward not disclosed"}</p>
+                {!opportunityReward(b) && b.rewardMention && <small>Unverified mention: {b.rewardMention}</small>}
+                {(b.reward?.evidenceUrl || b.rewardAnnouncement?.evidenceUrl) && <p><LinkOut url={b.reward?.evidenceUrl || b.rewardAnnouncement!.evidenceUrl}>View verification evidence</LinkOut></p>}
+                {b.reward?.payoutEvidenceUrl && <p><LinkOut url={b.reward.payoutEvidenceUrl}>Past payout evidence (separate)</LinkOut></p>}
+                <p>{paymentRisk(b)}</p>
+                <small>Last issue check: {b.checkedAt ? new Date(b.checkedAt).toLocaleString() : "Not checked"}. Funding check: {b.reward?.verifiedAt ? new Date(b.reward.verifiedAt).toLocaleString() : "Unconfirmed"}.</small>
+                <p>Estimated completion: {b.analysis?.ai ? b.analysis.ai.effort : "Unknown; analyze task for an uncertain estimate"}</p>
                 <p>{b.skills.join(" · ") || "Skills need review"}</p>
                 <p>
-                  Match {b.analysis?.score ?? "Not scored"}/100 · {b.difficulty}{" "}
+                  Technical match {b.analysis?.score ?? "Not scored"}/100 · {b.difficulty}{" "}
                   difficulty
                 </p>
                 <p>
@@ -327,12 +323,12 @@ export default function BountyWorkspace({
             ))}
           </div>
           {!results.length && (
-            <Empty>
-              {filters.includeUnverified
-                ? "No matching bounty candidates. Refresh the official GitHub search or import a task URL."
-                : "No matching tasks with recorded funding evidence and past payout proof. Unverified tasks are hidden. You can include them for review, but a bounty label or promised amount is not proof of funding."}
-            </Empty>
+            <>
+              <Empty>{bountyEmptyReason(data?.bounties || [], data?.sources || [], filters)}</Empty>
+              {!!data?.bounties.length && <button className="secondary" onClick={() => { setFilters({ verification: "All paid or potentially paid" }); setFilterVersion((v) => v + 1); setPage(0); }}>Show potentially paid tasks</button>}
+            </>
           )}
+          <BountyDiagnostics bounties={data?.bounties || []} sources={data?.sources || []} displayed={results.length} />
           <Pages count={results.length} page={page} setPage={setPage} />
         </>
       )}
@@ -578,9 +574,12 @@ export default function BountyWorkspace({
                 "Last issue verification":
                   selected.checkedAt || "Not automatically verified",
                 Deadline: selected.deadline || "Unconfirmed",
-                Reward: selected.reward
-                  ? `${selected.reward.currency} ${selected.reward.amount} · owner-verified, ${selected.reward.verifiedAt}`
-                  : "Unverified",
+                Reward: opportunityReward(selected)
+                  ? `${opportunityReward(selected)!.currency} ${opportunityReward(selected)!.amount} · ${hasFundingEvidence(selected) ? "confirmed funding, manually checked" : "advertised; unconfirmed funding"}`
+                  : "Reward not disclosed",
+                "Funding verification": fundingStatus(selected),
+                "Evidence authority": selected.reward?.authoritativeConfirmation?.authority || "No authoritative current-funding confirmation",
+                "Funding evidence expires": selected.reward?.authoritativeConfirmation?.validUntil || "Not confirmed",
                 Conditions: selected.reward?.conditions || "Unknown",
                 Eligibility:
                   selected.reward?.eligibility || "Unverified for Nigeria",
@@ -662,7 +661,7 @@ export default function BountyWorkspace({
             <details>
               <summary>Record funding evidence you have checked</summary>
               <p>
-                This is owner verification, not an automated provider funding
+                This records a manual check of authoritative funding evidence, not an automated provider funding
                 guarantee. Funding is separate from actual receipt.
               </p>
               <form
@@ -674,6 +673,7 @@ export default function BountyWorkspace({
                     ...f,
                     bountyId: selected.id,
                     confirmed: f.confirmed === "on",
+                    fundingConfirmed: f.fundingConfirmed === "on",
                   });
                 }}
               >
@@ -696,11 +696,12 @@ export default function BountyWorkspace({
                   options={["", "escrow", "deposit"]}
                 />
                 <Field
-                  label="Sponsor’s completed payout evidence URL"
+                  label="Sponsor’s completed payout evidence URL (optional)"
                   name="payoutEvidenceUrl"
                   type="url"
-                  required
                 />
+                <Field label="Authoritative funding source (provider or escrow authority)" name="authority" required />
+                <label><input type="checkbox" name="fundingConfirmed" required /> I checked an authoritative source confirming current escrow or deposited funds for this exact task and amount. A promise or past payout is insufficient.</label>
                 <Field
                   label="Verified payment conditions"
                   name="conditions"
@@ -721,7 +722,7 @@ export default function BountyWorkspace({
                 />
                 <label>
                   <input type="checkbox" name="confirmed" required /> I checked
-                  the escrow or deposited funds, past payout proof and conditions.
+                  the current funding evidence and conditions. Past payout history is optional.
                 </label>
                 <button className="primary" disabled={!!w.busy}>
                   Save funding evidence

@@ -27,6 +27,7 @@ import {
   reserveYoutubeQuota,
 } from "../src/lib/modules/youtube";
 import { snapshot } from "../src/lib/modules/workspace";
+import { hasFundingEvidence } from "../src/lib/modules/bounty-verification";
 import type {
   Bounty,
   ContentIdea,
@@ -104,7 +105,8 @@ test(
         evidenceUrl: bounty.url,
         confirmed: true,
         fundingType: "escrow",
-        payoutEvidenceUrl: "https://example.com/payout/123",
+        fundingConfirmed: true,
+        authority: "Test escrow provider",
         conditions: "Payment on approved PR",
         eligibility: "Unverified for Nigeria",
       },
@@ -115,6 +117,7 @@ test(
       (await get<Bounty>("bounties", bounty.id)).reward?.amount,
       "500",
     );
+    assert.equal(hasFundingEvidence(await get<Bounty>("bounties", bounty.id)), true);
     await assert.rejects(
       () => saveRecord("tracked", { bountyId: bounty.id, status: "Paid" }, ""),
       /actual received/,

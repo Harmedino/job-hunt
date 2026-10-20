@@ -43,7 +43,7 @@ test("dashboard navigation, empty states, and setup guidance", async ({
     page.getByText("Your next opportunity is out there."),
   ).toBeVisible();
   await page.getByRole("button", { name: "Browse job sources" }).click();
-  await expect(page.getByText("Remotive", { exact: true })).toBeVisible();
+  await expect(page.getByRole("article").getByText("Remotive", { exact: true })).toBeVisible();
   await page
     .getByRole("button", { name: "Find publisher social links" })
     .click();

@@ -109,6 +109,7 @@ async function fixtures(page: Page, bounties: WorkspaceSnapshot["bounties"] = []
         sponsor: "Unverified",
         assignees: [],
         difficulty: "unknown",
+        bountySignal: true,
       });
       return route.fulfill({ json: state.bounties[0] });
     }
@@ -151,7 +152,7 @@ test("separate module tabs preserve job finder and profile navigation and show h
     page.getByRole("heading", { name: "Find paid coding opportunities" }),
   ).toBeVisible();
   await expect(
-    page.getByText("No matching tasks with recorded funding evidence and past payout proof.", { exact: false }),
+    page.getByText("No opportunities have been saved yet.", { exact: false }),
   ).toBeVisible();
   await page
     .getByRole("button", { name: "Refresh opportunities", exact: true })
@@ -198,15 +199,16 @@ test("funding evidence is visible while unverified tasks are hidden by default",
     reward: {
       amount: "100", currency: "USD", verification: "user-verified",
       evidenceUrl: "https://github.com/example/project/issues/1#issuecomment-123",
-      fundingType: "escrow", payoutEvidenceUrl: "https://example.com/completed-payout/123",
+      fundingType: "escrow",
+      authoritativeConfirmation: { authority: "Test escrow provider", taskUrl: "https://github.com/example/project/issues/1", validUntil: new Date(Date.now() + 86400000).toISOString() },
       conditions: "Accepted submission", eligibility: "Check payout provider",
-      verifiedAt: "2026-10-19T00:00:00Z",
+      verifiedAt: new Date().toISOString(),
     },
   };
-  await fixtures(page, [bounty, { ...bounty, id: "unverified-test", title: "Unverified task", reward: undefined }]);
+  await fixtures(page, [bounty, { ...bounty, id: "unverified-test", title: "Unverified task", reward: undefined, bountySignal: true }]);
   await page.goto("/");
   await page.getByRole("button", { name: "Coding Bounties", exact: true }).click();
-  await expect(page.getByRole("link", { name: "View funding evidence", exact: false })).toHaveAttribute("href", bounty.reward!.evidenceUrl);
+  await expect(page.getByRole("link", { name: "View verification evidence", exact: false })).toHaveAttribute("href", bounty.reward!.evidenceUrl);
   await expect(page.getByRole("heading", { name: "Unverified task", exact: true })).toHaveCount(0);
   await page.getByRole("button", { name: "View task", exact: true }).click();
   await page.getByRole("button", { name: "Analyze Task", exact: true }).click();
@@ -214,10 +216,13 @@ test("funding evidence is visible while unverified tasks are hidden by default",
   await expect(dialog).toContainText("Basic task analysis is available below");
   await expect(dialog).toContainText("Explainable score: 20/100");
   await dialog.getByRole("button", { name: /close/i }).click();
-  await page.getByLabel("Include unverified tasks for review").check();
+  await page.getByRole("combobox", { name: "Funding verification", exact: true }).selectOption("All paid or potentially paid");
   await expect(page.getByRole("heading", { name: "Unverified task", exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Apply filters", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Unverified task", exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Reset filters", exact: true }).click();
+  await expect(page.getByRole("combobox", { name: "Funding verification", exact: true })).toHaveValue("Verified Funded");
+  await expect(page.getByRole("heading", { name: "Unverified task", exact: true })).toHaveCount(0);
 });
 test("manual bounty import never labels an unverified task as funded", async ({
   page,
@@ -240,7 +245,7 @@ test("manual bounty import never labels an unverified task as funded", async ({
     .fill("Test-only bounty fixture");
   await page.getByRole("button", { name: "Import task", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Test-only bounty fixture", exact: true })).toHaveCount(0);
-  await page.getByLabel("Include unverified tasks for review").check();
+  await page.getByRole("combobox", { name: "Funding verification", exact: true }).selectOption("All paid or potentially paid");
   await expect(
     page.getByRole("heading", {
       name: "Test-only bounty fixture",
@@ -248,7 +253,7 @@ test("manual bounty import never labels an unverified task as funded", async ({
     }),
   ).toBeVisible();
   await expect(
-    page.getByText("Funding unverified", { exact: true }),
+    page.locator("article").getByText("Unverified Bounty", { exact: true }),
   ).toBeVisible();
   await page.getByRole("button", { name: "View task", exact: true }).click();
   const dialog = page.getByRole("dialog", { name: "Bounty details" });
