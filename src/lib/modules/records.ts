@@ -145,12 +145,19 @@ export async function saveRecord(kind: string, input: unknown, skills: string) {
         throw new ModuleError("Confirm that you checked funding evidence.");
       if (o.fundingType !== "escrow" && o.fundingType !== "deposit")
         throw new ModuleError("Confirm escrow or deposited funding; a promised reward is not funded.");
+      if (o.fundingConfirmed !== true)
+        throw new ModuleError("Confirm that an authoritative source identifies current funding for this exact task; a reward announcement or past payout is insufficient.");
       const reward: NonNullable<Bounty["reward"]> = {
         ...money(o.amount, o.currency),
         verification: "user-verified" as const,
         evidenceUrl: httpsUrl(o.evidenceUrl, true),
         fundingType: o.fundingType,
-        payoutEvidenceUrl: httpsUrl(o.payoutEvidenceUrl, true),
+        payoutEvidenceUrl: httpsUrl(o.payoutEvidenceUrl || "", false),
+        authoritativeConfirmation: {
+          authority: text(o.authority, "funding authority", 500, true),
+          taskUrl: bounty.issueUrl || bounty.url,
+          validUntil: new Date(Date.parse(now) + 7 * 86400000).toISOString(),
+        },
         conditions: text(o.conditions, "payment conditions", 4000, true),
         eligibility: text(
           o.eligibility || "Unverified for Nigeria",

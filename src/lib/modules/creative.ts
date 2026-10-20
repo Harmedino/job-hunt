@@ -13,6 +13,7 @@ import type {
 } from "./types";
 import { get, lease, ownerFilter, OWNER, put } from "./store";
 import { ModuleError, number, object, stringList, text } from "./validation";
+import { fundingStatus, hasFundingEvidence, opportunityReward, paymentRisk } from "./bounty-verification";
 async function generated(
   instructions: string,
   data: unknown,
@@ -81,7 +82,10 @@ export async function taskPlan(bounty: Bounty, skills: string) {
         language: bounty.language,
         skills: bounty.skills,
         status: bounty.status,
-        reward: bounty.reward,
+        reward: hasFundingEvidence(bounty) ? bounty.reward : undefined,
+        advertisedReward: hasFundingEvidence(bounty) ? undefined : opportunityReward(bounty),
+        fundingStatus: fundingStatus(bounty),
+        paymentRisk: paymentRisk(bounty),
         assignees: bounty.assignees,
         comments: bounty.comments,
         repositoryPushedAt: bounty.repositoryPushedAt,

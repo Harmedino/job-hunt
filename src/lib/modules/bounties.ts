@@ -4,6 +4,7 @@ import { githubIssue, httpsUrl, ModuleError, object, text } from "./validation";
 import { providerJson } from "./http";
 import { get, lease, list, put, OWNER } from "./store";
 import { db } from "../db";
+import { bountyClassification, hasFundingEvidence, paymentRisk, sourceRewardAnnouncement } from "./bounty-verification";
 export function normalizeIssue(
   value: unknown,
   repository?: Record<string, unknown>,
@@ -42,6 +43,7 @@ export function normalizeIssue(
     "Tailwind",
     "PHP",
     "Laravel",
+    "Python",
   ].filter((skill) =>
     `${issue.title} ${body} ${labels.join(" ")} ${language}`
       .toLowerCase()
@@ -82,6 +84,15 @@ export function normalizeIssue(
     rewardMention: `${issue.title} ${body}`.match(
       /(?:USD|EUR|GBP|NGN|\$|€|£)\s*[\d,.]+/i,
     )?.[0],
+    labels,
+    bountySignal: labels.some((l) => /bounty|reward|paid/i.test(l)) || /\bbount(?:y|ies)\b|cash reward|\/bounty\b/i.test(`${issue.title} ${body}`),
+    rewardAnnouncement: sourceRewardAnnouncement(
+      String(issue.title || ""), body,
+      ["OWNER", "MEMBER", "COLLABORATOR"].includes(String(issue.author_association)) ||
+        (typeof issue.user === "object" && !!issue.user && String(object(issue.user).login).toLowerCase() === link.repository.split("/")[0].toLowerCase()),
+      typeof issue.user === "object" && issue.user ? String(object(issue.user).login || "Unknown") : "Unknown",
+      link.url,
+    ),
     difficulty: labels.some((l) => /good first issue|easy/i.test(l))
       ? "easy"
       : labels.some((l) => /hard|complex/i.test(l))
@@ -132,13 +143,13 @@ export function analyzeBounty(bounty: Bounty, skills: string): BountyAnalysis {
     {
       label: "Skill compatibility",
       points: Math.round(
-        40 *
+        60 *
           Math.min(
             1,
             matchedSkills.length / Math.max(1, Math.min(configured.length, 5)),
           ),
       ),
-      maximum: 40,
+      maximum: 60,
       reason: configured.length
         ? `${matchedSkills.length} configured skills found in task metadata; not proof of ability.`
         : "Add your skills in My Profile.",
@@ -148,14 +159,6 @@ export function analyzeBounty(bounty: Bounty, skills: string): BountyAnalysis {
       points: bounty.status === "open" ? 15 : 0,
       maximum: 15,
       reason: `Source status: ${bounty.status}. Assignees do not reveal every competitor.`,
-    },
-    {
-      label: "Payment evidence",
-      points: bounty.reward ? 20 : 0,
-      maximum: 20,
-      reason: bounty.reward
-        ? "Owner recorded funding evidence. Recheck terms before starting; no payout guarantee."
-        : "No funding confirmation. A money mention or label does not verify payment.",
     },
     {
       label: "Issue clarity",
@@ -195,9 +198,7 @@ export function analyzeBounty(bounty: Bounty, skills: string): BountyAnalysis {
         : "Low: manual or incomplete evidence",
     matchedSkills,
     criteria,
-    paymentRisk: bounty.reward
-      ? "Owner-verified funding evidence; payout remains conditional. Verify sponsor, current funding and acceptance terms."
-      : "HIGH — funding is unverified. Do not rely on the score as payment assurance.",
+    paymentRisk: paymentRisk(bounty),
     eligibility:
       bounty.reward?.eligibility ||
       "Nigeria payout eligibility, fees and geographic restrictions are unverified. Ask the sponsor and payment provider.",
@@ -214,6 +215,7 @@ export async function persistBounty(bounty: Bounty, skills: string) {
   });
   // Source refresh never overwrites user evidence or original manual provenance.
   const value = {
+    ...existing,
     ...bounty,
     ...(existing?.reward ? { reward: existing.reward } : {}),
     ...(existing?.manual
@@ -221,6 +223,9 @@ export async function persistBounty(bounty: Bounty, skills: string) {
       : {}),
   };
   value.analysis = analyzeBounty(value, skills);
+  if (existing?.updatedAt === value.updatedAt && existing?.description === value.description && existing?.status === value.status && JSON.stringify(existing?.reward) === JSON.stringify(value.reward) && existing?.analysis?.ai) {
+    value.analysis.ai = existing.analysis.ai;
+  }
   await put("bounties", value);
   const database = await db();
   const tracked = await (await import("./store")).collection("tracked");
@@ -242,7 +247,7 @@ export async function persistBounty(bounty: Bounty, skills: string) {
       {
         $setOnInsert: {
           id: noticeId,
-          title: `${saved ? "Saved task updated" : "New bounty candidate"}: ${value.title}${value.reward ? "" : " (payment unverified)"}`,
+          title: `${saved ? "Saved task updated" : "New bounty candidate"}: ${value.title}${hasFundingEvidence(value) ? "" : " (payment unverified)"}`,
           createdAt: new Date().toISOString(),
           read: false,
         },
@@ -252,84 +257,84 @@ export async function persistBounty(bounty: Bounty, skills: string) {
   }
   return value;
 }
-export async function discoverBounties(query: string, skills: string) {
-  if (!(await lease("bounty-discovery", 120)))
-    throw new ModuleError(
-      "Discovery was recently requested. Wait two minutes before refreshing.",
-      429,
-    );
-  let count = 0;
+export function bountyQueries(query: string) {
+  const clean = query.replace(/\b(?:is|state|type):\S+/gi, "").trim();
+  const qualifiers = clean.match(/(?:repo|org|user|language):[^\s]+/gi) || [];
+  const terms = clean.replace(/(?:repo|org|user|language):[^\s]+/gi, "").split(/[\s,;]+/).filter(Boolean).slice(0, 6);
+  return ["label:bounty", "bounty", '"reward"', '"paid"', '"cash reward"', '"/bounty"'].map((signal, i) =>
+    `is:public is:issue is:open ${signal} ${qualifiers.join(" ")} ${terms.length ? terms[i % terms.length] : ""}`.trim(),
+  );
+}
+export async function collectBountyCandidates(query: string, request = github, maxRequests = process.env.BOUNTY_GITHUB_TOKEN ? 12 : 8) {
+  const diagnostics: NonNullable<import("./types").SourceState["diagnostics"]> = {
+    queries: [], raw: 0, duplicates: 0, saved: 0, rejected: 0, classifications: {}, bounded: false,
+  };
+  const unique = new Map<string, unknown>();
   const failures: string[] = [];
-  const queries = [
-    `is:public is:issue is:open label:bounty ${query}`,
-    `is:public is:issue is:open label:reward ${query}`,
-  ];
-  const repositories = new Map<string, Record<string, unknown> | undefined>();
-  for (const q of queries) {
-    try {
-      const result = object(
-        await github(
-          `/search/issues?${new URLSearchParams({ q, sort: "updated", order: "desc", per_page: "30" })}`,
-        ),
-      );
-      const items = Array.isArray(result.items) ? result.items : [];
-      const repoNames = [
-        ...new Set(items.map((item) => normalizeIssue(item).repository)),
-      ]
-        .filter((name) => !repositories.has(name))
-        .slice(0, 6);
-      await Promise.allSettled(
-        repoNames.map(async (name) => {
-          const metadata = await github(
-            `/repos/${name.split("/").map(encodeURIComponent).join("/")}`,
-          )
-            .then(object)
-            .catch(() => undefined);
-          repositories.set(name, metadata);
-        }),
-      );
-      for (const item of items) {
-        try {
-          const initial = normalizeIssue(item);
-          const repo = repositories.get(initial.repository);
-          if (repo?.private) continue;
-          await persistBounty(normalizeIssue(item, repo), skills);
-          count++;
-        } catch (e) {
-          if (!(e instanceof ModuleError)) throw e;
-        }
+  const queries = bountyQueries(query);
+  const exhausted = new Set<string>();
+  const start = Date.now();
+  let retryAt: string | undefined;
+  outer: for (let page = 1; page <= 2; page++) {
+    for (const q of queries) {
+      if (exhausted.has(q)) continue;
+      if (diagnostics.queries.length >= maxRequests || Date.now() - start > 22000) {
+        diagnostics.bounded = true; break outer;
       }
-      if (result.incomplete_results)
-        failures.push(
-          "GitHub search returned partial results. Narrow the query and retry.",
-        );
-    } catch (e) {
-      failures.push(
-        e instanceof ModuleError ? e.message : "Discovery storage unavailable.",
-      );
-      if (e instanceof ModuleError && e.status === 429) {
-        await put("sources", {
-          id: "github",
-          name: "GitHub",
-          mode: "Official API",
-          message: e.message,
-          retryAt: e.retryAt,
-          checkedAt: new Date().toISOString(),
-        } as { id: string });
-        break;
+      try {
+        const result = object(await request(`/search/issues?${new URLSearchParams({ q, sort: "updated", order: "desc", per_page: "30", page: String(page) })}`));
+        if (!Array.isArray(result.items)) throw new ModuleError("GitHub returned an invalid search response.", 502);
+        diagnostics.queries.push({ query: q, page, returned: result.items.length, success: true });
+        diagnostics.raw += result.items.length;
+        if (result.items.length < 30) exhausted.add(q);
+        if (result.incomplete_results) { diagnostics.bounded = true; failures.push("GitHub returned partial search results."); }
+        for (const item of result.items) {
+          try {
+            const b = normalizeIssue(item);
+            if (unique.has(b.id)) diagnostics.duplicates++;
+            else unique.set(b.id, item);
+          } catch { diagnostics.rejected++; }
+        }
+      } catch (error) {
+        const message = error instanceof ModuleError ? error.message : "GitHub search unavailable.";
+        diagnostics.queries.push({ query: q, page, returned: 0, success: false, error: message });
+        failures.push(message);
+        if (error instanceof ModuleError && error.status === 429) { retryAt = error.retryAt; diagnostics.bounded = true; break outer; }
       }
     }
   }
+  return { items: [...unique.values()], diagnostics, failures: [...new Set(failures)], retryAt };
+}
+export async function discoverBounties(query: string, skills: string) {
+  if (!(await lease("bounty-discovery", 120)))
+    throw new ModuleError("Discovery was recently requested. Wait two minutes before refreshing.", 429);
+  const previous = await get<import("./types").SourceState>("sources", "github").catch(() => undefined);
+  const { items, diagnostics, failures, retryAt } = await collectBountyCandidates(query);
+  const repositories = new Map<string, Record<string, unknown>>();
+  const names = [...new Set(items.map((item) => normalizeIssue(item).repository))].slice(0, 6);
+  await Promise.allSettled(names.map(async (name) => {
+    try { repositories.set(name, object(await github(`/repos/${name.split("/").map(encodeURIComponent).join("/")}`))); } catch { /* Optional language metadata; preserve the issue. */ }
+  }));
+  for (let offset = 0; offset < items.length; offset += 5) {
+    await Promise.all(items.slice(offset, offset + 5).map(async (item) => {
+      const initial = normalizeIssue(item);
+      const repo = repositories.get(initial.repository);
+      if (repo?.private) { diagnostics.rejected++; return; }
+      const saved = await persistBounty(normalizeIssue(item, repo), skills);
+      diagnostics.saved++;
+      const classification = bountyClassification(saved);
+      diagnostics.classifications[classification] = (diagnostics.classifications[classification] || 0) + 1;
+    }));
+  }
+  const success = diagnostics.queries.some((q) => q.success);
   await put("sources", {
-    id: "github",
-    name: "GitHub",
-    mode: "Official API",
-    message:
-      failures.join(" ") ||
-      `Checked ${count} candidates. Funding requires independent verification.`,
-    checkedAt: new Date().toISOString(),
-  } as { id: string });
-  return { count, failures };
+    id: "github", name: "GitHub", mode: "Official API", success,
+    message: `${diagnostics.raw} raw results; ${diagnostics.duplicates} duplicates; ${diagnostics.saved} unique tasks saved. ${failures.join(" ")}${diagnostics.bounded ? " Bounded or partial search; narrow keywords for more coverage." : ""}`,
+    checkedAt: new Date().toISOString(), retryAt,
+    lastSuccessAt: success ? new Date().toISOString() : previous?.lastSuccessAt,
+    diagnostics,
+  });
+  return { count: diagnostics.saved, failures, diagnostics };
 }
 export async function importBounty(
   body: Record<string, unknown>,
@@ -371,6 +376,7 @@ export async function importBounty(
         sponsor: "Unverified",
         assignees: [],
         difficulty: "unknown",
+        bountySignal: true,
       };
   }
   return persistBounty(bounty, skills);

@@ -2,7 +2,7 @@ import { defaultBountySkills } from "./defaults";
 import { aiConfigured } from "../ai";
 import { db } from "../db";
 import { emptyProfile } from "../types";
-import { discoverBounties, verifySavedBounties } from "./bounties";
+import { analyzeBounty, discoverBounties, verifySavedBounties } from "./bounties";
 import { oauthConfigured, channelAnalytics } from "./oauth";
 import { collection, get, lease, list, ownerFilter, put, OWNER } from "./store";
 import { refreshSavedYoutube, savedYoutube, discoverVideos } from "./youtube";
@@ -118,9 +118,10 @@ export async function snapshot(): Promise<WorkspaceSnapshot> {
         .limit(50)
         .toArray(),
     ]);
+    const skills = await ownerSkills();
     return {
       ...base,
-      bounties,
+      bounties: bounties.map((b) => ({ ...b, analysis: { ...b.analysis, ...analyzeBounty(b, skills) } })),
       tracked,
       payments,
       profiles: profiles.some((p) => p.id === "bruno")

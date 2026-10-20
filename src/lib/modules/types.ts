@@ -27,6 +27,11 @@ export type Reward = Money & {
   evidenceUrl: string;
   fundingType?: "escrow" | "deposit";
   payoutEvidenceUrl?: string;
+  authoritativeConfirmation?: {
+    authority: string;
+    taskUrl: string;
+    validUntil: string;
+  };
   conditions: string;
   eligibility: string;
   verifiedAt: string;
@@ -54,6 +59,9 @@ export type Bounty = {
   repositoryPushedAt?: string;
   reward?: Reward;
   rewardMention?: string;
+  labels?: string[];
+  bountySignal?: boolean;
+  rewardAnnouncement?: { evidenceUrl: string; announcedBy: string; reward?: Money };
   difficulty: "unknown" | "easy" | "medium" | "hard";
   analysis?: BountyAnalysis;
 };
@@ -235,6 +243,17 @@ export type SourceState = {
   message: string;
   checkedAt?: string;
   retryAt?: string;
+  success?: boolean;
+  lastSuccessAt?: string;
+  diagnostics?: {
+    queries: { query: string; page: number; returned: number; success: boolean; error?: string }[];
+    raw: number;
+    duplicates: number;
+    saved: number;
+    rejected: number;
+    classifications: Record<string, number>;
+    bounded: boolean;
+  };
 };
 export type IntegrationSummary = {
   id: string;
