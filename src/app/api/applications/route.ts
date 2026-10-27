@@ -67,13 +67,20 @@ export async function PATCH(request: Request) {
       updatedAt: new Date().toISOString(),
     };
     if (status) update.status = status;
-    if (status === "Submitted") update.submittedAt = new Date().toISOString();
+
     if (followUp !== undefined) update.followUp = followUp;
-    const result = await (
-      await db()
-    )
-      .collection("applications")
-      .updateOne({ id }, { $set: update });
+    const database=await db();
+    const application=await database.collection('applications').findOne({id});
+    if(!application)return Response.json({error:'Application not found'},{status:404});
+    const changes:Record<string,unknown>={...update};
+    const query:Record<string,unknown>={id};
+    if(status==='Submitted' && !application.submittedAt){
+      query.submittedAt={$exists:false};
+      changes.submittedAt=new Date().toISOString();
+      const cv=application.cvDraftId?await database.collection('resumes').findOne({id:application.cvDraftId},{projection:{_id:0}}):null;
+      changes.documentSnapshot={cv,coverLetter:application.coverLetter,profileSnapshot:application.profileSnapshot,cvFacts:application.cvFacts,capturedAt:changes.submittedAt};
+    }
+    const result=await database.collection('applications').updateOne(query,{$set:changes});
     if (!result.matchedCount)
       return Response.json({ error: "Application not found" }, { status: 404 });
     return Response.json({ ok: true });

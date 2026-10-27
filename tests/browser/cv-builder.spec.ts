@@ -182,7 +182,7 @@ test("applications open the correct job in CV builder and link an explicit saved
     return r.fulfill({ json: { ok: true, applicationId: application.id } });
   });
   await open(page, [application]);
-  await page.getByRole("button", { name: "Applications", exact: true }).click();
+  await page.getByRole("button", { name: /^Applications(?: \d+)?$/ }).click();
   await page
     .getByRole("button", { name: "Build tailored CV", exact: true })
     .click();
@@ -473,4 +473,20 @@ test("AI is the default and a missing key cannot silently create a basic CV", as
   await expect(
     builder.getByRole("button", { name: "Create basic layout" }),
   ).toBeEnabled();
+});
+
+test('unfinished edits autosave separately, recover explicitly, and expose master comparison and readability checks',async({page})=>{
+ let copy: {content:typeof first.content;coverLetter:string;template:string;updatedAt:string}|undefined;
+ await page.route('**/api/resumes/working**',r=>{if(r.request().method()==='POST'){const b=r.request().postDataJSON();copy={content:b.content,coverLetter:b.coverLetter,template:b.template,updatedAt:new Date().toISOString()};return r.fulfill({json:{ok:true}});}return r.fulfill({json:{copy}});});
+ await page.route('**/api/resumes',r=>r.fulfill({json:r.request().method()==='GET'?{drafts:[first]}:first}));
+ await page.route('**/api/resumes/cv-version-1',r=>r.fulfill({json:first}));
+ await page.route('**/api/resumes/cv-version-1/readability',r=>r.fulfill({json:{selectableText:true,wordCount:120,warnings:[],notice:'Readability checks, not an ATS score.',extractedText:'CV Builder Test React TypeScript'}}));
+ await open(page);await page.getByRole('button',{name:'CV Builder',exact:true}).click();const builder=page.getByRole('region',{name:'CV builder',exact:true});
+ await builder.getByRole('button',{name:/Frontend Developer.*Builder Fixture/}).first().click();
+ await builder.getByLabel('Professional summary',{exact:true}).fill('Unfinished genuine profile edit');
+ await expect(builder.getByText('Unfinished edits autosaved.',{exact:false})).toBeVisible();expect(copy?.content.summary).toBe('Unfinished genuine profile edit');
+ await page.reload();await page.getByRole('button',{name:'CV Builder',exact:true}).click();await builder.getByRole('button',{name:/Frontend Developer.*Builder Fixture/}).first().click();
+ await builder.getByRole('button',{name:'Restore unfinished edits'}).click();await expect(builder.getByLabel('Professional summary',{exact:true})).toHaveValue('Unfinished genuine profile edit');
+ await builder.getByText('Compare with master CV',{exact:true}).click();await expect(builder.getByText('Master profile',{exact:true}).first()).toBeVisible();
+ await builder.getByText('Required and preferred skills',{exact:true}).click();await expect(builder).toContainText('Profile mentions: React, TypeScript');
 });

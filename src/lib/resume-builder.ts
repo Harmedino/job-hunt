@@ -1,3 +1,4 @@
+import { knownSkills, skillMention } from "./job-intelligence";
 import { splitCvSections } from "./resume-sections";
 import { cleanResumeLayout, resumeEntries } from "./resume-layout";
 import { AiError, aiJson, aiConnection } from "./ai";
@@ -84,7 +85,8 @@ export function profileResume(
     training: "",
     certifications: "",
   };
-  const ordered = evidence;
+  const wanted = knownSkills.filter(skill=>skillMention(target.description,skill));
+  const ordered = [...evidence].sort((a,b)=>wanted.filter(skill=>skillMention(b.text,skill)).length-wanted.filter(skill=>skillMention(a.text,skill)).length);
   for (const section of Object.keys(resumeSections) as ResumeSection[]) {
     result[section] = ordered
       .filter((e) => e.section === section)

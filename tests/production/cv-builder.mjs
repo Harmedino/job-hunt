@@ -10,6 +10,7 @@ if (!process.env.TEST_MONGODB_URI)
   throw new Error("Set TEST_MONGODB_URI for the production CV builder test.");
 for (const tracePath of [
   resolve(".next/server/app/api/resumes/[id]/pdf/route.js.nft.json"),
+  resolve(".next/server/app/api/resumes/[id]/readability/route.js.nft.json"),
   resolve(".next/server/app/api/resumes/[id]/export/route.js.nft.json"),
   resolve(".next/server/app/api/documents/[id]/route.js.nft.json"),
 ]) {
@@ -123,6 +124,12 @@ try {
   assert.ok(
     (await PDFDocument.load(await pdf.arrayBuffer())).getPageCount() >= 1,
   );
+  const readable = await fetch(server.url + `/api/resumes/${version.id}/readability`, { headers: { Cookie: cookie } });
+  assert.equal(readable.status,200);
+  const readableResult=await readable.json();
+  assert.equal(readableResult.selectableText,true);
+  assert.match(readableResult.extractedText,/Production CV Test/);
+  assert.match(readableResult.notice,/not an ATS score/);
   assert.equal(version.template, "modern");
   assert.match(version.coverLetter, /edited production-test/);
   for (const document of ["cv", "letter"]) {

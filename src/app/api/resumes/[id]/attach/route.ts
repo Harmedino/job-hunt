@@ -1,5 +1,5 @@
 import { db } from "@/lib/db";
-import { discover } from "@/lib/discovery";
+import { jobAvailable } from "@/lib/job-intelligence";
 import { loadResume, privateHeaders, resumeError } from "@/lib/resume-store";
 import { ResumeInputError, profileCoverLetter } from "@/lib/resume-types";
 export const maxDuration = 60;
@@ -17,6 +17,7 @@ export async function POST(
     const query = {
       id: draft.target.applicationId,
       "job.id": draft.target.jobId,
+      submittedAt: { $exists: false },
       status: { $in: ["Saved", "Preparing", "Ready for review"] },
     };
     const application = await database
@@ -27,13 +28,7 @@ export async function POST(
         "This application has progressed or no longer exists. Its submitted CV is preserved.",
         409,
       );
-    const live = await discover();
-    const job = live.jobs.find((j) => j.id === draft.target.jobId);
-    if (!job || job.eligibility !== "eligible")
-      throw new ResumeInputError(
-        "The current source cannot confirm this job and your location eligibility. Your CV remains saved and downloadable; check the original posting before applying.",
-        409,
-      );
+    if (!jobAvailable(application.job) || application.job.eligibility === 'restricted') throw new ResumeInputError('This posting is closed, expired or location-restricted. Your CV remains saved.',409);
     const coverLetter =
       draft.coverLetter ??
       application.coverLetter ??

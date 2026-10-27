@@ -10,7 +10,7 @@ export async function GET(
     const { id } = await params;
     const app = await (await db()).collection("applications").findOne({ id });
     if (app?.cvDraftId) {
-      const draft = await (await db()).collection<ResumeDraft>("resumes").findOne({ id: app.cvDraftId });
+      const draft = app.documentSnapshot?.cv || await (await db()).collection<ResumeDraft>("resumes").findOne({ id: app.cvDraftId });
       if (!draft) return Response.json({ error: "Saved CV version not found." }, { status: 404 });
       return new Response(await resumePdf(draft.content, draft.target, draft.template, undefined, draft.layoutVersion !== 2), { headers: { "Content-Type": "application/pdf", "Content-Disposition": 'attachment; filename="tailored-cv.pdf"', "Cache-Control": "no-store" } });
     }

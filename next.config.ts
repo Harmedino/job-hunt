@@ -9,6 +9,7 @@ const nextConfig: NextConfig = {
   ],
   outputFileTracingIncludes: {
     "/api/resumes/*/export": ["./src/assets/fonts/*.ttf"],
+    "/api/resumes/*/readability": ["./src/assets/fonts/*.ttf", "./node_modules/pdf-parse/dist/worker/pdf.worker.mjs", "./node_modules/pdfjs-dist/legacy/build/pdf.worker.mjs"],
     "/api/resumes/*/pdf": ["./src/assets/fonts/*.ttf"],
     "/api/documents/*": ["./src/assets/fonts/*.ttf"],
     "/api/cv": [

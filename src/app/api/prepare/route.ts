@@ -19,7 +19,7 @@ export async function POST(request: Request) {
     if (!application)
       return Response.json({ error: "Application not found" }, { status: 404 });
     if (
-      ["Submitted", "Interview", "Rejected", "Offer"].includes(
+      application.submittedAt || ["Submitted", "Interview", "Rejected", "Offer"].includes(
         application.status,
       )
     )
@@ -68,7 +68,7 @@ export async function POST(request: Request) {
     }
     const coverLetter = `Dear Hiring Team,\n\nI am applying for the ${application.job.title} position at ${application.job.company}. Please consider the following qualifications from my profile:\n\n${chosen.join("\n\n")}\n\nI would welcome the opportunity to discuss how my background fits your team. Thank you for considering my application.\n\n${profile.name}`;
     await database.collection("applications").updateOne(
-      { id },
+      { id, submittedAt: { $exists: false } },
       {
         $set: {
           status: "Ready for review",

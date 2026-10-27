@@ -1,4 +1,6 @@
 "use client";
+import { extractRequirements } from "@/lib/job-intelligence";
+import type { Profile } from "@/lib/types";
 import { cleanResumeLayout } from "@/lib/resume-layout";
 import ResumeSectionBody from "@/components/resume-section-body";
 import { useEffect, useRef, useState } from "react";
@@ -79,6 +81,11 @@ export default function CvBuilder({
   const [busy, setBusy] = useState("");
   const [feedback, setFeedback] = useState("");
   const [error, setError] = useState("");
+  const [master,setMaster]=useState<Profile>();
+  const [recovery,setRecovery]=useState<{content:ResumeContent;coverLetter:string;template:ResumeTemplate;updatedAt:string}>();
+  const [autosaveStatus,setAutosaveStatus]=useState('');
+  const [readability,setReadability]=useState<{selectableText:boolean;wordCount:number;warnings:string[];notice:string;extractedText:string}>();
+  useEffect(()=>{if(!active||!connected)return;let current=true;void fetch('/api/profile').then(r=>r.ok?r.json():undefined).then(p=>{if(current&&p)setMaster(p);}).catch(()=>{});return()=>{current=false;};},[active,connected]);
   const revealEditor = useRef(false);
   const useAi = mode === "ai";
   const dirty =
@@ -89,6 +96,17 @@ export default function CvBuilder({
         (draft.coverLetter ??
           profileCoverLetter(draft.content, draft.target)) ||
       template !== (draft.template || "classic"));
+  useEffect(()=>{
+    if(!draft)return;let current=true;
+    void request<{copy:typeof recovery}>(`/working?draftId=${encodeURIComponent(draft.id)}`).then(data=>{if(current)setRecovery(data.copy || undefined);}).catch(()=>{if(current)setAutosaveStatus('Recovery is unavailable; keep this tab open or save a version.');});
+    return()=>{current=false;};
+  },[draft]);
+  useEffect(()=>{
+    if(!dirty||!draft||!content||!connected)return;
+    const controller=new AbortController();
+    const timer=setTimeout(()=>{setAutosaveStatus('Autosaving unfinished edits…');void fetch('/api/resumes/working',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({draftId:draft.id,content,coverLetter,template,revision:Date.now()}),signal:controller.signal}).then(r=>{if(!r.ok)throw new Error();setAutosaveStatus('Unfinished edits autosaved. Save a new version before linking or exporting.');}).catch(()=>{if(!controller.signal.aborted)setAutosaveStatus('Autosave failed. Your edits remain in this tab; save a version before leaving.');});},1200);
+    return()=>{clearTimeout(timer);controller.abort();};
+  },[dirty,draft,content,coverLetter,template,connected]);
   useEffect(() => {
     if (!active || !draft || !revealEditor.current) return;
     revealEditor.current = false;
@@ -502,6 +520,12 @@ export default function CvBuilder({
                     Preview {documentKind === "cv" ? "CV" : "cover letter"}
                   </button>
                 </div>
+                <p aria-live="polite">{autosaveStatus}</p>
+                {recovery && <div className="notice"><span>Unfinished edits were saved at {new Date(recovery.updatedAt).toLocaleString()}.</span><button className="secondary" onClick={()=>{setContent(recovery.content);setCoverLetter(recovery.coverLetter);setTemplate(recovery.template);setRecovery(undefined);}}>Restore unfinished edits</button><button className="secondary" onClick={()=>setRecovery(undefined)}>Keep current version</button></div>}
+                <details><summary>Compare with master CV</summary><p>My Profile is your master source. Editing this tailored version does not alter it.</p>{master ? (['skills','experience','projects','education'] as const).map(section=><div className="builder-comparison" key={section}><h4>{section}</h4><p>Master profile</p><pre style={{whiteSpace:'pre-wrap'}}>{master[section] || 'Not supplied'}</pre><p>Tailored version</p><pre style={{whiteSpace:'pre-wrap'}}>{content[section] || 'Not supplied'}</pre></div>):<p>Master profile could not be loaded. Your saved draft retains its original evidence snapshot.</p>}</details>
+                <details><summary>Required and preferred skills</summary><p>Text-based requirement checks show mentions in your profile, not proof of proficiency or years of experience.</p>{extractRequirements(draft.target.description,master || draft.profileSnapshot).map((r,i)=><article key={i}><b>{r.kind === 'required'?'Required / stated requirement':'Preferred'}: {r.text}</b><p>Profile mentions: {r.supported.join(', ') || 'No supporting skill mentions'}</p><p>Needs review: {r.needsReview.join(', ') || 'Confirm context, proficiency and experience duration'}</p></article>)}</details>
+                <button className="secondary" disabled={!!busy} onClick={()=>work('readability',async()=>{const current=await saved();setReadability(await request(`/${encodeURIComponent(current.id)}/readability`));})}>Check ATS readability</button>
+                {readability && <div aria-label="CV readability results"><p>{readability.selectableText?'Selectable PDF text extracted':'PDF text needs review'} · {readability.wordCount} words</p>{readability.warnings.map(w=><p key={w}>{w}</p>)}<p>{readability.notice}</p><details><summary>Extracted PDF text</summary><pre style={{whiteSpace:'pre-wrap'}}>{readability.extractedText}</pre></details></div>}
                 <p>
                   Keep every qualification accurate. Edits you type are treated
                   as your own information. New versions preserve earlier CVs and
