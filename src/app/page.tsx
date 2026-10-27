@@ -1,10 +1,12 @@
 "use client";
 import Link from "next/link";
+import SavedJobSearches from "@/components/saved-job-searches";
+import {matchesRole,sortJobResults,validateJobFilters,type JobFilters} from "@/lib/job-filter-state";
 import { jobTypes, experienceLevels, eligibilityLabels, jobAvailable, assessStackFit } from "@/lib/job-intelligence";
 import BountyWorkspace from "@/components/modules/bounty-workspace";
 import YoutubeWorkspace from "@/components/modules/youtube-workspace";
 import WorkspaceOverview from "@/components/modules/workspace-overview";
-import { DISCOVERY_REFRESH_MS, recentPosting, activeBoardPosting } from "@/lib/job-freshness";
+import { recentPosting, activeBoardPosting } from "@/lib/job-freshness";
 import SocialIntake from "@/components/social-intake";
 import CvUpload from "@/components/cv-upload";
 import CvBuilder from "@/components/cv-builder";
@@ -108,6 +110,12 @@ export default function Home() {
   const [jobType, setJobType] = useState("all");
   const [level, setLevel] = useState("all");
   const [opportunityView, setOpportunityView] = useState("all");
+  const [sort,setSort]=useState("best");
+  const [filtersReady,setFiltersReady]=useState(false);
+  const filters=useMemo(()=>({query,category,jobType,level,fresh,review,includeOtherStacks,opportunityView,sort}),[query,category,jobType,level,fresh,review,includeOtherStacks,opportunityView,sort]);
+  const applyFilters=useCallback((input:JobFilters)=>{const f=validateJobFilters(input);setQuery(f.query);setCategory(f.category);setJobType(f.jobType);setLevel(f.level);setFresh(f.fresh);setReview(f.review);setIncludeOtherStacks(f.includeOtherStacks);setOpportunityView(f.opportunityView);setSort(f.sort);setJobPage(1);},[]);
+  useEffect(()=>{const timer=setTimeout(()=>{try{const value=localStorage.getItem("launchpad-job-filters");if(value)applyFilters(validateJobFilters(JSON.parse(value)));}catch{}setFiltersReady(true);},0);return()=>clearTimeout(timer);},[applyFilters]);
+  useEffect(()=>{if(!filtersReady)return;const timer=setTimeout(()=>{try{localStorage.setItem("launchpad-job-filters",JSON.stringify(filters));}catch{}},250);return()=>clearTimeout(timer);},[filters,filtersReady]);
   const [selected, setSelected] = useState<Job>();
   const [notices, setNotices] = useState<{ id: string; title: string }[]>([]);
   const [showNotices, setShowNotices] = useState(false);
@@ -138,17 +146,6 @@ export default function Home() {
         const loads: Promise<void>[] = [api<DiscoveryResponse>("discover").then(async (data) => {
           if (!active) return;
           if (!autoSearched.current) receiveDiscovery(data);
-          if (data.refreshRecommended && !autoSearched.current) {
-            autoSearched.current = true;
-            setBusy("discovery");
-            try {
-              const result = await api<DiscoveryResponse>("discover", "POST");
-              if (active) {
-                receiveDiscovery(result);
-                if (result.failures?.length) setMessage(result.failures.join(" · "));
-              }
-            } finally { if (active) setBusy(""); }
-          }
         })];
         if (h.database) {
           loads.push(
@@ -169,24 +166,7 @@ export default function Home() {
     };
   }, [receiveDiscovery]);
   useEffect(()=>{const reload=()=>{setFresh('active');setReview(true);setJobPage(1);void api<DiscoveryResponse>('discover').then(receiveDiscovery).catch(e=>setMessage(e.message));};window.addEventListener('lead-promoted',reload);return ()=>window.removeEventListener('lead-promoted',reload);},[receiveDiscovery]);
-  const backgroundSearch = useRef(false);
-  const lastBackgroundAttempt = useRef(0);
-  useEffect(() => {
-    const tick = () => {
-      const current = Date.now();
-      setNow(current);
-      if (document.visibilityState !== "visible" || !checked || busy || backgroundSearch.current || current - Date.parse(checked) < DISCOVERY_REFRESH_MS || current - lastBackgroundAttempt.current < 15 * 60000) return;
-      backgroundSearch.current = true;
-      lastBackgroundAttempt.current = current;
-      void api<DiscoveryResponse>("discover", "POST").then((data) => {
-        receiveDiscovery(data);
-        if (data.failures?.length) setMessage(data.failures.join(" · "));
-      }).catch((error) => setMessage(error instanceof Error ? error.message : "Automatic search could not be completed.")).finally(() => { backgroundSearch.current = false; });
-    };
-    const timer = setInterval(tick, 60000);
-    document.addEventListener("visibilitychange", tick);
-    return () => { clearInterval(timer); document.removeEventListener("visibilitychange", tick); };
-  }, [checked, busy, receiveDiscovery]);
+  useEffect(()=>{const timer=setInterval(()=>setNow(Date.now()),60000);return()=>clearInterval(timer);},[]);
   async function task(name: string, work: () => Promise<void>) {
     setBusy(name);
     setMessage("");
@@ -231,7 +211,7 @@ export default function Home() {
   const profileJobs=useMemo(()=>jobs.map(job=>{const stack=assessStackFit(job.title,job.description,profile);return {...job,...stack,score:stack.stackFit==='incompatible'?Math.min(job.score,20):job.score};}),[jobs,profile]);
   const filtered = useMemo(
     () =>
-      profileJobs.filter(
+      sortJobResults(profileJobs.filter(
         (j) =>
           `${j.title} ${j.company} ${j.description}`
             .toLowerCase()
@@ -242,13 +222,10 @@ export default function Home() {
           (jobType === 'all' || j.jobType === jobType) &&
           (level === 'all' || j.experienceLevel === level) &&
           (opportunityView === 'all' || (opportunityView === 'strong' && j.score >= 65) || (opportunityView === 'new' && recentPosting(j.postedAt,now,1)) || (opportunityView === 'eligible' && j.eligibility === 'eligible') || (opportunityView === 'review' && j.eligibility === 'review') || (opportunityView === 'saved' && applications.some(a=>a.job.id===j.id))) &&
-          (category === "All opportunities" ||
-            (category === "Development"
-              ? !/security|soc/i.test(j.title)
-              : /security|soc/i.test(j.title))) &&
+          matchesRole(j,category) &&
           (fresh === "active" ? activeBoardPosting(j, now) : fresh === "available" ? (recentPosting(j.postedAt,now,30) || activeBoardPosting(j,now)) : recentPosting(j.postedAt, now, Number(fresh))),
-      ),
-    [profileJobs, query, category, review, fresh, now, jobType, level, opportunityView, applications, includeOtherStacks],
+      ),sort),
+    [profileJobs, query, category, review, fresh, now, jobType, level, opportunityView, applications, includeOtherStacks, sort],
   );
   const activeOlderCount = jobs.filter(j => activeBoardPosting(j, now) && !recentPosting(j.postedAt, now)).length;
   const totalJobPages = Math.max(1, Math.ceil(filtered.length / 24));
@@ -262,7 +239,7 @@ export default function Home() {
     setOpportunityView(kind==='strong'?'strong':'all');setFresh(kind==='strong'?'available':'7');
     requestAnimationFrame(()=>{const results=document.getElementById('job-results');results?.scrollIntoView({behavior:'smooth',block:'start'});results?.focus({preventScroll:true});});
   }
-  const reviewCount = jobs.filter((j) => (fresh === "active" ? activeBoardPosting(j, now) : recentPosting(j.postedAt, now)) && j.eligibility === "review").length;
+  const reviewCount = jobs.filter((j) => (fresh === "active" ? activeBoardPosting(j, now) : fresh === "available" ? (recentPosting(j.postedAt,now,30)||activeBoardPosting(j,now)) : recentPosting(j.postedAt, now,Number(fresh))) && jobAvailable(j,now) && j.eligibility === "review").length;
   const sourcesUnavailable = sourceReports.length > 0 && sourceReports.filter(s => s.status !== "not_configured").every((s) => s.status === "error");
   return (
     <div className="app-shell">
@@ -422,10 +399,9 @@ export default function Home() {
           {tab === "YouTube Research" && <YoutubeWorkspace />}
           {tab === "Job Finder" && (
             <>
-              <WorkspaceOverview jobs={jobs.length} navigate={setTab} />
               <section className="stats-grid">
                 <Stat
-                  label="Open opportunities"
+                  label="Location-supported jobs"
                   value={
                     jobs.filter((j) => j.eligibility === "eligible").length
                   }
@@ -481,10 +457,6 @@ export default function Home() {
                     : "On-demand discovery"}
                 </span>
               </section>
-              <JobPlatformDirectory />
-              <SourceDirectory />
-              <SocialIntake connected={!!health?.database} />
-              <DiscoveryReport sources={sourceReports} storageWarning={storageWarning} />
               <div className="section-title">
                 <div>
                   <h2 id="job-results" tabIndex={-1}>
@@ -500,6 +472,8 @@ export default function Home() {
                   {sourceReports.length ? `${sourceReports.filter(s => s.status === "ok" || s.status === "partial").length} sources checked` : `${jobPlatforms.filter(p => p.access !== "manual").length} search connectors`} <ExternalLink size={13} />
                 </span>
               </div>
+              <p className="result-summary">{jobs.length} loaded · {profileJobs.filter(j=>jobAvailable(j,now)).length} active · {jobs.filter(j=>j.eligibility==='eligible').length} location-supported · {jobs.filter(j=>j.eligibility==='review').length} need location review · {filtered.length} match your filters</p>
+              <details className="count-definitions"><summary>What these counts mean</summary><p>Loaded means retained discovery results. Active excludes known closed or expired vacancies. Location-supported means explicit Nigeria, worldwide or Africa coverage. A job may be active without matching your stack or filters; unknown eligibility stays available for review. Strong matches are profile scores of at least 65/100, not hiring probabilities. Fresh means posted within seven days.</p></details>
               <div className="filter-bar">
                 <div className="search-input">
                   <Search size={17} />
@@ -521,6 +495,8 @@ export default function Home() {
                   <option value="7">Last 7 days</option><option value="14">Last 14 days</option><option value="30">Last 30 days</option>
                   <option value="active">Active public boards</option>
                 </select>
+                <label>Role type<select aria-label="Role type" value={category} onChange={e=>{setCategory(e.target.value);setJobPage(1);}}>{['All opportunities','Development','Frontend','Backend','Full-stack','Software engineering','Cybersecurity'].map(role=><option key={role}>{role}</option>)}</select></label>
+                <label>Sort<select aria-label="Sort jobs" value={sort} onChange={e=>{setSort(e.target.value);setJobPage(1);}}><option value="best">Best Match</option><option value="newest">Newest</option><option value="company">Company</option><option value="experience">Experience Level</option></select></label>
                 <label>Job type<select aria-label="Job type" value={jobType} onChange={e=>{setJobType(e.target.value);setJobPage(1);}}><option value="all">All job types</option>{jobTypes.map(t=><option key={t}>{t}</option>)}</select></label>
                 <label>Experience level<select aria-label="Experience level" value={level} onChange={e=>{setLevel(e.target.value);setJobPage(1);}}><option value="all">All levels</option>{experienceLevels.map(t=><option key={t}>{t}</option>)}</select></label>
                 <label>View<select aria-label="Opportunity view" value={opportunityView} onChange={e=>{setOpportunityView(e.target.value);setJobPage(1);}}><option value="all">All relevant jobs</option><option value="strong">Strong matches</option><option value="new">Newly posted</option><option value="eligible">Nigeria / Africa / worldwide eligible</option><option value="review">Eligibility needs checking</option><option value="saved">Saved jobs</option></select></label>
@@ -534,7 +510,8 @@ export default function Home() {
                   Include location review{reviewCount ? ` (${reviewCount})` : ""}
                 </label>
               </div>
-              <div className="module-actions"><button className="secondary" onClick={()=>setTab('Applications')}>Application history</button><button className="secondary" onClick={()=>{document.getElementById('social-inbox')?.scrollIntoView();window.dispatchEvent(new Event('open-social-inbox'));}}>Social opportunities awaiting verification</button></div>
+              <SavedJobSearches filters={filters} connected={!!health?.database} onRun={async f=>{applyFilters(f);await findJobs();}} />
+              <div className="module-actions"><button className="secondary" onClick={()=>{document.getElementById("manual-intake-panel")?.setAttribute("open","");window.dispatchEvent(new CustomEvent("open-social-inbox",{detail:{platform:"Manual job"}}));document.getElementById("manual-intake-panel")?.scrollIntoView({behavior:"smooth"});}}>Add job for review</button><button className="secondary" onClick={()=>setTab('Applications')}>Application history</button><button className="secondary" onClick={()=>{document.getElementById('manual-intake-panel')?.setAttribute('open','');document.getElementById('social-inbox')?.scrollIntoView();window.dispatchEvent(new Event('open-social-inbox'));}}>Social opportunities awaiting verification</button></div>
               <div className="category-tabs">
                 {["All opportunities", "Development", "Cybersecurity"].map(
                   (c) => (
@@ -549,7 +526,7 @@ export default function Home() {
                 )}
                 <span>
                   <LayoutGrid size={16} />
-                  Newest first
+                  {sort==='best'?'Best match first':sort==='newest'?'Newest first':sort==='company'?'Company name':'Experience level'}
                 </span>
               </div>
               {!review && reviewCount > 0 && <div className="notice">
@@ -580,14 +557,6 @@ export default function Home() {
                           {job.company}
                           <small>{job.source}</small>
                         </div>
-                        <button
-                          className={`icon-button save ${applications.some((a) => a.job.id === job.id) ? "saved" : ""}`}
-                          aria-label={`Save ${job.title}`}
-                          disabled={!!busy || !health?.database}
-                          onClick={() => save(job)}
-                        >
-                          <Bookmark size={19} />
-                        </button>
                       </div>
                       <button
                         className="job-title"
@@ -600,12 +569,12 @@ export default function Home() {
                         {job.location || "Location not specified"}
                       </div>
                       <p>{eligibilityLabels[job.eligibilityClass || (job.eligibility==='eligible'?'worldwide':'review')]}</p>
-                      <small>{job.eligibilityReason}</small>
+
                       {job.stackFit==='incompatible' && <p className="location-warning">Outside your saved stack · {job.stackReason}</p>}
-                      {job.matchedSkills.length>0 && <p>Matching skills: {job.matchedSkills.join(', ')}</p>}
-                      <a href={job.url} target="_blank" rel="noopener noreferrer">Original application listing ↗</a>
+                      {job.matchedSkills.length>0 && <p>Matching skills: {job.matchedSkills.slice(0,4).join(', ')}</p>}
+
                       <div className="job-tags">
-                        {job.jobType && <span>{job.jobType}</span>}{job.experienceLevel && <span>{job.experienceLevel}</span>}
+                        <span>{job.jobType || "Type not supplied"}</span><span>{job.experienceLevel || "Level not supplied"}</span>
                         <span>
                           <Globe2 size={12} />
                           Remote
@@ -639,12 +608,16 @@ export default function Home() {
                           {job.postedAt ? ago(job.postedAt, now) : "Posting date unavailable"}
                         </span>
                       </div>
+                      <details className="card-match"><summary>Why this match?</summary><p>Profile similarity, not a hiring probability.</p>{job.matchReasons?.map(reason=><p key={reason}>{reason}</p>) || <p>Save your qualifications in My Profile to compare this vacancy.</p>}</details>
+                      <div className="job-card-actions">
+                      <button className="secondary" aria-label={`Save ${job.title}`} disabled={!!busy||!health?.database} onClick={()=>save(job)}><Bookmark size={15}/>{applications.some(a=>a.job.id===job.id)?'Saved':'Save Job'}</button>
                       <button
-                        className="card-action"
+                        className="secondary"
                         onClick={() => setSelected(job)}
                       >
-                        Explore opportunity <ArrowUpRight size={15} />
+                        View Details <ArrowUpRight size={15} />
                       </button>
+                      <a className="primary" href={job.url} target="_blank" rel="noopener noreferrer">Apply <ExternalLink size={14}/></a></div>
                       {job.eligibility === "review" && (
                         <small className="location-warning">
                           Applicant location needs review
@@ -687,6 +660,8 @@ export default function Home() {
                 Your career data stays in your private workspace.
                 <span>One step closer to your next chapter.</span>
               </footer>
+              <details className="panel advanced-job-sources"><summary>Job sources and connection diagnostics</summary><JobPlatformDirectory/><SourceDirectory/><DiscoveryReport sources={sourceReports} storageWarning={storageWarning}/><WorkspaceOverview jobs={jobs.length} navigate={setTab}/></details>
+              <details className="panel" id="manual-intake-panel"><summary>Paste a job, social post or alert for review</summary><SocialIntake connected={!!health?.database}/></details>
             </>
           )}
           <div hidden={tab !== "CV Builder"}>

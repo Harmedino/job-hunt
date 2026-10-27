@@ -70,6 +70,7 @@ test("unknown locations remain visible, and date/type/experience/view filters wo
     page.getByRole("button", { name: "Junior React Developer", exact: true }),
   ).not.toBeVisible();
   await page.getByLabel("Opportunity view").selectOption("all");
+  await page.getByLabel("Include jobs outside my stack").check();
   await page.getByLabel("Job type", { exact: true }).selectOption("Freelance");
   await page.getByLabel("Experience level").selectOption("Senior");
   await expect(
@@ -121,7 +122,7 @@ test("manual WhatsApp lead import and review preserve unverified status and do n
   });
   await page.goto("/");
   await page
-    .getByRole("button", { name: "Add social post", exact: true })
+    .getByRole("button", { name: "Social opportunities awaiting verification", exact: true })
     .click();
   const inbox = page.getByRole("region", { name: "Social opportunity inbox" });
   await inbox.getByLabel("Import source").selectOption("WhatsApp");

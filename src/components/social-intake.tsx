@@ -28,7 +28,8 @@ export default function SocialIntake({ connected }: { connected: boolean }) {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   useEffect(() => {
-    const show = () => setOpen(true);
+    const reveal=()=>{document.getElementById("manual-intake-panel")?.setAttribute("open","");};
+    const show = (event:Event) => {reveal();const source=(event as CustomEvent).detail?.platform;if(source==='Manual job')setPlatform(source);setOpen(true);};
     window.addEventListener("open-social-inbox", show);
     const timer = setTimeout(() => {
       try {
@@ -38,7 +39,7 @@ export default function SocialIntake({ connected }: { connected: boolean }) {
           setText(String(data.text || "").slice(0, 20000));
           setUrl(String(data.url || "").slice(0, 2000));
           setPlatform("WhatsApp");
-          setOpen(true);
+          reveal();setOpen(true);
           sessionStorage.removeItem("launchpad-shared-lead");
         }
       } catch {
@@ -63,7 +64,7 @@ export default function SocialIntake({ connected }: { connected: boolean }) {
     void fetch("/api/job-searches")
       .then((r) => (r.ok ? r.json() : []))
       .then((items) => {
-        if (current) setSearches(items);
+        if (current) setSearches(items.filter((item:{url?:string})=>!!item.url));
       })
       .catch(() => {});
     return () => {
@@ -74,7 +75,7 @@ export default function SocialIntake({ connected }: { connected: boolean }) {
     if (connected) {
       setLeads(await leadsRequest());
       const r = await fetch("/api/job-searches");
-      if (r.ok) setSearches(await r.json());
+      if (r.ok) setSearches((await r.json()).filter((item:{url?:string})=>!!item.url));
     }
   }
   return (
@@ -129,7 +130,7 @@ export default function SocialIntake({ connected }: { connected: boolean }) {
             >
               <option>Social URL</option>
               <option>WhatsApp</option>
-              <option>Indeed alert</option>
+              <option>Indeed alert</option><option>Manual job</option>
             </select>
           </label>
           <form

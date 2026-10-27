@@ -21,7 +21,7 @@ export function parseSocialLead(
   const url = input.url;
   if (
     url === "" &&
-    ["WhatsApp", "Indeed alert"].includes(String(input.platform)) &&
+    ["WhatsApp", "Indeed alert", "Manual job"].includes(String(input.platform)) &&
     typeof text === "string" &&
     text.trim().length >= 30 &&
     text.length <= 20000
@@ -84,7 +84,7 @@ export function parseSocialLead(
   )[host];
   const platform =
     knownPlatform ||
-    (["WhatsApp", "Indeed alert"].includes(String(input.platform)) &&
+    (["WhatsApp", "Indeed alert", "Manual job"].includes(String(input.platform)) &&
     publicHttps(parsed.href)
       ? String(input.platform)
       : undefined);

@@ -1907,3 +1907,39 @@ footer > span {
 .stat-action:hover, .stat-action[aria-pressed="true"] { border-color: var(--accent, #79b894); }
 .stat-action:focus-visible { outline: 2px solid #79b894; outline-offset: 3px; }
 #job-results { scroll-margin-top: 100px; }
+
+/* Launchpad workspace palette. The document preview retains its paper colours. */
+:root { color-scheme: dark; --ink: #e5eee9; --muted: #abb9af; --green: #8bccaa; --border: #3b4940; --canvas: #1b211d; --surface: #111613; }
+.app-shell :is(.sidebar,.panel,.job-card,.stat-card,.module-panel,.modal,.account,.search-input,.builder-history > button,.module-plan-card,.module-overview button) { background: var(--surface); border-color: var(--border); color: var(--ink); }
+.app-shell header { background: #141a16ee; }
+.app-shell main :is(h1,h2,h3,h4):not(.resume-paper *) { color: var(--ink); }
+.app-shell :is(input,textarea,select):not([type=checkbox]) { color: var(--ink); background: #151c17; border-color: var(--border); font-size: 14px; }
+.app-shell :is(.nav-item.active,.nav-item:hover,.builder-history > button.selected) { background: #263b2e; color: #a5dfbd; }
+.app-shell :is(.secondary,.category-tabs button,.icon-button) { background: #1d2821; color: #c9dfd1; border-color: var(--border); }
+.app-shell .primary { background: #326c50; color: #fff; }
+.app-shell .primary:hover { background: #3c8060; }
+.app-shell :is(.discovery-note,.eligibility-note,.notice,.builder-layout-notice,.builder-ai-proof,.module-notice,.module-empty,.honesty-card) { background: #243128; color: #c7ddcd; border-color: #45634c; }
+.app-shell :is(.module-error,.source-error) { background: #36231f; color: #ffc1aa; }
+.app-shell :is(.job-tags span,.pill,.match,.avatar,.nav-count) { background: #26372b; color: #bdd9c2; border-color: var(--border); }
+.app-shell :is(.job-excerpt,.company-name small,.breadcrumb,.breadcrumb strong,.builder-intro p,.builder-help,.builder-history p,.builder-history span,.builder-history small,.builder-editor > p,.builder-target label,.builder-editor label,.builder-field-help,.builder-evidence,.builder-preview-label,.discovery-report > p,.discovery-report details p,.discovery-report summary span) { color: var(--muted); }
+.app-shell .location-warning { color: #f0cb7b; }
+.app-shell .builder-gaps { background: #322e20; color: #e1d49c; border-color: #75673c; }
+.app-shell .builder-gaps p { color: #dfd2ac; }
+.app-shell .builder-history b { color: #c6e1c3; }
+.job-card { font-size: 14px; line-height: 1.6; }
+.job-card .job-title { font-size: 19px; line-height: 1.4; }
+.job-card .job-excerpt { font-size: 14px; }
+.job-card-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
+.job-card-actions :is(button,a) { padding: 10px 12px; font-size: 13px; }
+.card-match { margin-top: 12px; font-size: 13px; }
+.card-match p { line-height: 1.6; font-size: 13px; }
+.result-summary { line-height: 1.8; font-size: 14px; color: var(--muted); }
+:is(.count-definitions,.saved-searches) { border: 1px solid var(--border); border-radius: 9px; padding: 14px; margin: 12px 0; line-height: 1.7; }
+:is(.count-definitions,.saved-searches,.advanced-job-sources,#manual-intake-panel) > summary { cursor: pointer; font-weight: 600; }
+.saved-searches form { display: flex; flex-wrap: wrap; align-items: end; gap: 12px; margin-top: 14px; }
+.saved-searches label { display: grid; gap: 7px; }
+.saved-searches input { border: 1px solid var(--border); border-radius: 6px; padding: 10px; max-width: 100%; }
+.advanced-job-sources > summary,#manual-intake-panel > summary { padding: 8px 0 16px; }
+.advanced-job-sources .module-overview { margin-top: 20px; }
+.resume-paper { color-scheme: light; }
+@media(max-width:700px) { .filter-bar .search-input { flex-basis: 100%; } .job-card-actions { gap: 6px; } .job-card-actions :is(button,a) { flex: 1; justify-content: center; } }

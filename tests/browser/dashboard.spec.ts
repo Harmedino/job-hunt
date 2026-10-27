@@ -36,11 +36,12 @@ test("dashboard navigation, empty states, and setup guidance", async ({
     }),
   );
   await page.goto("/");
+  await page.getByText("Job sources and connection diagnostics",{exact:true}).click();
   await expect(
     page.getByRole("heading", { name: "Find your next opportunity." }),
   ).toBeVisible();
   await expect(
-    page.getByText("Your next opportunity is out there."),
+    page.getByText("No matching jobs in this search"),
   ).toBeVisible();
   await page.getByRole("button", { name: "Browse job sources" }).click();
   await expect(page.getByRole("article").getByText("Remotive", { exact: true })).toBeVisible();
@@ -53,7 +54,7 @@ test("dashboard navigation, empty states, and setup guidance", async ({
     ),
   ).toBeVisible();
   await page.getByRole("button", { name: "Hide sources" }).click();
-  await page.getByRole("button", { name: "Add social post" }).click();
+  await page.getByRole("button", { name: "Social opportunities awaiting verification" }).click();
   await expect(page.getByLabel("Social post or channel link")).toBeVisible();
   await expect(
     page.getByRole("button", { name: "Save for verification" }),

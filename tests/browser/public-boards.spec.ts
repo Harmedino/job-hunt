@@ -60,6 +60,7 @@ test("active undated public board jobs show honest dates and paginate without ch
     }),
   );
   await page.goto("/");
+  await page.getByText("Job sources and connection diagnostics",{exact:true}).click();
   await expect(
     page.getByRole("button", {
       name: "Backend Node.js Developer 0",

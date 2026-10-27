@@ -22,6 +22,7 @@ test("expanded platform directory clearly separates enabled sources, setup and b
     }),
   );
   await page.goto("/");
+  await page.getByText("Job sources and connection diagnostics",{exact:true}).click();
   const directory = page.getByRole("region", { name: "Job platforms" });
   await expect(directory).toContainText("33 platforms");
   await expect(directory).toContainText("22 search connectors");
@@ -88,6 +89,7 @@ test("search activity does not report missing API keys as checked jobs or feed f
     }),
   );
   await page.goto("/");
+  await page.getByText("Job sources and connection diagnostics",{exact:true}).click();
   const activity = page.getByRole("region", { name: "Search activity" });
   await expect(activity).toContainText("Setup required");
   await expect(activity).not.toContainText("0 checked");

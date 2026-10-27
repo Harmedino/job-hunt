@@ -23,7 +23,7 @@ const excluded = {
   location: 0,
   duplicate: 0,
 };
-test("first visit searches once and keeps location-review jobs visible", async ({
+test("first visit waits for manual search and keeps location-review jobs visible", async ({
   page,
 }) => {
   let searches = 0;
@@ -59,6 +59,9 @@ test("first visit searches once and keeps location-review jobs visible", async (
     });
   });
   await page.goto("/");
+  expect(searches).toBe(0);
+  await page.getByRole("button", {name:"Find new jobs",exact:true}).click();
+  await page.getByText("Job sources and connection diagnostics",{exact:true}).click();
   await expect(
     page.getByRole("region", { name: "Search activity" }),
   ).toContainText("1 checked · 0 location-supported · 1 need review");
@@ -109,6 +112,8 @@ test("source outage is displayed as a failed search instead of no openings", asy
     }),
   );
   await page.goto("/");
+  await page.getByRole("button", {name:"Find new jobs",exact:true}).click();
+  await page.getByText("Job sources and connection diagnostics",{exact:true}).click();
   await expect(
     page.getByRole("heading", { name: "Job sources could not be reached" }),
   ).toBeVisible();
@@ -189,7 +194,7 @@ test("finder defaults to three days and offers wider posting views", async ({
   );
 });
 
-test("an open dashboard ages out jobs and refreshes a search after an hour", async ({
+test("an open dashboard ages out jobs without running a background search", async ({
   page,
 }) => {
   await page.clock.install({ time: new Date() });
@@ -231,10 +236,10 @@ test("an open dashboard ages out jobs and refreshes a search after an hour", asy
   ).toBeVisible();
   await page.clock.fastForward(61 * 60000);
   await expect(
-    page.locator(".company-name").filter({ hasText: "New Source Company" }),
-  ).toBeVisible();
-  await expect(
     page.locator(".company-name").filter({ hasText: "Almost Old Company" }),
   ).toHaveCount(0);
+  expect(searches).toBe(0);
+  await page.getByRole("button",{name:"Find new jobs",exact:true}).click();
+  await expect(page.locator(".company-name").filter({hasText:"New Source Company"})).toBeVisible();
   expect(searches).toBe(1);
 });
