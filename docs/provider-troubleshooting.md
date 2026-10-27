@@ -16,7 +16,7 @@ The credential configured in this cloud environment was accepted by Google's mod
 
 The app now preserves a received provider overload when a subsequent transport retry times out, rather than losing the actual HTTP 503 behind a generic timeout. CV analysis, writing and verification share one fifty-second budget with up to thirty seconds available per stage, preserving headroom inside the sixty-second route limit. Generation still requires all factual checks to complete before saving.
 
-The writer always receives the user's supplied core skills, experience and education evidence even if relevance selection omitted a section. Prompts explicitly request two separate cover-letter body items, matching the existing validation contract. No credentials, model choice or provider were silently replaced, and no unsupported CV was substituted for a failed AI run.
+The writer always receives the user's supplied core skills, experience and education evidence even if relevance selection omitted a section. Prompts explicitly request two separate cover-letter body items, matching the existing validation contract. Credentials and provider are preserved. Automatic Gemini mode may recover with another documented Gemini alias and records the successful models in the saved CV; explicit model pins stay pinned. No unsupported CV is substituted for a failed AI run.
 
 In Vercel Production, use `GEMINI_API_KEY` and `AI_PROVIDER=gemini`. `GEMINI_MODEL=auto` keeps the app's documented default alias; an explicit supported text model may be chosen through settings. There is no guarantee that another model avoids provider capacity problems. HTTP 401/403, unavailable models, quota errors, overloads and timeouts should be diagnosed separately. Basic manual layouts and saved document exports remain available without a successful AI request.
 
@@ -34,3 +34,7 @@ No Vercel deployment status was available to this session, so successful publica
 ## Validation
 
 The provider follow-up passed lint, TypeScript, the webpack production build and 113 unit/database tests with no failures or skips. Provider error handling and Findwork query fallback have dedicated regressions. The earlier workflow implementation also passed sixty desktop/mobile browser checks and production authentication/document-export checks. Live full AI generation remains subject to the provider availability limitation above.
+
+## Retrying completed CV stages
+
+**Retry Generation** reuses completed analysis and, after a transient verification failure, the already parsed writing only for the same saved profile, exact target and provider/model settings. Private MongoDB checkpoints expire after thirty minutes and are not completed CVs. Every retry still performs factual verification. Schema/factual-completeness failures discard the writing checkpoint; changed inputs or expired checkpoints start fresh. Successful generation clears its checkpoint. Inputs and edits remain in the builder when a provider fails; **Use Basic Layout without AI** is an explicit separate choice.

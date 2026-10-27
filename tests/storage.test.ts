@@ -133,7 +133,7 @@ test(
     ]);
     assert.equal(saved?.status, "Ready for review");
     assert.equal(
-      (await updateApplication(request({ id: first.id, status: "Submitted" })))
+      (await updateApplication(request({ id: first.id, status: "Submitted", submissionConfirmed:true })))
         .status,
       200,
     );

@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { db, errorResponse } from "@/lib/db";
-import { statuses } from "@/lib/types";
+import {applicationUpdate} from "@/lib/application-updates";
 export async function GET() {
   try {
     return Response.json(
@@ -52,23 +52,9 @@ export async function POST(request: Request) {
 }
 export async function PATCH(request: Request) {
   try {
-    const { id, status, followUp } = await request.json();
-    if (
-      typeof id !== "string" ||
-      (status !== undefined && !statuses.includes(status)) ||
-      (followUp !== undefined &&
-        (typeof followUp !== "string" || followUp.length > 2000))
-    )
-      return Response.json(
-        { error: "Invalid application update." },
-        { status: 400 },
-      );
-    const update: Record<string, string> = {
-      updatedAt: new Date().toISOString(),
-    };
-    if (status) update.status = status;
-
-    if (followUp !== undefined) update.followUp = followUp;
+    let parsed;try{parsed=applicationUpdate(await request.json());}catch(e){return Response.json({error:(e as Error).message},{status:400});}
+    const {id,fields}=parsed;const status=fields.status;
+    const update={...fields,updatedAt:new Date().toISOString()};
     const database=await db();
     const application=await database.collection('applications').findOne({id});
     if(!application)return Response.json({error:'Application not found'},{status:404});

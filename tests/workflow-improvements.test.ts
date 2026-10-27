@@ -189,7 +189,7 @@ test(
           await updateApplication(
             req("/api/applications", {
               id: application.id,
-              status: "Submitted",
+              status: "Submitted", submissionConfirmed:true,
             }),
           )
         ).status,

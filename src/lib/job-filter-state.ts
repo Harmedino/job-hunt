@@ -10,6 +10,7 @@ export function validateJobFilters(value:unknown):JobFilters {
  for(const key of ['review','includeOtherStacks'] as const){if(v[key]!==undefined&&typeof v[key]!=='boolean')throw new Error('Invalid search preference.');if(typeof v[key]==='boolean')result[key]=v[key];}
  return result;
 }
+export function matchesKeywords(job:Pick<Job,'title'|'company'|'description'>,query:string){const text=[job.title,job.company,job.description].join(' ').toLowerCase();return query.trim().toLowerCase().split(/\s+/).filter(Boolean).every(word=>text.includes(word));}
 export function matchesRole(job:Pick<Job,'title'|'description'>,role:string){
  if(role==='All opportunities')return true;
  if(role==='Development')return !/security|\bsoc\b/i.test(job.title);

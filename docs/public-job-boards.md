@@ -45,6 +45,17 @@ SMARTRECRUITERS_BOARDS=
 
 Format: `token1,token2`, without quotes inside the value, full URLs, paths or API keys. Tokens allow ASCII letters, digits, `_` and `-`; preserve their case. Lever additionally supports `eu:token` for `https://jobs.eu.lever.co/token`. Up to 200 custom tokens per platform are accepted. Incorrect formats fail clearly rather than triggering arbitrary network requests. There is no fixed mandatory company list to copy into Vercel. Deploy the implementation to enable the automatic registry; setting empty variables on the old deployment does not install this change.
 
+Optional examples from the dated official-API verification (already present in the registry; setting these does not establish applicant eligibility):
+
+```dotenv
+GREENHOUSE_BOARDS=twitch,graphcore
+LEVER_BOARDS=bloomon,palantir
+ASHBY_BOARDS=brainco,quora
+SMARTRECRUITERS_BOARDS=NextCenturyCorporation,MarlabsInc1
+```
+
+The recommended required value for all four remains **unset**. These are public board tokens, not API keys. The registry refreshes automatically during manual discovery, within the documented cache and request budget.
+
 ## Verification commands and current limitation
 
 ```sh

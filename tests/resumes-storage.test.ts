@@ -213,7 +213,7 @@ test(
     );
     assert.equal(pdf.headers.get("Content-Type"), "application/pdf");
     await updateApplication(
-      request({ id: application.id, status: "Submitted" }),
+      request({ id: application.id, status: "Submitted", submissionConfirmed:true }),
     );
     const next = await (
       await createResume(

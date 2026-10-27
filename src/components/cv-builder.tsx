@@ -1,5 +1,5 @@
 "use client";
-import { extractRequirements } from "@/lib/job-intelligence";
+import { extractRequirements,skillMention } from "@/lib/job-intelligence";
 import type { Profile } from "@/lib/types";
 import { cleanResumeLayout } from "@/lib/resume-layout";
 import ResumeSectionBody from "@/components/resume-section-body";
@@ -7,6 +7,8 @@ import { useEffect, useRef, useState } from "react";
 import { Download, FileText, History, Save, Sparkles } from "lucide-react";
 import {
   resumeContactFields,
+  orderedResumeSections,
+  type ResumeSection,
   resumeTemplates,
   profileCoverLetter,
   type ResumeTemplate,
@@ -59,6 +61,7 @@ export default function CvBuilder({
   initialJob,
   onProfile,
   onAttached,
+  onTrack,
 }: {
   active: boolean;
   connected: boolean;
@@ -68,6 +71,7 @@ export default function CvBuilder({
   initialJob?: BuilderJob;
   onProfile: () => void;
   onAttached: () => Promise<void>;
+  onTrack?:()=>void;
 }) {
   const [target, setTarget] = useState<TargetForm>(blankTarget);
   const [choice, setChoice] = useState("manual");
@@ -75,15 +79,18 @@ export default function CvBuilder({
   const [draft, setDraft] = useState<ResumeDraft>();
   const [content, setContent] = useState<ResumeContent>();
   const [coverLetter, setCoverLetter] = useState("");
+  const [sectionOrder,setSectionOrder]=useState<ResumeSection[]>(orderedResumeSections());
   const [template, setTemplate] = useState<ResumeTemplate>("classic");
   const [documentKind, setDocumentKind] = useState<"cv" | "letter">("cv");
   const [history, setHistory] = useState<ResumeListItem[]>([]);
   const [busy, setBusy] = useState("");
   const [feedback, setFeedback] = useState("");
   const [error, setError] = useState("");
+  const [failedAction,setFailedAction]=useState('');
   const [master,setMaster]=useState<Profile>();
-  const [recovery,setRecovery]=useState<{content:ResumeContent;coverLetter:string;template:ResumeTemplate;updatedAt:string}>();
+  const [recovery,setRecovery]=useState<{content:ResumeContent;coverLetter:string;template:ResumeTemplate;sectionOrder?:ResumeSection[];updatedAt:string}>();
   const [autosaveStatus,setAutosaveStatus]=useState('');
+  const [pdfPreview,setPdfPreview]=useState('');
   const [readability,setReadability]=useState<{selectableText:boolean;wordCount:number;warnings:string[];notice:string;extractedText:string}>();
   useEffect(()=>{if(!active||!connected)return;let current=true;void fetch('/api/profile').then(r=>r.ok?r.json():undefined).then(p=>{if(current&&p)setMaster(p);}).catch(()=>{});return()=>{current=false;};},[active,connected]);
   const revealEditor = useRef(false);
@@ -95,7 +102,7 @@ export default function CvBuilder({
       coverLetter !==
         (draft.coverLetter ??
           profileCoverLetter(draft.content, draft.target)) ||
-      template !== (draft.template || "classic"));
+      template !== (draft.template || "classic") || JSON.stringify(sectionOrder)!==JSON.stringify(orderedResumeSections(draft.sectionOrder)));
   useEffect(()=>{
     if(!draft)return;let current=true;
     void request<{copy:typeof recovery}>(`/working?draftId=${encodeURIComponent(draft.id)}`).then(data=>{if(current)setRecovery(data.copy || undefined);}).catch(()=>{if(current)setAutosaveStatus('Recovery is unavailable; keep this tab open or save a version.');});
@@ -104,9 +111,9 @@ export default function CvBuilder({
   useEffect(()=>{
     if(!dirty||!draft||!content||!connected)return;
     const controller=new AbortController();
-    const timer=setTimeout(()=>{setAutosaveStatus('Autosaving unfinished edits…');void fetch('/api/resumes/working',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({draftId:draft.id,content,coverLetter,template,revision:Date.now()}),signal:controller.signal}).then(r=>{if(!r.ok)throw new Error();setAutosaveStatus('Unfinished edits autosaved. Save a new version before linking or exporting.');}).catch(()=>{if(!controller.signal.aborted)setAutosaveStatus('Autosave failed. Your edits remain in this tab; save a version before leaving.');});},1200);
+    const timer=setTimeout(()=>{setAutosaveStatus('Autosaving unfinished edits…');void fetch('/api/resumes/working',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({draftId:draft.id,content,coverLetter,template,sectionOrder,revision:Date.now()}),signal:controller.signal}).then(r=>{if(!r.ok)throw new Error();setAutosaveStatus('Unfinished edits autosaved. Save a new version before linking or exporting.');}).catch(()=>{if(!controller.signal.aborted)setAutosaveStatus('Autosave failed. Your edits remain in this tab; save a version before leaving.');});},1200);
     return()=>{clearTimeout(timer);controller.abort();};
-  },[dirty,draft,content,coverLetter,template,connected]);
+  },[dirty,draft,content,coverLetter,template,sectionOrder,connected]);
   useEffect(() => {
     if (!active || !draft || !revealEditor.current) return;
     revealEditor.current = false;
@@ -168,6 +175,7 @@ export default function CvBuilder({
       value.coverLetter ?? profileCoverLetter(value.content, value.target),
     );
     setTemplate(value.template || "classic");
+    setSectionOrder(orderedResumeSections(value.sectionOrder));
     setHistory((items) =>
       [
         {
@@ -187,11 +195,12 @@ export default function CvBuilder({
   async function work(name: string, action: () => Promise<void>) {
     setBusy(name);
     setError("");
+    setFailedAction('');
     setFeedback("");
     try {
       await action();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "CV action failed.");
+      setFailedAction(name);setError(e instanceof Error ? e.message : "CV action failed.");
     } finally {
       setBusy("");
     }
@@ -205,16 +214,18 @@ export default function CvBuilder({
       content,
       coverLetter,
       template,
+      sectionOrder,
     });
     remember(value);
     return value;
   }
-  async function generate() {
+  async function generate(retry=false) {
     await work("generate", async () => {
       if (dirty) await saved();
       const value = await request<ResumeDraft>("", {
         action: "generate",
         useAi,
+        retry,
         template,
         ...(target.jobId
           ? { jobId: target.jobId, applicationId: target.applicationId }
@@ -240,13 +251,13 @@ export default function CvBuilder({
       );
     });
   }
-  async function download(format: "pdf" | "docx" = "pdf") {
+  async function download(format: "pdf" | "docx" = "pdf",kind: "cv"|"letter"=documentKind) {
     await work("download", async () => {
       const value = await saved();
       const path =
-        documentKind === "cv" && format === "pdf"
+        kind === "cv" && format === "pdf"
           ? "pdf"
-          : `export?document=${documentKind}&format=${format}`;
+          : `export?document=${kind}&format=${format}`;
       const response = await fetch(`/api/resumes/${value.id}/${path}`);
       if (!response.ok) {
         const data = await response.json().catch(() => null);
@@ -258,7 +269,7 @@ export default function CvBuilder({
       const url = URL.createObjectURL(await response.blob());
       const link = window.document.createElement("a");
       link.href = url;
-      link.download = `${documentKind === "cv" ? "tailored-cv" : "cover-letter"}.${format}`;
+      link.download = `${kind === "cv" ? "tailored-cv" : "cover-letter"}.${format}`;
       window.document.body.appendChild(link);
       link.click();
       link.remove();
@@ -268,6 +279,11 @@ export default function CvBuilder({
       );
     });
   }
+  async function revert(){if(!draft)return;await work('revert',async()=>{const r=await fetch('/api/resumes/working',{method:'DELETE',headers:{'Content-Type':'application/json'},body:JSON.stringify({draftId:draft.id,revision:Date.now()+1})});if(!r.ok)throw new Error('Could not clear unfinished edits. Your current text remains available.');remember(draft);setRecovery(undefined);setAutosaveStatus('Reverted to the saved version.');});}
+  function moveSection(key:ResumeSection,direction:number){setSectionOrder(current=>{const next=[...current],index=next.indexOf(key),other=index+direction;if(other<0||other>=next.length)return current;[next[index],next[other]]=[next[other],next[index]];return next;});}
+  const requirements=master?extractRequirements(target.description,master):[];
+  const requestedSkills=[...new Set(requirements.flatMap(r=>r.skills))];
+  const relevant=(section:'experience'|'projects')=>(master?.[section]||'').split(/\n\s*\n/).filter(text=>requestedSkills.some(skill=>skillMention(text,skill)));
   const labels = {
     name: "Full name",
     email: "Email",
@@ -289,6 +305,7 @@ export default function CvBuilder({
           </p>
         </div>
       </div>
+      <nav className="builder-steps" aria-label="CV preparation stages">{[['cv-stage-1','1. Choose job'],['cv-stage-2','2. Analyze requirements'],['cv-stage-3','3. Build and edit'],['cv-stage-4','4. Save and use']].map(([id,label])=><button className="secondary" key={id} onClick={()=>document.getElementById(id)?.scrollIntoView({behavior:'smooth',block:'start'})}>{label}</button>)}</nav>
       {!connected && (
         <div className="notice">
           Connect MongoDB and save your profile to create and keep CV versions.{" "}
@@ -297,7 +314,7 @@ export default function CvBuilder({
       )}
       {error && (
         <div className="cv-feedback error" role="alert">
-          {error}
+          <p>{error}</p><p>Your job inputs and unfinished edits remain available.</p>{failedAction==='generate'&&<button className="secondary" disabled={!!busy||!connected||(useAi&&!ai)} onClick={()=>void generate(true)}>Retry Generation</button>}<button className="secondary" disabled={!!busy} onClick={()=>{setMode('profile');setFeedback('Basic Layout selected. Create it below without AI.');}}>Use Basic Layout without AI</button>
         </div>
       )}
       {feedback && (
@@ -314,7 +331,7 @@ export default function CvBuilder({
               void generate();
             }}
           >
-            <h3>1. Choose the job</h3>
+            <h3 id="cv-stage-1">1. Choose the job</h3>
             <label>
               Job to tailor for
               <select
@@ -372,6 +389,7 @@ export default function CvBuilder({
                 onChange={(e) => editTarget({ company: e.target.value })}
               />
             </label>
+            <details className="builder-description" key={choice} open={choice==='manual'}><summary>Job description · {target.description.length} characters</summary>
             <label>
               Job description
               <textarea
@@ -379,13 +397,15 @@ export default function CvBuilder({
                 required
                 minLength={50}
                 maxLength={25000}
-                rows={9}
+                rows={5}
+                onInvalid={event=>event.currentTarget.closest("details")?.setAttribute("open","")}
                 value={target.description}
                 disabled={!!busy}
                 onChange={(e) => editTarget({ description: e.target.value })}
                 placeholder="Paste the responsibilities and requirements…"
               />
             </label>
+            </details>
             {!target.jobId && (
               <label>
                 Original job link (optional)
@@ -400,6 +420,8 @@ export default function CvBuilder({
                 />
               </label>
             )}
+            <section id="cv-stage-2" className="builder-analysis" aria-label="Job requirements analysis"><h3>2. Analyze the requirements</h3><p>Based on mentions in your saved master profile. Duration, proficiency and credentials need your review.</p>{!master?<p>Save your qualifications in My Profile to compare them.</p>:!target.description?<p>Choose or paste a job to begin.</p>:<><p><b>Required technical skills:</b> {[...new Set(requirements.filter(r=>r.kind==='required').flatMap(r=>r.skills))].join(', ')||'No explicit technical skills identified; review the original description.'}</p><p><b>Preferred technical skills:</b> {[...new Set(requirements.filter(r=>r.kind==='preferred').flatMap(r=>r.skills))].join(', ')||'Not identified'}</p><p><b>Matching qualifications:</b> {[...new Set(requirements.flatMap(r=>r.supported))].join(', ')||'No supporting mentions established'}</p><p><b>Missing or unverified:</b> {[...new Set(requirements.flatMap(r=>r.needsReview))].join('; ')||'Check all requirements and experience context manually.'}</p>{(['experience','projects'] as const).map(section=><details key={section}><summary>Relevant {section}</summary>{relevant(section).length?relevant(section).map((text,i)=><pre className="module-pre" key={i}>{text}</pre>):<p>No direct supporting text identified. Review your master profile; no experience has been invented.</p>}</details>)}<details><summary>Full requirement comparison</summary>{requirements.map((r,i)=><article key={i}><p><b>{r.kind}:</b> {r.text}</p><p>Profile mentions: {r.supported.join(', ')||'None'}. Unverified: {r.needsReview.join(', ')||'Confirm context and proficiency.'}</p></article>)}</details></>}</section>
+            <h3 id="cv-stage-3">3. Build and edit the CV</h3>
             <fieldset className="builder-mode">
               <legend>Writing mode</legend>
               <label>
@@ -503,7 +525,7 @@ export default function CvBuilder({
               >
                 <div className="builder-editor-heading">
                   <div>
-                    <h3>2. Edit your application documents</h3>
+                    <h3>Edit your application documents</h3>
                     <p>
                       {draft.manualEdits ? "Manually edited CV" : draft.method}{" "}
                       · {dirty ? "Unsaved edits" : "Saved version"}
@@ -521,7 +543,7 @@ export default function CvBuilder({
                   </button>
                 </div>
                 <p aria-live="polite">{autosaveStatus}</p>
-                {recovery && <div className="notice"><span>Unfinished edits were saved at {new Date(recovery.updatedAt).toLocaleString()}.</span><button className="secondary" onClick={()=>{setContent(recovery.content);setCoverLetter(recovery.coverLetter);setTemplate(recovery.template);setRecovery(undefined);}}>Restore unfinished edits</button><button className="secondary" onClick={()=>setRecovery(undefined)}>Keep current version</button></div>}
+                {recovery && <div className="notice"><span>Unfinished edits were saved at {new Date(recovery.updatedAt).toLocaleString()}.</span><button className="secondary" onClick={()=>{setContent(recovery.content);setCoverLetter(recovery.coverLetter);setTemplate(recovery.template);setSectionOrder(orderedResumeSections(recovery.sectionOrder));setRecovery(undefined);}}>Restore unfinished edits</button><button className="secondary" onClick={()=>setRecovery(undefined)}>Keep current version</button></div>}
                 <details><summary>Compare with master CV</summary><p>My Profile is your master source. Editing this tailored version does not alter it.</p>{master ? (['skills','experience','projects','education'] as const).map(section=><div className="builder-comparison" key={section}><h4>{section}</h4><p>Master profile</p><pre style={{whiteSpace:'pre-wrap'}}>{master[section] || 'Not supplied'}</pre><p>Tailored version</p><pre style={{whiteSpace:'pre-wrap'}}>{content[section] || 'Not supplied'}</pre></div>):<p>Master profile could not be loaded. Your saved draft retains its original evidence snapshot.</p>}</details>
                 <details><summary>Required and preferred skills</summary><p>Text-based requirement checks show mentions in your profile, not proof of proficiency or years of experience.</p>{extractRequirements(draft.target.description,master || draft.profileSnapshot).map((r,i)=><article key={i}><b>{r.kind === 'required'?'Required / stated requirement':'Preferred'}: {r.text}</b><p>Profile mentions: {r.supported.join(', ') || 'No supporting skill mentions'}</p><p>Needs review: {r.needsReview.join(', ') || 'Confirm context, proficiency and experience duration'}</p></article>)}</details>
                 <button className="secondary" disabled={!!busy} onClick={()=>work('readability',async()=>{const current=await saved();setReadability(await request(`/${encodeURIComponent(current.id)}/readability`));})}>Check ATS readability</button>
@@ -595,12 +617,8 @@ export default function CvBuilder({
                       </label>
                     ))}
                   </div>
-                  {(
-                    Object.keys(
-                      resumeSections,
-                    ) as (keyof typeof resumeSections)[]
-                  ).map((key) => (
-                    <label key={key}>
+                  {sectionOrder.map((key,index) => (
+                    <div key={key} className="builder-section-edit"><div className="section-order-actions"><button type="button" className="secondary" aria-label={`Move ${resumeSections[key]} up`} disabled={!!busy||index===0} onClick={()=>moveSection(key,-1)}>↑</button><button type="button" className="secondary" aria-label={`Move ${resumeSections[key]} down`} disabled={!!busy||index===sectionOrder.length-1} onClick={()=>moveSection(key,1)}>↓</button></div><details open={!!content[key]?.trim()}><summary>{resumeSections[key]}</summary><label>
                       {resumeSections[key]}
                       {key === "projects" && (
                         <span className="builder-field-help">
@@ -619,7 +637,7 @@ export default function CvBuilder({
                           setContent({ ...content, [key]: e.target.value })
                         }
                       />
-                    </label>
+                    </label></details></div>
                   ))}
                 </div>
                 {documentKind === "letter" && (
@@ -703,7 +721,72 @@ export default function CvBuilder({
                     </p>
                   ))}
                 </details>
-                <div className="builder-actions">
+
+              </section>
+              <section
+                id="cv-builder-preview"
+                className="builder-preview"
+                aria-label={
+                  documentKind === "cv" ? "CV preview" : "Cover letter preview"
+                }
+              >
+                <div className="builder-preview-label">
+                  Live preview of your{" "}
+                  {documentKind === "cv" ? "CV" : "cover letter"}{" "}
+                  <button
+                    className="builder-profile-link"
+                    onClick={() =>
+                      document
+                        .getElementById("cv-builder-editor")
+                        ?.scrollIntoView({ behavior: "smooth" })
+                    }
+                  >
+                    Back to editor
+                  </button>
+                </div>
+                <article className={`resume-paper resume-${template}`}>
+                  <h2>{content.name}</h2>
+                  <p className="resume-contact">
+                    {[content.email, content.phone, content.location]
+                      .filter(Boolean)
+                      .join(" · ")}
+                  </p>
+                  {[content.github, content.linkedin, content.portfolio]
+                    .filter(Boolean)
+                    .map((url, index) => (
+                      <p className="resume-url" key={index}>
+                        {url}
+                      </p>
+                    ))}
+                  <p className="resume-target">
+                    {documentKind === "letter" ? "Re: " : ""}
+                    {draft.target.title}
+                    {documentKind === "letter" && draft.target.company
+                      ? ` · ${draft.target.company}`
+                      : ""}
+                  </p>
+                  {documentKind === "letter" && (
+                    <div className="letter-body">{coverLetter}</div>
+                  )}
+                  {documentKind === "cv" && (
+                    <>
+                      {sectionOrder.map(
+                        (key) =>
+                          content[key]?.trim() && (
+                            <section key={key}>
+                              <h3>{resumeSections[key]}</h3>
+                              <ResumeSectionBody
+                                section={key}
+                                text={content[key] || ""}
+                              />
+                            </section>
+                          ),
+                      )}
+                    </>
+                  )}
+                </article>
+              </section>
+              <section className="panel builder-use" id="cv-stage-4"><h3>4. Save and use</h3><button className="secondary" disabled={!!busy} onClick={()=>void work('pdf-preview',async()=>{const value=await saved();setFeedback('PDF layout ready. Open the preview link below; downloads remain available.');setPdfPreview(`/api/resumes/${value.id}/pdf`);})}>Preview PDF layout</button>{pdfPreview&&<a className="secondary" href={pdfPreview} target="_blank" rel="noopener noreferrer">Open saved PDF preview ↗</a>}<p>{draft.target.title} · {draft.target.company||'Company not supplied'} · CV version {draft.id.slice(0,8)}</p><p>Your master CV and earlier versions stay unchanged. Open the employer page to apply, then confirm submission in your tracker.</p><div className="module-actions"><button className="secondary" disabled={!!busy||!dirty} onClick={()=>void revert()}>Revert unsaved edits</button><button className="secondary" disabled={!!busy} onClick={()=>void work('package',async()=>{const value=await saved();await request(`/${value.id}/package`,{});await onAttached();setFeedback('Application package saved to Applications. Submission has not been recorded.');})}>Save application package</button>{draft.target.url&&<a className="secondary" href={draft.target.url} target="_blank" rel="noopener noreferrer">Open original application page ↗</a>}<button className="secondary" onClick={onTrack}>Track application status</button></div>                <div className="builder-actions"><button className="secondary" disabled={!!busy} onClick={()=>void download('pdf',documentKind==='cv'?'letter':'cv')}>{documentKind==='cv'?'Download cover letter PDF':'Download CV PDF'}</button>
                   <button
                     className="secondary"
                     disabled={!!busy || !dirty}
@@ -761,75 +844,7 @@ export default function CvBuilder({
                       ? "Checking application…"
                       : "Use this CV for application"}
                   </button>
-                )}
-              </section>
-              <section
-                id="cv-builder-preview"
-                className="builder-preview"
-                aria-label={
-                  documentKind === "cv" ? "CV preview" : "Cover letter preview"
-                }
-              >
-                <div className="builder-preview-label">
-                  3. Preview your{" "}
-                  {documentKind === "cv" ? "CV" : "cover letter"}{" "}
-                  <button
-                    className="builder-profile-link"
-                    onClick={() =>
-                      document
-                        .getElementById("cv-builder-editor")
-                        ?.scrollIntoView({ behavior: "smooth" })
-                    }
-                  >
-                    Back to editor
-                  </button>
-                </div>
-                <article className={`resume-paper resume-${template}`}>
-                  <h2>{content.name}</h2>
-                  <p className="resume-contact">
-                    {[content.email, content.phone, content.location]
-                      .filter(Boolean)
-                      .join(" · ")}
-                  </p>
-                  {[content.github, content.linkedin, content.portfolio]
-                    .filter(Boolean)
-                    .map((url, index) => (
-                      <p className="resume-url" key={index}>
-                        {url}
-                      </p>
-                    ))}
-                  <p className="resume-target">
-                    {documentKind === "letter" ? "Re: " : ""}
-                    {draft.target.title}
-                    {documentKind === "letter" && draft.target.company
-                      ? ` · ${draft.target.company}`
-                      : ""}
-                  </p>
-                  {documentKind === "letter" && (
-                    <div className="letter-body">{coverLetter}</div>
-                  )}
-                  {documentKind === "cv" && (
-                    <>
-                      {(
-                        Object.keys(
-                          resumeSections,
-                        ) as (keyof typeof resumeSections)[]
-                      ).map(
-                        (key) =>
-                          content[key]?.trim() && (
-                            <section key={key}>
-                              <h3>{resumeSections[key]}</h3>
-                              <ResumeSectionBody
-                                section={key}
-                                text={content[key] || ""}
-                              />
-                            </section>
-                          ),
-                      )}
-                    </>
-                  )}
-                </article>
-              </section>
+                )}</section>
             </>
           ) : (
             <div className="panel builder-empty">

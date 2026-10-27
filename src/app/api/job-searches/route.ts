@@ -18,10 +18,10 @@ export async function POST(request: Request) {
     if(body?.kind==='filters') {
       if(typeof body.name!=='string'||!body.name.trim()||body.name.length>100)throw new Error('Name your saved search.');
       const filters=validateJobFilters(body.filters);
-      const c=(await db()).collection('job_filter_searches');
+      try{const c=(await db()).collection('job_filter_searches');
       await c.createIndex({name:1},{unique:true});
       await c.updateOne({name:body.name.trim()},{$set:{filters,kind:'filters',updatedAt:new Date().toISOString()},$setOnInsert:{id:randomUUID(),name:body.name.trim(),createdAt:new Date().toISOString()}},{upsert:true});
-      return Response.json({ok:true});
+      return Response.json({ok:true});}catch(error){return errorResponse(error);}
     }
     input = searchLink(body);
   } catch (e) {

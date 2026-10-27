@@ -1,8 +1,10 @@
 "use client";
 import Link from "next/link";
 import SavedJobSearches from "@/components/saved-job-searches";
-import {matchesRole,sortJobResults,validateJobFilters,type JobFilters} from "@/lib/job-filter-state";
-import { jobTypes, experienceLevels, eligibilityLabels, jobAvailable, assessStackFit } from "@/lib/job-intelligence";
+import {plainText} from "@/lib/job-text";
+import {applicationStatusLabel} from "@/lib/application-updates";
+import {matchesRole,sortJobResults,matchesKeywords,validateJobFilters,type JobFilters} from "@/lib/job-filter-state";
+import { jobTypes, experienceLevels, eligibilityLabels, jobAvailable, assessStackFit, inferExperience } from "@/lib/job-intelligence";
 import BountyWorkspace from "@/components/modules/bounty-workspace";
 import YoutubeWorkspace from "@/components/modules/youtube-workspace";
 import WorkspaceOverview from "@/components/modules/workspace-overview";
@@ -208,14 +210,13 @@ export default function Home() {
     ...applications.map((a) => ({ ...a.job, applicationId: a.id, draftId: a.cvDraftId })),
     ...jobs.filter((j) => !applications.some((a) => a.job.id === j.id)),
   ], [applications, jobs]);
-  const profileJobs=useMemo(()=>jobs.map(job=>{const stack=assessStackFit(job.title,job.description,profile);return {...job,...stack,score:stack.stackFit==='incompatible'?Math.min(job.score,20):job.score};}),[jobs,profile]);
+  const profileJobs=useMemo(()=>jobs.map(raw=>{const job={...raw,title:plainText(raw.title),company:plainText(raw.company),description:plainText(raw.description),source:plainText(raw.source)};const stack=assessStackFit(job.title,job.description,profile),profileLevel=inferExperience(profile.experience+' '+profile.roles),seniorMismatch=(job.experienceLevel||inferExperience(job.title))==='Senior'&&profileLevel&&profileLevel!=='Senior';return {...job,...stack,seniorityMismatch:!!seniorMismatch,score:Math.min(job.score,stack.stackFit==='incompatible'?20:100,seniorMismatch?59:100)};}),[jobs,profile]);
+  const activeJobs=profileJobs.filter(j=>jobAvailable(j,now));
   const filtered = useMemo(
     () =>
       sortJobResults(profileJobs.filter(
         (j) =>
-          `${j.title} ${j.company} ${j.description}`
-            .toLowerCase()
-            .includes(query.toLowerCase()) &&
+          matchesKeywords(j,query) &&
           jobAvailable(j,now) && j.eligibility !== "restricted" &&
           (includeOtherStacks || opportunityView === 'saved' || j.stackFit !== 'incompatible') &&
           (review || j.eligibility === "eligible") &&
@@ -403,7 +404,7 @@ export default function Home() {
                 <Stat
                   label="Location-supported jobs"
                   value={
-                    jobs.filter((j) => j.eligibility === "eligible").length
+                    activeJobs.filter((j) => j.eligibility === "eligible").length
                   }
                   hint="Worldwide employers · location checked"
                   icon={<BriefcaseBusiness size={19} />}
@@ -472,8 +473,8 @@ export default function Home() {
                   {sourceReports.length ? `${sourceReports.filter(s => s.status === "ok" || s.status === "partial").length} sources checked` : `${jobPlatforms.filter(p => p.access !== "manual").length} search connectors`} <ExternalLink size={13} />
                 </span>
               </div>
-              <p className="result-summary">{jobs.length} loaded · {profileJobs.filter(j=>jobAvailable(j,now)).length} active · {jobs.filter(j=>j.eligibility==='eligible').length} location-supported · {jobs.filter(j=>j.eligibility==='review').length} need location review · {filtered.length} match your filters</p>
-              <details className="count-definitions"><summary>What these counts mean</summary><p>Loaded means retained discovery results. Active excludes known closed or expired vacancies. Location-supported means explicit Nigeria, worldwide or Africa coverage. A job may be active without matching your stack or filters; unknown eligibility stays available for review. Strong matches are profile scores of at least 65/100, not hiring probabilities. Fresh means posted within seven days.</p></details>
+              <p className="result-summary">{jobs.length} loaded · {activeJobs.length} active · {activeJobs.filter(j=>j.eligibility==='eligible').length} location-supported · {activeJobs.filter(j=>j.eligibility==='review').length} need location review · {filtered.length} match your filters</p>
+              <details className="count-definitions"><summary>What these counts mean</summary><p>Loaded means retained discovery results. Active excludes known closed or expired vacancies. Location-supported and location-review counts cover active listings. Location-supported means explicit Nigeria, worldwide or Africa coverage. A job may be active without matching your stack or filters; unknown eligibility stays available for review. Strong matches are profile scores of at least 65/100, not hiring probabilities. Fresh means posted within seven days.</p></details>
               <div className="filter-bar">
                 <div className="search-input">
                   <Search size={17} />
@@ -570,6 +571,7 @@ export default function Home() {
                       </div>
                       <p>{eligibilityLabels[job.eligibilityClass || (job.eligibility==='eligible'?'worldwide':'review')]}</p>
 
+                      {job.seniorityMismatch && <p className="location-warning">Seniority exceeds your stated level. Review the experience requirement.</p>}
                       {job.stackFit==='incompatible' && <p className="location-warning">Outside your saved stack · {job.stackReason}</p>}
                       {job.matchedSkills.length>0 && <p>Matching skills: {job.matchedSkills.slice(0,4).join(', ')}</p>}
 
@@ -665,7 +667,7 @@ export default function Home() {
             </>
           )}
           <div hidden={tab !== "CV Builder"}>
-            <CvBuilder active={tab === "CV Builder"} connected={!!health?.database} ai={!!health?.ai} aiLabel={health?.aiLabel} jobs={builderJobs} initialJob={builderJob} onProfile={() => setTab("My Profile")} onAttached={refreshApplications} />
+            <CvBuilder active={tab === "CV Builder"} connected={!!health?.database} ai={!!health?.ai} aiLabel={health?.aiLabel} jobs={builderJobs} initialJob={builderJob} onProfile={() => setTab("My Profile")} onAttached={refreshApplications} onTrack={()=>setTab("Applications")} />
           </div>
           {tab === "My Profile" && (
             <div className="profile-layout">
@@ -861,7 +863,7 @@ export default function Home() {
                     <b>
                       {applications.filter((a) => a.status === status).length}
                     </b>
-                    <span>{status}</span>
+                    <span>{applicationStatusLabel(status)}</span>
                   </div>
                 ))}
               </div>
@@ -897,13 +899,14 @@ export default function Home() {
                               await api("applications", "PATCH", {
                                 id: app.id,
                                 status,
+                                submissionConfirmed:status==='Submitted',
                               });
                               await refreshApplications();
                             });
                           }}
                         >
                           {statuses.map((s) => (
-                            <option key={s}>{s}</option>
+                            <option key={s} value={s}>{applicationStatusLabel(s)}</option>
                           ))}
                         </select>
                       </div>
@@ -960,6 +963,9 @@ export default function Home() {
                           }}
                         />
                       </label>
+                      <p className="application-package-info">CV version: {app.cvDraftId ? app.cvDraftId.slice(0,8) : 'Not prepared'} · Cover letter: {app.coverLetter ? 'Saved' : 'Not prepared'}{app.submittedAt?' · Submitted documents preserved':''}</p>
+                      {app.followUpDate && <p className="follow-up-reminder" role="note">{app.followUpDate<=new Date(now).toLocaleDateString('en-CA')?'Follow-up due':'Follow-up planned'}: {app.followUpDate}</p>}
+                      <details className="application-tracking"><summary>Application dates, notes and interview details</summary><div className="form-grid">{(['applicationDate','followUpDate'] as const).map(key=><label key={key}>{key==='applicationDate'?'Application date':'Follow-up date'}<input type="date" aria-label={`${key==='applicationDate'?'Application date':'Follow-up date'} for ${app.job.title}`} defaultValue={app[key]||''} disabled={!!busy} onBlur={e=>{if(e.target.value!==(app[key]||''))void task(app.id,async()=>{await api('applications','PATCH',{id:app.id,[key]:e.target.value});await refreshApplications();});}}/></label>)}</div>{(['notes','interviewInfo'] as const).map(key=><label key={key}>{key==='notes'?'Personal notes':'Interview information'}<textarea rows={3} maxLength={key==='notes'?8000:4000} aria-label={`${key==='notes'?'Personal notes':'Interview information'} for ${app.job.title}`} defaultValue={app[key]||''} disabled={!!busy} onBlur={e=>{if(e.target.value!==(app[key]||''))void task(app.id,async()=>{await api('applications','PATCH',{id:app.id,[key]:e.target.value});await refreshApplications();});}}/></label>)}<p>Dates are your own records. Setting an application date does not mark it submitted. Follow-up dates appear here as reminders.</p></details>
                       {app.submittedAt && (
                         <small>
                           Marked submitted{" "}
