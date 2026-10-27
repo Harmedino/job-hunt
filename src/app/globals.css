@@ -1892,3 +1892,13 @@ footer > span {
 .platform-grid h4 { margin: 0 0 12px; }
 .platform-grid small { display: block; color: var(--muted); font-size: 11px; }
 .platform-grid .module-actions { margin-bottom: 0; }
+
+/* Job filters and manual intake stay usable on narrow screens. */
+.filter-bar { flex-wrap: wrap; align-items: end; }
+.filter-bar > label { display: grid; gap: 6px; max-width: 100%; font-size: 12px; }
+.filter-bar select { max-width: 100%; }
+.filter-bar .search-input { min-width: min(240px,100%); }
+.social-intake select { max-width: 100%; padding: 10px; }
+.social-intake input[type="checkbox"] { width: auto; }
+.social-intake form { display: grid; gap: 12px; }
+.builder-comparison { border-top: 1px solid var(--border); padding: 12px 0; overflow-wrap: anywhere; }

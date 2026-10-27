@@ -1,9 +1,10 @@
 "use client";
 import Link from "next/link";
+import { jobTypes, experienceLevels, eligibilityLabels, jobAvailable } from "@/lib/job-intelligence";
 import BountyWorkspace from "@/components/modules/bounty-workspace";
 import YoutubeWorkspace from "@/components/modules/youtube-workspace";
 import WorkspaceOverview from "@/components/modules/workspace-overview";
-import { DISCOVERY_REFRESH_MS, recentPosting } from "@/lib/job-freshness";
+import { DISCOVERY_REFRESH_MS, recentPosting, activeBoardPosting } from "@/lib/job-freshness";
 import SocialIntake from "@/components/social-intake";
 import CvUpload from "@/components/cv-upload";
 import CvBuilder from "@/components/cv-builder";
@@ -101,7 +102,11 @@ export default function Home() {
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState("All opportunities");
   const [fresh, setFresh] = useState("3");
-  const [review, setReview] = useState(false);
+  const [jobPage, setJobPage] = useState(1);
+  const [review, setReview] = useState(true);
+  const [jobType, setJobType] = useState("all");
+  const [level, setLevel] = useState("all");
+  const [opportunityView, setOpportunityView] = useState("all");
   const [selected, setSelected] = useState<Job>();
   const [notices, setNotices] = useState<{ id: string; title: string }[]>([]);
   const [showNotices, setShowNotices] = useState(false);
@@ -162,6 +167,7 @@ export default function Home() {
       active = false;
     };
   }, [receiveDiscovery]);
+  useEffect(()=>{const reload=()=>{setFresh('active');setReview(true);setJobPage(1);void api<DiscoveryResponse>('discover').then(receiveDiscovery).catch(e=>setMessage(e.message));};window.addEventListener('lead-promoted',reload);return ()=>window.removeEventListener('lead-promoted',reload);},[receiveDiscovery]);
   const backgroundSearch = useRef(false);
   const lastBackgroundAttempt = useRef(0);
   useEffect(() => {
@@ -201,7 +207,7 @@ export default function Home() {
       setMessage(
         data.failures?.length
           ? data.failures.join(" · ")
-          : `Search checked: ${data.jobs.length} openings posted within 72 hours. ${added ? `${added} added since the previous check.` : "No new listings since the previous check."}${data.persisted ? "" : " Connect MongoDB to save jobs."}`,
+          : `Search checked: ${data.jobs.length} available openings checked across the last 30 days and active public boards. ${added ? `${added} added since the previous check.` : "No new listings since the previous check."}${data.persisted ? "" : " Connect MongoDB to save jobs."}`,
       );
       if (health?.database && data.persisted) setNotices(await api("notifications"));
     });
@@ -228,21 +234,29 @@ export default function Home() {
           `${j.title} ${j.company} ${j.description}`
             .toLowerCase()
             .includes(query.toLowerCase()) &&
+          jobAvailable(j,now) && j.eligibility !== "restricted" &&
           (review || j.eligibility === "eligible") &&
+          (jobType === 'all' || j.jobType === jobType) &&
+          (level === 'all' || j.experienceLevel === level) &&
+          (opportunityView === 'all' || (opportunityView === 'strong' && j.score >= 70) || (opportunityView === 'new' && recentPosting(j.postedAt,now,1)) || (opportunityView === 'eligible' && j.eligibility === 'eligible') || (opportunityView === 'review' && j.eligibility === 'review') || (opportunityView === 'saved' && applications.some(a=>a.job.id===j.id))) &&
           (category === "All opportunities" ||
             (category === "Development"
               ? !/security|soc/i.test(j.title)
               : /security|soc/i.test(j.title))) &&
-          recentPosting(j.postedAt, now) && now - Date.parse(j.postedAt) <= Number(fresh) * 86400000,
+          (fresh === "active" ? activeBoardPosting(j, now) : recentPosting(j.postedAt, now, Number(fresh))),
       ),
-    [jobs, query, category, review, fresh, now],
+    [jobs, query, category, review, fresh, now, jobType, level, opportunityView, applications],
   );
+  const activeOlderCount = jobs.filter(j => activeBoardPosting(j, now) && !recentPosting(j.postedAt, now)).length;
+  const totalJobPages = Math.max(1, Math.ceil(filtered.length / 24));
+  const currentJobPage = Math.min(jobPage, totalJobPages);
+  const visibleJobs = filtered.slice((currentJobPage - 1) * 24, currentJobPage * 24);
   const freshCount = jobs.filter(
     (j) =>
       recentPosting(j.postedAt, now) &&
       j.eligibility === "eligible",
   ).length;
-  const reviewCount = jobs.filter((j) => recentPosting(j.postedAt, now) && j.eligibility === "review").length;
+  const reviewCount = jobs.filter((j) => (fresh === "active" ? activeBoardPosting(j, now) : recentPosting(j.postedAt, now)) && j.eligibility === "review").length;
   const sourcesUnavailable = sourceReports.length > 0 && sourceReports.filter(s => s.status !== "not_configured").every((s) => s.status === "error");
   return (
     <div className="app-shell">
@@ -487,32 +501,38 @@ export default function Home() {
                     aria-label="Search jobs"
                     placeholder="Search titles, companies, or skills…"
                     value={query}
-                    onChange={(e) => setQuery(e.target.value)}
+                    onChange={(e) => { setQuery(e.target.value); setJobPage(1); }}
                   />
                 </div>
                 <select
                   aria-label="Posting age"
                   value={fresh}
-                  onChange={(e) => setFresh(e.target.value)}
+                  onChange={(e) => { setFresh(e.target.value); setJobPage(1); }}
                 >
                   <option value="3">Last 72 hours</option>
                   <option value="1">Last 24 hours</option>
+                  <option value="7">Last 7 days</option><option value="14">Last 14 days</option><option value="30">Last 30 days</option>
+                  <option value="active">Active public boards</option>
                 </select>
+                <label>Job type<select aria-label="Job type" value={jobType} onChange={e=>{setJobType(e.target.value);setJobPage(1);}}><option value="all">All job types</option>{jobTypes.map(t=><option key={t}>{t}</option>)}</select></label>
+                <label>Experience level<select aria-label="Experience level" value={level} onChange={e=>{setLevel(e.target.value);setJobPage(1);}}><option value="all">All levels</option>{experienceLevels.map(t=><option key={t}>{t}</option>)}</select></label>
+                <label>View<select aria-label="Opportunity view" value={opportunityView} onChange={e=>{setOpportunityView(e.target.value);setJobPage(1);}}><option value="all">All relevant jobs</option><option value="strong">Strong matches</option><option value="new">Newly posted</option><option value="eligible">Nigeria / Africa / worldwide eligible</option><option value="review">Eligibility needs checking</option><option value="saved">Saved jobs</option></select></label>
                 <label className="review-toggle">
                   <input
                     type="checkbox"
                     checked={review}
-                    onChange={(e) => setReview(e.target.checked)}
+                    onChange={(e) => { setReview(e.target.checked); setJobPage(1); }}
                   />
                   Include location review{reviewCount ? ` (${reviewCount})` : ""}
                 </label>
               </div>
+              <div className="module-actions"><button className="secondary" onClick={()=>setTab('Applications')}>Application history</button><button className="secondary" onClick={()=>{document.getElementById('social-inbox')?.scrollIntoView();window.dispatchEvent(new Event('open-social-inbox'));}}>Social opportunities awaiting verification</button></div>
               <div className="category-tabs">
                 {["All opportunities", "Development", "Cybersecurity"].map(
                   (c) => (
                     <button
                       key={c}
-                      onClick={() => setCategory(c)}
+                      onClick={() => { setCategory(c); setJobPage(1); }}
                       className={category === c ? "selected" : ""}
                     >
                       {c}
@@ -528,9 +548,19 @@ export default function Home() {
                 <CircleHelp size={17} /><span>{reviewCount} remote {reviewCount === 1 ? "opening needs" : "openings need"} applicant-location confirmation and {reviewCount === 1 ? "is" : "are"} hidden. These are unverified candidates.</span>
                 <button className="secondary" onClick={() => setReview(true)}>Review location requirements</button>
               </div>}
+              {fresh !== "active" && activeOlderCount > 0 && <div className="notice">
+                <CircleHelp size={17} /><span>{activeOlderCount} active employer listings have older or unavailable posting dates.</span>
+                <button className="secondary" onClick={() => { setFresh("active"); setJobPage(1); }}>View active public board jobs</button>
+              </div>}
+              {fresh === "active" && <p className="notice">Public board listings checked within 24 hours. Some have older or unavailable posting dates; these are not labeled as new. Confirm applicant restrictions on the original posting.</p>}
+              {filtered.length > 24 && <nav aria-label="Job result pages" className="module-actions">
+                <button className="secondary" disabled={currentJobPage <= 1} onClick={() => setJobPage(currentJobPage - 1)}>Previous jobs</button>
+                <span>Page {currentJobPage} of {totalJobPages} · {filtered.length} opportunities</span>
+                <button className="secondary" disabled={currentJobPage >= totalJobPages} onClick={() => setJobPage(currentJobPage + 1)}>Next jobs</button>
+              </nav>}
               {filtered.length ? (
                 <div className="job-grid">
-                  {filtered.map((job) => (
+                  {visibleJobs.map((job) => (
                     <article className="job-card" key={job.id}>
                       <div className="job-top">
                         <span
@@ -561,7 +591,12 @@ export default function Home() {
                         <MapPin size={14} />
                         {job.location || "Location not specified"}
                       </div>
+                      <p>{eligibilityLabels[job.eligibilityClass || (job.eligibility==='eligible'?'worldwide':'review')]}</p>
+                      <small>{job.eligibilityReason}</small>
+                      {job.matchedSkills.length>0 && <p>Matching skills: {job.matchedSkills.join(', ')}</p>}
+                      <a href={job.url} target="_blank" rel="noopener noreferrer">Original application listing ↗</a>
                       <div className="job-tags">
+                        {job.jobType && <span>{job.jobType}</span>}{job.experienceLevel && <span>{job.experienceLevel}</span>}
                         <span>
                           <Globe2 size={12} />
                           Remote
@@ -587,12 +622,12 @@ export default function Home() {
                         >
                           <Sparkles size={13} />
                           {profile.skills
-                            ? `${job.score}% skill match`
+                            ? `${job.score}/100 profile match`
                             : "Add skills to match"}
                         </span>
                         <span>
                           <Clock3 size={12} />
-                          {ago(job.postedAt, now)}
+                          {job.postedAt ? ago(job.postedAt, now) : "Posting date unavailable"}
                         </span>
                       </div>
                       <button
@@ -996,7 +1031,7 @@ export default function Home() {
               <X />
             </button>
             <span className="eyebrow">
-              {selected.source} · {ago(selected.postedAt, now)}
+              {selected.source} · {selected.postedAt ? ago(selected.postedAt, now) : "Posting date unavailable"}
             </span>
             <h2>{selected.title}</h2>
             <p>
@@ -1006,9 +1041,8 @@ export default function Home() {
               <ShieldCheck size={17} />
               {selected.eligibilityReason}
             </div>
-            <p>
-              <b>{selected.salary || "Salary not disclosed"}</b>
-            </p>
+            <p><b>{selected.salary || "Salary not disclosed"}</b></p>
+              <details><summary>Why this job matches</summary><p>Match scores compare profile evidence with the posting; they are not hiring probabilities.</p>{selected.matchReasons?.map(reason=><p key={reason}>{reason}</p>)}</details>
             <h3>Requirements & role description</h3>
             <p className="description">{selected.description}</p>
             {selected.matchedSkills.length > 0 && (

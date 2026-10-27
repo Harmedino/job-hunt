@@ -23,7 +23,7 @@ const excluded = {
   location: 0,
   duplicate: 0,
 };
-test("first visit searches once and explains jobs hidden for location review", async ({
+test("first visit searches once and keeps location-review jobs visible", async ({
   page,
 }) => {
   let searches = 0;
@@ -62,20 +62,12 @@ test("first visit searches once and explains jobs hidden for location review", a
   await expect(
     page.getByRole("region", { name: "Search activity" }),
   ).toContainText("1 checked · 0 location-supported · 1 need review");
-  await expect(
-    page.getByText("1 remote opening needs applicant-location confirmation", {
-      exact: false,
-    }),
-  ).toBeVisible();
-  await expect(
-    page.getByRole("button", { name: "Frontend Developer", exact: true }),
-  ).not.toBeVisible();
-  await page
-    .getByRole("button", { name: "Review location requirements" })
-    .click();
-  await expect(
-    page.getByRole("button", { name: "Frontend Developer", exact: true }),
-  ).toBeVisible();
+  await expect(page.getByRole("button", { name: "Frontend Developer", exact: true })).toBeVisible();
+  await expect(page.getByLabel('Include location review')).toBeChecked();
+  await page.getByLabel('Include location review').uncheck();
+  await expect(page.getByRole("button", { name: "Frontend Developer", exact: true })).not.toBeVisible();
+  await page.getByRole('button',{name:'Review location requirements'}).click();
+  await expect(page.getByRole("button", { name: "Frontend Developer", exact: true })).toBeVisible();
   expect(searches).toBe(1);
   expect(
     await page.evaluate(
@@ -159,7 +151,7 @@ test("a recent stored search is reused without another automatic source request"
   expect(searches).toBe(0);
 });
 
-test("finder defaults to 72 hours and excludes older cached postings", async ({
+test("finder defaults to three days and offers wider posting views", async ({
   page,
 }) => {
   await page.route("**/api/status", (r) =>
@@ -184,7 +176,7 @@ test("finder defaults to 72 hours and excludes older cached postings", async ({
   await page.goto("/");
   await expect(page.getByLabel("Posting age")).toHaveValue("3");
   await expect(page.getByRole("option", { name: "Last 30 days" })).toHaveCount(
-    0,
+    1,
   );
   await expect(page.locator(".company-name").filter({ hasText: "Age 71 Company" })).toBeVisible();
   await expect(page.locator(".company-name").filter({ hasText: "Age 73 Company" })).toHaveCount(
