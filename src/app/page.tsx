@@ -1,6 +1,6 @@
 "use client";
 import Link from "next/link";
-import { jobTypes, experienceLevels, eligibilityLabels, jobAvailable } from "@/lib/job-intelligence";
+import { jobTypes, experienceLevels, eligibilityLabels, jobAvailable, assessStackFit } from "@/lib/job-intelligence";
 import BountyWorkspace from "@/components/modules/bounty-workspace";
 import YoutubeWorkspace from "@/components/modules/youtube-workspace";
 import WorkspaceOverview from "@/components/modules/workspace-overview";
@@ -104,6 +104,7 @@ export default function Home() {
   const [fresh, setFresh] = useState("3");
   const [jobPage, setJobPage] = useState(1);
   const [review, setReview] = useState(true);
+  const [includeOtherStacks,setIncludeOtherStacks]=useState(false);
   const [jobType, setJobType] = useState("all");
   const [level, setLevel] = useState("all");
   const [opportunityView, setOpportunityView] = useState("all");
@@ -227,35 +228,40 @@ export default function Home() {
     ...applications.map((a) => ({ ...a.job, applicationId: a.id, draftId: a.cvDraftId })),
     ...jobs.filter((j) => !applications.some((a) => a.job.id === j.id)),
   ], [applications, jobs]);
+  const profileJobs=useMemo(()=>jobs.map(job=>{const stack=assessStackFit(job.title,job.description,profile);return {...job,...stack,score:stack.stackFit==='incompatible'?Math.min(job.score,20):job.score};}),[jobs,profile]);
   const filtered = useMemo(
     () =>
-      jobs.filter(
+      profileJobs.filter(
         (j) =>
           `${j.title} ${j.company} ${j.description}`
             .toLowerCase()
             .includes(query.toLowerCase()) &&
           jobAvailable(j,now) && j.eligibility !== "restricted" &&
+          (includeOtherStacks || opportunityView === 'saved' || j.stackFit !== 'incompatible') &&
           (review || j.eligibility === "eligible") &&
           (jobType === 'all' || j.jobType === jobType) &&
           (level === 'all' || j.experienceLevel === level) &&
-          (opportunityView === 'all' || (opportunityView === 'strong' && j.score >= 70) || (opportunityView === 'new' && recentPosting(j.postedAt,now,1)) || (opportunityView === 'eligible' && j.eligibility === 'eligible') || (opportunityView === 'review' && j.eligibility === 'review') || (opportunityView === 'saved' && applications.some(a=>a.job.id===j.id))) &&
+          (opportunityView === 'all' || (opportunityView === 'strong' && j.score >= 65) || (opportunityView === 'new' && recentPosting(j.postedAt,now,1)) || (opportunityView === 'eligible' && j.eligibility === 'eligible') || (opportunityView === 'review' && j.eligibility === 'review') || (opportunityView === 'saved' && applications.some(a=>a.job.id===j.id))) &&
           (category === "All opportunities" ||
             (category === "Development"
               ? !/security|soc/i.test(j.title)
               : /security|soc/i.test(j.title))) &&
-          (fresh === "active" ? activeBoardPosting(j, now) : recentPosting(j.postedAt, now, Number(fresh))),
+          (fresh === "active" ? activeBoardPosting(j, now) : fresh === "available" ? (recentPosting(j.postedAt,now,30) || activeBoardPosting(j,now)) : recentPosting(j.postedAt, now, Number(fresh))),
       ),
-    [jobs, query, category, review, fresh, now, jobType, level, opportunityView, applications],
+    [profileJobs, query, category, review, fresh, now, jobType, level, opportunityView, applications, includeOtherStacks],
   );
   const activeOlderCount = jobs.filter(j => activeBoardPosting(j, now) && !recentPosting(j.postedAt, now)).length;
   const totalJobPages = Math.max(1, Math.ceil(filtered.length / 24));
   const currentJobPage = Math.min(jobPage, totalJobPages);
   const visibleJobs = filtered.slice((currentJobPage - 1) * 24, currentJobPage * 24);
-  const freshCount = jobs.filter(
-    (j) =>
-      recentPosting(j.postedAt, now) &&
-      j.eligibility === "eligible",
-  ).length;
+  const currentOpportunities=profileJobs.filter(j=>j.stackFit !== 'incompatible' && jobAvailable(j,now) && j.eligibility !== 'restricted' && (recentPosting(j.postedAt,now,30)||activeBoardPosting(j,now)));
+  const freshCount=currentOpportunities.filter(j=>recentPosting(j.postedAt,now,7)).length;
+  const strongCount=currentOpportunities.filter(j=>j.score>=65).length;
+  function showStatJobs(kind:'strong'|'fresh') {
+    setQuery('');setCategory('All opportunities');setJobType('all');setLevel('all');setReview(true);setIncludeOtherStacks(false);setJobPage(1);
+    setOpportunityView(kind==='strong'?'strong':'all');setFresh(kind==='strong'?'available':'7');
+    requestAnimationFrame(()=>{const results=document.getElementById('job-results');results?.scrollIntoView({behavior:'smooth',block:'start'});results?.focus({preventScroll:true});});
+  }
   const reviewCount = jobs.filter((j) => (fresh === "active" ? activeBoardPosting(j, now) : recentPosting(j.postedAt, now)) && j.eligibility === "review").length;
   const sourcesUnavailable = sourceReports.length > 0 && sourceReports.filter(s => s.status !== "not_configured").every((s) => s.status === "error");
   return (
@@ -429,16 +435,16 @@ export default function Home() {
                 <Stat
                   label="Fresh this week"
                   value={freshCount}
-                  hint="Posted in the last 72 hours"
+                  hint="Posted in the last 7 days"
+                  onClick={()=>showStatJobs('fresh')}
+                  pressed={fresh==='7' && opportunityView==='all'}
                   icon={<Zap size={19} />}
                 />
                 <Stat
                   label="Strong matches"
-                  value={
-                    jobs.filter(
-                      (j) => j.score >= 65 && j.eligibility === "eligible",
-                    ).length
-                  }
+                  value={strongCount}
+                  onClick={()=>showStatJobs('strong')}
+                  pressed={opportunityView==='strong'}
                   hint={
                     profile.skills
                       ? "Based on your saved skills"
@@ -481,7 +487,7 @@ export default function Home() {
               <DiscoveryReport sources={sourceReports} storageWarning={storageWarning} />
               <div className="section-title">
                 <div>
-                  <h2>
+                  <h2 id="job-results" tabIndex={-1}>
                     Your opportunities <span>{filtered.length}</span>
                   </h2>
                   <p>
@@ -509,6 +515,7 @@ export default function Home() {
                   value={fresh}
                   onChange={(e) => { setFresh(e.target.value); setJobPage(1); }}
                 >
+                  <option value="available">All available postings</option>
                   <option value="3">Last 72 hours</option>
                   <option value="1">Last 24 hours</option>
                   <option value="7">Last 7 days</option><option value="14">Last 14 days</option><option value="30">Last 30 days</option>
@@ -517,6 +524,7 @@ export default function Home() {
                 <label>Job type<select aria-label="Job type" value={jobType} onChange={e=>{setJobType(e.target.value);setJobPage(1);}}><option value="all">All job types</option>{jobTypes.map(t=><option key={t}>{t}</option>)}</select></label>
                 <label>Experience level<select aria-label="Experience level" value={level} onChange={e=>{setLevel(e.target.value);setJobPage(1);}}><option value="all">All levels</option>{experienceLevels.map(t=><option key={t}>{t}</option>)}</select></label>
                 <label>View<select aria-label="Opportunity view" value={opportunityView} onChange={e=>{setOpportunityView(e.target.value);setJobPage(1);}}><option value="all">All relevant jobs</option><option value="strong">Strong matches</option><option value="new">Newly posted</option><option value="eligible">Nigeria / Africa / worldwide eligible</option><option value="review">Eligibility needs checking</option><option value="saved">Saved jobs</option></select></label>
+                <label className="review-toggle"><input type="checkbox" checked={includeOtherStacks} onChange={e=>{setIncludeOtherStacks(e.target.checked);setJobPage(1);}}/>Include jobs outside my stack</label>
                 <label className="review-toggle">
                   <input
                     type="checkbox"
@@ -593,6 +601,7 @@ export default function Home() {
                       </div>
                       <p>{eligibilityLabels[job.eligibilityClass || (job.eligibility==='eligible'?'worldwide':'review')]}</p>
                       <small>{job.eligibilityReason}</small>
+                      {job.stackFit==='incompatible' && <p className="location-warning">Outside your saved stack · {job.stackReason}</p>}
                       {job.matchedSkills.length>0 && <p>Matching skills: {job.matchedSkills.join(', ')}</p>}
                       <a href={job.url} target="_blank" rel="noopener noreferrer">Original application listing ↗</a>
                       <div className="job-tags">
@@ -836,7 +845,7 @@ export default function Home() {
                     Keys stay on the server. Do not paste them into this page or chat.
                   </p>
                   <p>
-                    With just a Gemini key, provider selection is automatic. To choose Gemini when both keys exist, set <code>AI_PROVIDER=gemini</code>. Gemini uses Google’s latest Flash text model alias; <code>GEMINI_MODEL</code> can override it. Provider quotas, billing and data-use terms apply. A ChatGPT or Gemini app subscription does not supply an API key.
+                    With just a Gemini key, provider selection is automatic. To choose Gemini when both keys exist, set <code>AI_PROVIDER=gemini</code>. With <code>GEMINI_MODEL=auto</code>, temporary overloads can recover using another Gemini model. Saved CVs record the models used. An explicit <code>GEMINI_MODEL</code> pins that model and disables alternate-model recovery. Provider quotas, billing and data-use terms apply. A ChatGPT or Gemini app subscription does not supply an API key.
                   </p>
                   {health?.aiConfigurationError && <p role="alert">{health.aiConfigurationError}</p>}
                   <button className="secondary" type="button" disabled={!!busy || !health?.ai} onClick={() => void task("ai-check", async () => {
@@ -1170,27 +1179,9 @@ export default function Home() {
     </div>
   );
 }
-function Stat({
-  label,
-  value,
-  hint,
-  icon,
-}: {
-  label: string;
-  value: number;
-  hint: string;
-  icon: React.ReactNode;
-}) {
-  return (
-    <div className="stat">
-      <div>
-        <span>{label}</span>
-        <i>{icon}</i>
-      </div>
-      <b>{value.toString().padStart(2, "0")}</b>
-      <small>{hint}</small>
-    </div>
-  );
+function Stat({label,value,hint,icon,onClick,pressed}:{label:string;value:number;hint:string;icon:React.ReactNode;onClick?:()=>void;pressed?:boolean}) {
+  const content=<><div><span>{label}</span><i>{icon}</i></div><b>{value.toString().padStart(2,'0')}</b><small>{hint}</small></>;
+  return onClick ? <button type="button" className="stat stat-action" aria-label={`Show ${label.toLowerCase()}`} aria-pressed={pressed} onClick={onClick}>{content}</button> : <div className="stat">{content}</div>;
 }
 function Connection({ name, connected }: { name: string; connected: boolean }) {
   return (

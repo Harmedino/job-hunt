@@ -261,8 +261,11 @@ export function explainMatch(job: Job, profile: Profile): Job {
     matchReasons.push(
       "The advertised seniority exceeds your stated experience level; review before applying.",
     );
+  const stack=assessStackFit(job.title,job.description,profile);
+  if(stack.stackFit==='incompatible')matchReasons.push(stack.stackReason+' Profile match score is capped because the primary stack differs.');
   return {
     ...job,
+    ...stack,
     jobType: type,
     experienceLevel: level,
     matchedSkills,
@@ -271,6 +274,7 @@ export function explainMatch(job: Job, profile: Profile): Job {
       (!profile.skills.trim() && !profile.experience.trim())
         ? 0
         : Math.min(
+            stack.stackFit==='incompatible'?20:100,
             level === "Senior" && profileLevel && profileLevel !== "Senior"
               ? 59
               : 100,
@@ -329,4 +333,31 @@ export function jobAvailable(
   now = Date.now(),
 ) {
   return !job.closedAt && (!job.expiresAt || Date.parse(job.expiresAt) > now);
+}
+
+const stackFamilies = [
+ {name:'JavaScript / TypeScript',pattern:/\b(?:javascript|typescript|react|angular|next\.?js|node\.?js|express(?:\.?js)?|vue|svelte)\b/i},
+ {name:'.NET / C#',pattern:/(?:^|[^a-z0-9])(?:c#|f#|\.net|asp\.?net|dotnet)(?:$|[^a-z0-9])/i},
+ {name:'Java / Spring',pattern:/\bjava\b|\bspring(?: boot)?\b/i},
+ {name:'Python',pattern:/\b(?:python|django|flask|fastapi)\b/i},
+ {name:'PHP / Laravel',pattern:/\b(?:php|laravel|symfony)\b/i},
+ {name:'Ruby',pattern:/\b(?:ruby|rails)\b/i},
+ {name:'Go',pattern:/\b(?:golang|go)\b/i},
+ {name:'Rust',pattern:/\brust\b/i},
+ {name:'C / C++',pattern:/(?:^|[^a-z0-9])c\+\+(?:$|[^a-z0-9])|\bc developer\b|\bc engineer\b/i},
+ {name:'Swift / Kotlin',pattern:/\b(?:swift|kotlin|objective[ -]?c)\b/i},
+ {name:'Elixir / Scala',pattern:/\b(?:elixir|scala)\b/i},
+] as const;
+export function assessStackFit(title:string,description:string,profile:Pick<Profile,'skills'|'roles'>):{stackFit:'match'|'incompatible'|'unknown';stackReason:string} {
+ const preferred=stackFamilies.filter(f=>f.pattern.test(profile.skills+' '+profile.roles));
+ if(!preferred.length)return {stackFit:'unknown',stackReason:'Add your technologies to My Profile to personalize stack relevance.'};
+ const inTitle=stackFamilies.filter(f=>f.pattern.test(title));
+ const missing=inTitle.filter(f=>!preferred.includes(f));
+ if(missing.length)return {stackFit:'incompatible',stackReason:`The advertised role names ${missing.map(f=>f.name).join(', ')}, which your saved skills or role preferences do not list.`};
+ if(inTitle.length)return {stackFit:'match',stackReason:`The role names ${inTitle.map(f=>f.name).join(', ')}, matching your saved stack preferences. Check the full requirements.`};
+ const requiredText=description.split(/\n|(?<=[.!?])\s+/).filter(line=>/required|requirements|must have|essential|proficien(?:t|cy)|tech(?:nology)? stack|experience (?:with|in)/i.test(line) && !/preferred|nice[ -]to[ -]have|optional|bonus/i.test(line)).join(' ');
+ const required=stackFamilies.filter(f=>f.pattern.test(requiredText));
+ if(required.length && !required.some(f=>preferred.includes(f)))return {stackFit:'incompatible',stackReason:`The stated requirements name ${required.map(f=>f.name).join(', ')} rather than the stack in your saved profile.`};
+ if(required.length)return {stackFit:'match',stackReason:'The requirements mention your saved technology stack. Confirm proficiency and all other qualifications.'};
+ return {stackFit:'unknown',stackReason:'The primary technology stack is not explicit. Check the original posting.'};
 }

@@ -1902,3 +1902,8 @@ footer > span {
 .social-intake input[type="checkbox"] { width: auto; }
 .social-intake form { display: grid; gap: 12px; }
 .builder-comparison { border-top: 1px solid var(--border); padding: 12px 0; overflow-wrap: anywhere; }
+
+.stat-action { text-align: left; font: inherit; color: inherit; cursor: pointer; }
+.stat-action:hover, .stat-action[aria-pressed="true"] { border-color: var(--accent, #79b894); }
+.stat-action:focus-visible { outline: 2px solid #79b894; outline-offset: 3px; }
+#job-results { scroll-margin-top: 100px; }

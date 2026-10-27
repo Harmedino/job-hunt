@@ -18,6 +18,8 @@ export type Job = {
   jobType?: import("./job-intelligence").JobType;
   experienceLevel?: import("./job-intelligence").ExperienceLevel;
   eligibilityClass?: "nigeria" | "worldwide" | "review" | "restricted";
+  stackFit?: "match" | "incompatible" | "unknown";
+  stackReason?: string;
   scoreBreakdown?: { role:number; skills:number; experience:number; location:number; freshness:number };
   matchReasons?: string[];
   requirements?: import("./job-intelligence").RequirementCheck[];

@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
+  assessStackFit,
   classifyLocation,
   inferExperience,
   inferJobType,
@@ -124,4 +125,17 @@ test("matching explains component scores and separates preferred requirements wi
   assert.equal(j.scoreBreakdown?.location, 5);
   assert.equal(j.matchReasons?.length, 5);
   assert.doesNotMatch(j.matchReasons!.join(" "), /probability|guaranteed/i);
+});
+
+
+test('Java and .NET backend roles are incompatible with a JavaScript profile even when incidental web skills appear',()=>{
+ const profile={...emptyProfile,skills:'React, TypeScript, Node.js',roles:'Frontend, Backend, Full-stack JavaScript'};
+ for(const title of ['Backend Developer (.NET - C#)','Backend Engineer, Java - Web 3 Wallet']) {
+  assert.equal(assessStackFit(title,'Worldwide remote React frontend, Java backend services.',profile).stackFit,'incompatible');
+  const job=explainMatch({id:'stack-fixture',title,company:'Stack Fixture',location:'Worldwide',description:'Build services and React interfaces.',url:'https://example.org/job',salary:'',source:'Fixture',postedAt:new Date().toISOString(),discoveredAt:new Date().toISOString(),eligibility:'eligible',eligibilityReason:'Worldwide',score:90,matchedSkills:[]},profile);
+  assert.ok(job.score<=20);assert.equal(job.stackFit,'incompatible');
+ }
+ assert.equal(assessStackFit('JavaScript Backend Developer','Node.js',profile).stackFit,'match');
+ assert.equal(assessStackFit('Software Engineer','Details not supplied',profile).stackFit,'unknown');
+ assert.equal(assessStackFit('Java Backend Developer','', {...profile,skills:'Java, Spring'}).stackFit,'match');
 });
