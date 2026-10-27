@@ -95,3 +95,5 @@ test("remote-only discovery rejects office arrangements while allowing hybrid-cl
     true,
   );
 });
+
+test('escaped feed markup and numeric entities become readable text without retaining scripts',()=>{assert.equal(plainText('&amp;lt;p&amp;gt;React &amp;amp; TypeScript &#x48;iring&amp;lt;/p&amp;gt;'),'React & TypeScript Hiring');assert.equal(plainText('&lt;script&gt;bad()&lt;/script&gt;<p>Real job</p>'),'Real job');assert.equal(plainText('&#x110000;Frontend&#0;'), 'Frontend');});

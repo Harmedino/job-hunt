@@ -1,17 +1,6 @@
 import { classifyLocation, explainMatch } from "./job-intelligence";
 import type { Job, Profile } from "./types";
-export function plainText(html: string) {
-  return html
-    .replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, " ")
-    .replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi, " ")
-    .replace(/<[^>]*>/g, " ")
-    .replace(/&nbsp;/g, " ")
-    .replace(/&amp;/g, "&")
-    .replace(/&#39;/g, "'")
-    .replace(/&quot;/g, '"')
-    .replace(/\s+/g, " ")
-    .trim();
-}
+export {plainText} from "./job-text";
 export function eligibility(location:string,description:string) {
  const result=classifyLocation(location,description);
  return result.eligibility === 'restricted' ? null : result;

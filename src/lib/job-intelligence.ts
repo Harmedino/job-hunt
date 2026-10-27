@@ -1,3 +1,4 @@
+import {plainText} from "./job-text";
 import type { Job, Profile } from "./types";
 export const jobTypes = [
   "Full-time",
@@ -94,6 +95,15 @@ export function classifyLocation(
     eligibilityClass: "restricted",
     eligibilityReason: why,
   });
+  const timezoneClause=text.match(/\b(?:must|need to|required to)\s+(?:be\s+)?(?:based|located|reside|live|work)[^.!?\n]{0,100}\b(?:GMT|UTC)\s*([+-])\s*(\d{1,2})(?::(\d{2}))?[^.!?\n]{0,60}/i);
+  if(timezoneClause){
+    const hour=Number(timezoneClause[2]),minute=Number(timezoneClause[3]||0),offset=(hour+minute/60)*(timezoneClause[1]==='-'?-1:1);
+    if(hour<=14&&minute<60){
+      if(/between|within|overlap|hours?|±|\+\s*\/\s*-|\bto\b|\band\b/i.test(timezoneClause[0]) || [...timezoneClause[0].matchAll(/(?:GMT|UTC)\s*[+-]\s*\d/gi)].length>1)return {eligibility:'review',eligibilityClass:'review',eligibilityReason:'The posting includes required timezone or overlap conditions. Confirm that Nigeria (UTC+1) is permitted.'};
+      if(offset!==1)return restricted('The posting requires applicants to be based in a timezone other than Nigeria (UTC+1).');
+    }
+  }
+  if(/\bremote\s*[-–—]\s*(?:united states|united kingdom|canada|australia|india|europe|\bus\b|\buk\b)\b/i.test(text))return restricted('The posting explicitly labels the remote work location outside Nigeria.');
   const normalized = (countries || []).map((c) => c.toLowerCase().trim());
   if (timezones?.length && !timezones.includes(1))
     return restricted("The advertised timezone list excludes Nigeria (UTC+1).");
@@ -167,6 +177,7 @@ export function classifyLocation(
   };
 }
 export function explainMatch(job: Job, profile: Profile): Job {
+  job={...job,title:plainText(job.title),company:plainText(job.company),description:plainText(job.description),source:plainText(job.source)};
   if (typeof job.location === "string") {
     const assessment = classifyLocation(
       job.location,
@@ -193,7 +204,8 @@ export function explainMatch(job: Job, profile: Profile): Job {
     .split(/[,\n]/)
     .map((s) => s.trim())
     .filter(Boolean);
-  const matchedSkills = skills.filter((s) =>
+  const profileSkills=[...new Set([...skills,...knownSkills.filter(s=>skillMention(profile.experience+" "+profile.projects,s))])];
+  const matchedSkills = profileSkills.filter((s) =>
     skillMention(`${job.title} ${job.description}`, s),
   );
   const level = job.experienceLevel || inferExperience(job.title);
@@ -215,7 +227,7 @@ export function explainMatch(job: Job, profile: Profile): Job {
     : 0;
   const skillScore = requested.length
     ? Math.round(
-        (requested.filter((s) => skillMention(profile.skills, s)).length /
+        (requested.filter((s) => skillMention(profile.skills+" "+profile.experience+" "+profile.projects, s)).length /
           requested.length) *
           35,
       )
@@ -268,10 +280,11 @@ export function explainMatch(job: Job, profile: Profile): Job {
     ...stack,
     jobType: type,
     experienceLevel: level,
+    seniorityMismatch:!!(level==='Senior'&&profileLevel&&profileLevel!=='Senior'),
     matchedSkills,
     score:
       job.eligibility === "restricted" ||
-      (!profile.skills.trim() && !profile.experience.trim())
+      (!profile.skills.trim() && !profile.experience.trim() && !profile.projects.trim())
         ? 0
         : Math.min(
             stack.stackFit==='incompatible'?20:100,
@@ -348,12 +361,12 @@ const stackFamilies = [
  {name:'Swift / Kotlin',pattern:/\b(?:swift|kotlin|objective[ -]?c)\b/i},
  {name:'Elixir / Scala',pattern:/\b(?:elixir|scala)\b/i},
 ] as const;
-export function assessStackFit(title:string,description:string,profile:Pick<Profile,'skills'|'roles'>):{stackFit:'match'|'incompatible'|'unknown';stackReason:string} {
- const preferred=stackFamilies.filter(f=>f.pattern.test(profile.skills+' '+profile.roles));
+export function assessStackFit(title:string,description:string,profile:Pick<Profile,'skills'|'roles'>&Partial<Pick<Profile,'experience'|'projects'>>):{stackFit:'match'|'incompatible'|'unknown';stackReason:string} {
+ const preferred=stackFamilies.filter(f=>f.pattern.test([profile.skills,profile.roles,profile.experience,profile.projects].filter(Boolean).join(' ')));
  if(!preferred.length)return {stackFit:'unknown',stackReason:'Add your technologies to My Profile to personalize stack relevance.'};
  const inTitle=stackFamilies.filter(f=>f.pattern.test(title));
  const missing=inTitle.filter(f=>!preferred.includes(f));
- if(missing.length)return {stackFit:'incompatible',stackReason:`The advertised role names ${missing.map(f=>f.name).join(', ')}, which your saved skills or role preferences do not list.`};
+ if(missing.length)return {stackFit:'incompatible',stackReason:`The advertised role names ${missing.map(f=>f.name).join(', ')}, which your saved profile and role preferences do not list.`};
  if(inTitle.length)return {stackFit:'match',stackReason:`The role names ${inTitle.map(f=>f.name).join(', ')}, matching your saved stack preferences. Check the full requirements.`};
  const requiredText=description.split(/\n|(?<=[.!?])\s+/).filter(line=>/required|requirements|must have|essential|proficien(?:t|cy)|tech(?:nology)? stack|experience (?:with|in)/i.test(line) && !/preferred|nice[ -]to[ -]have|optional|bonus/i.test(line)).join(' ');
  const required=stackFamilies.filter(f=>f.pattern.test(requiredText));

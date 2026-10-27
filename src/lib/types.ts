@@ -20,6 +20,7 @@ export type Job = {
   eligibilityClass?: "nigeria" | "worldwide" | "review" | "restricted";
   stackFit?: "match" | "incompatible" | "unknown";
   stackReason?: string;
+  seniorityMismatch?:boolean;
   scoreBreakdown?: { role:number; skills:number; experience:number; location:number; freshness:number };
   matchReasons?: string[];
   requirements?: import("./job-intelligence").RequirementCheck[];
@@ -80,6 +81,10 @@ export type Application = {
   createdAt: string;
   updatedAt: string;
   submittedAt?: string;
+  applicationDate?:string;
+  followUpDate?:string;
+  notes?:string;
+  interviewInfo?:string;
   followUp: string;
   coverLetter?: string;
   cvFacts?: string[];
