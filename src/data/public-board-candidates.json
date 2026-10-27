@@ -1,0 +1,1170 @@
+[
+  {
+    "platform": "Greenhouse",
+    "token": "andurilindustries",
+    "company": "Anduril",
+    "region": "global",
+    "careersUrl": "https://boards.greenhouse.io/andurilindustries",
+    "evidenceUrl": "https://github.com/SimplifyJobs/New-Grad-Positions/blob/dev/README.md"
+  },
+  {
+    "platform": "Lever",
+    "token": "shieldai",
+    "company": "Shield AI",
+    "region": "global",
+    "careersUrl": "https://jobs.lever.co/shieldai",
+    "evidenceUrl": "https://github.com/SimplifyJobs/New-Grad-Positions/blob/dev/README.md"
+  },
+  {
+    "platform": "Lever",
+    "token": "palantir",
+    "company": "palantir",
+    "region": "global",
+    "careersUrl": "https://jobs.lever.co/palantir",
+    "evidenceUrl": "https://github.com/SimplifyJobs/New-Grad-Positions/blob/dev/archived/README-2025.md"
+  },
+  {
+    "platform": "Greenhouse",
+    "token": "twitch",
+    "company": "twitch",
+    "region": "global",
+    "careersUrl": "https://job-boards.greenhouse.io/twitch",
+    "evidenceUrl": "https://github.com/SimplifyJobs/New-Grad-Positions/blob/dev/archived/README-2025.md"
+  },
+  {
+    "platform": "Ashby",
+    "token": "brainco",
+    "company": "Brain Co.",
+    "region": "global",
+    "careersUrl": "https://jobs.ashbyhq.com/brainco",
+    "evidenceUrl": "https://github.com/SimplifyJobs/New-Grad-Positions/blob/dev/README.md"
+  },
+  {
+    "platform": "Ashby",
+    "token": "quora",
+    "company": "Quora",
+    "region": "global",
+    "careersUrl": "https://jobs.ashbyhq.com/quora",
+    "evidenceUrl": "https://github.com/SimplifyJobs/New-Grad-Positions/blob/dev/README.md"
+  },
+  {
+    "platform": "Ashby",
+    "token": "Sierra",
+    "company": "Sierra",
+    "region": "global",
+    "careersUrl": "https://jobs.ashbyhq.com/Sierra",
+    "evidenceUrl": "https://github.com/SimplifyJobs/New-Grad-Positions/blob/dev/README.md"
+  },
+  {
+    "platform": "Greenhouse",
+    "token": "graphcore",
+    "company": "Graphcore",
+    "region": "global",
+    "careersUrl": "https://job-boards.greenhouse.io/graphcore",
+    "evidenceUrl": "https://github.com/SimplifyJobs/New-Grad-Positions/blob/dev/README.md"
+  },
+  {
+    "platform": "Lever",
+    "token": "bloomon",
+    "company": "Bloom & Wild Group",
+    "region": "global",
+    "careersUrl": "https://jobs.lever.co/bloomon",
+    "evidenceUrl": "https://github.com/SimplifyJobs/New-Grad-Positions/blob/dev/README.md"
+  },
+  {
+    "platform": "Greenhouse",
+    "token": "affirm",
+    "company": "affirm",
+    "region": "global",
+    "careersUrl": "https://job-boards.greenhouse.io/affirm",
+    "evidenceUrl": "https://github.com/SimplifyJobs/New-Grad-Positions/blob/dev/archived/README-2025.md"
+  },
+  {
+    "platform": "Greenhouse",
+    "token": "sirenopt",
+    "company": "SirenOpt",
+    "region": "global",
+    "careersUrl": "https://job-boards.greenhouse.io/sirenopt",
+    "evidenceUrl": "https://github.com/SimplifyJobs/New-Grad-Positions/blob/dev/README.md"
+  },
+  {
+    "platform": "Greenhouse",
+    "token": "clear",
+    "company": "CLEAR",
+    "region": "global",
+    "careersUrl": "https://job-boards.greenhouse.io/clear",
+    "evidenceUrl": "https://github.com/SimplifyJobs/New-Grad-Positions/blob/dev/README.md"
+  },
+  {
+    "platform": "Ashby",
+    "token": "aurelian",
+    "company": "Aurelian",
+    "region": "global",
+    "careersUrl": "https://jobs.ashbyhq.com/aurelian",
+    "evidenceUrl": "https://github.com/SimplifyJobs/New-Grad-Positions/blob/dev/README.md"
+  },
+  {
+    "platform": "Ashby",
+    "token": "chalk",
+    "company": "Chalk",
+    "region": "global",
+    "careersUrl": "https://jobs.ashbyhq.com/chalk",
+    "evidenceUrl": "https://github.com/SimplifyJobs/New-Grad-Positions/blob/dev/README.md"
+  },
+  {
+    "platform": "Ashby",
+    "token": "spruceid",
+    "company": "SpruceID",
+    "region": "global",
+    "careersUrl": "https://jobs.ashbyhq.com/spruceid",
+    "evidenceUrl": "https://github.com/SimplifyJobs/New-Grad-Positions/blob/dev/README.md"
+  },
+  {
+    "platform": "Greenhouse",
+    "token": "trueanomalyinc",
+    "company": "True Anomaly",
+    "region": "global",
+    "careersUrl": "https://job-boards.greenhouse.io/trueanomalyinc",
+    "evidenceUrl": "https://github.com/SimplifyJobs/New-Grad-Positions/blob/dev/README.md"
+  },
+  {
+    "platform": "Greenhouse",
+    "token": "purestorage",
+    "company": "Pure Storage",
+    "region": "global",
+    "careersUrl": "https://job-boards.greenhouse.io/purestorage",
+    "evidenceUrl": "https://github.com/SimplifyJobs/New-Grad-Positions/blob/dev/README.md"
+  },
+  {
+    "platform": "Ashby",
+    "token": "whoop",
+    "company": "Whoop",
+    "region": "global",
+    "careersUrl": "https://jobs.ashbyhq.com/whoop",
+    "evidenceUrl": "https://github.com/SimplifyJobs/New-Grad-Positions/blob/dev/README.md"
+  },
+  {
+    "platform": "Greenhouse",
+    "token": "machindustries",
+    "company": "Mach Industries",
+    "region": "global",
+    "careersUrl": "https://job-boards.greenhouse.io/machindustries",
+    "evidenceUrl": "https://github.com/SimplifyJobs/New-Grad-Positions/blob/dev/README.md"
+  },
+  {
+    "platform": "Greenhouse",
+    "token": "asteraearlycareer2027",
+    "company": "Astera Labs",
+    "region": "global",
+    "careersUrl": "https://job-boards.greenhouse.io/asteraearlycareer2027",
+    "evidenceUrl": "https://github.com/SimplifyJobs/New-Grad-Positions/blob/dev/README.md"
+  },
+  {
+    "platform": "Greenhouse",
+    "token": "idme",
+    "company": "ID.me",
+    "region": "global",
+    "careersUrl": "https://job-boards.greenhouse.io/idme",
+    "evidenceUrl": "https://github.com/SimplifyJobs/New-Grad-Positions/blob/dev/README.md"
+  },
+  {
+    "platform": "Ashby",
+    "token": "harvey",
+    "company": "Harvey",
+    "region": "global",
+    "careersUrl": "https://jobs.ashbyhq.com/harvey",
+    "evidenceUrl": "https://github.com/SimplifyJobs/New-Grad-Positions/blob/dev/README.md"
+  },
+  {
+    "platform": "Greenhouse",
+    "token": "freedomconsulting",
+    "company": "Freedom Technology Solutions Group",
+    "region": "global",
+    "careersUrl": "https://job-boards.greenhouse.io/freedomconsulting",
+    "evidenceUrl": "https://github.com/SimplifyJobs/New-Grad-Positions/blob/dev/README.md"
+  },
+  {
+    "platform": "Greenhouse",
+    "token": "tripadvisor",
+    "company": "TripAdvisor",
+    "region": "global",
+    "careersUrl": "https://job-boards.greenhouse.io/tripadvisor",
+    "evidenceUrl": "https://github.com/SimplifyJobs/New-Grad-Positions/blob/dev/README.md"
+  },
+  {
+    "platform": "Ashby",
+    "token": "swarmaero",
+    "company": "Swarm Aero",
+    "region": "global",
+    "careersUrl": "https://jobs.ashbyhq.com/swarmaero",
+    "evidenceUrl": "https://github.com/SimplifyJobs/New-Grad-Positions/blob/dev/README.md"
+  },
+  {
+    "platform": "Greenhouse",
+    "token": "harborglobal",
+    "company": "Harbor",
+    "region": "global",
+    "careersUrl": "https://job-boards.greenhouse.io/harborglobal",
+    "evidenceUrl": "https://github.com/SimplifyJobs/New-Grad-Positions/blob/dev/README.md"
+  },
+  {
+    "platform": "Greenhouse",
+    "token": "ziprecruiter",
+    "company": "ZipRecruiter",
+    "region": "global",
+    "careersUrl": "https://job-boards.greenhouse.io/ziprecruiter",
+    "evidenceUrl": "https://github.com/SimplifyJobs/New-Grad-Positions/blob/dev/README.md"
+  },
+  {
+    "platform": "Greenhouse",
+    "token": "scaleai",
+    "company": "Scale AI",
+    "region": "global",
+    "careersUrl": "https://job-boards.greenhouse.io/scaleai",
+    "evidenceUrl": "https://github.com/SimplifyJobs/New-Grad-Positions/blob/dev/README.md"
+  },
+  {
+    "platform": "Ashby",
+    "token": "qumulo",
+    "company": "Qumulo",
+    "region": "global",
+    "careersUrl": "https://jobs.ashbyhq.com/qumulo",
+    "evidenceUrl": "https://github.com/SimplifyJobs/New-Grad-Positions/blob/dev/README.md"
+  },
+  {
+    "platform": "Greenhouse",
+    "token": "authenticinsurance",
+    "company": "Authentic",
+    "region": "global",
+    "careersUrl": "https://job-boards.greenhouse.io/authenticinsurance",
+    "evidenceUrl": "https://github.com/SimplifyJobs/New-Grad-Positions/blob/dev/README.md"
+  },
+  {
+    "platform": "Ashby",
+    "token": "meow",
+    "company": "Meow",
+    "region": "global",
+    "careersUrl": "https://jobs.ashbyhq.com/meow",
+    "evidenceUrl": "https://github.com/SimplifyJobs/New-Grad-Positions/blob/dev/README.md"
+  },
+  {
+    "platform": "Greenhouse",
+    "token": "captivation",
+    "company": "Captivation",
+    "region": "global",
+    "careersUrl": "https://job-boards.greenhouse.io/captivation",
+    "evidenceUrl": "https://github.com/SimplifyJobs/New-Grad-Positions/blob/dev/README.md"
+  },
+  {
+    "platform": "Greenhouse",
+    "token": "headlandstechnologiesllc",
+    "company": "Headlands Tech Holdings",
+    "region": "global",
+    "careersUrl": "https://job-boards.greenhouse.io/headlandstechnologiesllc",
+    "evidenceUrl": "https://github.com/SimplifyJobs/New-Grad-Positions/blob/dev/README.md"
+  },
+  {
+    "platform": "Ashby",
+    "token": "jampack-ai",
+    "company": "Jampack AI",
+    "region": "global",
+    "careersUrl": "https://jobs.ashbyhq.com/jampack-ai",
+    "evidenceUrl": "https://github.com/SimplifyJobs/New-Grad-Positions/blob/dev/README.md"
+  },
+  {
+    "platform": "Greenhouse",
+    "token": "singlestore",
+    "company": "singlestore",
+    "region": "global",
+    "careersUrl": "https://boards.greenhouse.io/singlestore",
+    "evidenceUrl": "https://github.com/SimplifyJobs/New-Grad-Positions/blob/dev/archived/README-2025.md"
+  },
+  {
+    "platform": "Greenhouse",
+    "token": "klaviyocampus",
+    "company": "Klaviyo",
+    "region": "global",
+    "careersUrl": "https://job-boards.greenhouse.io/klaviyocampus",
+    "evidenceUrl": "https://github.com/SimplifyJobs/New-Grad-Positions/blob/dev/README.md"
+  },
+  {
+    "platform": "Greenhouse",
+    "token": "perpay",
+    "company": "Perpay",
+    "region": "global",
+    "careersUrl": "https://job-boards.greenhouse.io/perpay",
+    "evidenceUrl": "https://github.com/SimplifyJobs/New-Grad-Positions/blob/dev/README.md"
+  },
+  {
+    "platform": "Ashby",
+    "token": "cursor",
+    "company": "Anysphere",
+    "region": "global",
+    "careersUrl": "https://jobs.ashbyhq.com/cursor",
+    "evidenceUrl": "https://github.com/SimplifyJobs/New-Grad-Positions/blob/dev/README.md"
+  },
+  {
+    "platform": "Greenhouse",
+    "token": "spacex",
+    "company": "SpaceX",
+    "region": "global",
+    "careersUrl": "https://boards.greenhouse.io/spacex",
+    "evidenceUrl": "https://github.com/SimplifyJobs/New-Grad-Positions/blob/dev/README.md"
+  },
+  {
+    "platform": "Ashby",
+    "token": "aiprise",
+    "company": "AiPrise",
+    "region": "global",
+    "careersUrl": "https://jobs.ashbyhq.com/aiprise",
+    "evidenceUrl": "https://github.com/SimplifyJobs/New-Grad-Positions/blob/dev/README.md"
+  },
+  {
+    "platform": "Greenhouse",
+    "token": "idmeuniversityrecruiting",
+    "company": "ID.me",
+    "region": "global",
+    "careersUrl": "https://job-boards.greenhouse.io/idmeuniversityrecruiting",
+    "evidenceUrl": "https://github.com/SimplifyJobs/New-Grad-Positions/blob/dev/README.md"
+  },
+  {
+    "platform": "Greenhouse",
+    "token": "doordashusa",
+    "company": "doordashusa",
+    "region": "global",
+    "careersUrl": "https://boards.greenhouse.io/doordashusa",
+    "evidenceUrl": "https://github.com/SimplifyJobs/New-Grad-Positions/blob/dev/archived/README-2025.md"
+  },
+  {
+    "platform": "Greenhouse",
+    "token": "kikoff",
+    "company": "Kikoff",
+    "region": "global",
+    "careersUrl": "https://job-boards.greenhouse.io/kikoff",
+    "evidenceUrl": "https://github.com/SimplifyJobs/New-Grad-Positions/blob/dev/README.md"
+  },
+  {
+    "platform": "Ashby",
+    "token": "Valon",
+    "company": "Valon",
+    "region": "global",
+    "careersUrl": "https://jobs.ashbyhq.com/Valon",
+    "evidenceUrl": "https://github.com/SimplifyJobs/New-Grad-Positions/blob/dev/README.md"
+  },
+  {
+    "platform": "Greenhouse",
+    "token": "intersystems",
+    "company": "InterSystems",
+    "region": "global",
+    "careersUrl": "https://job-boards.greenhouse.io/intersystems",
+    "evidenceUrl": "https://github.com/SimplifyJobs/New-Grad-Positions/blob/dev/README.md"
+  },
+  {
+    "platform": "Ashby",
+    "token": "whatnot",
+    "company": "WhatNot",
+    "region": "global",
+    "careersUrl": "https://jobs.ashbyhq.com/whatnot",
+    "evidenceUrl": "https://github.com/SimplifyJobs/New-Grad-Positions/blob/dev/README.md"
+  },
+  {
+    "platform": "Greenhouse",
+    "token": "teletrackingtechnologiesinc",
+    "company": "TeleTracking",
+    "region": "global",
+    "careersUrl": "https://job-boards.greenhouse.io/teletrackingtechnologiesinc",
+    "evidenceUrl": "https://github.com/SimplifyJobs/New-Grad-Positions/blob/dev/README.md"
+  },
+  {
+    "platform": "Lever",
+    "token": "steerbridge",
+    "company": "SteerBridge",
+    "region": "global",
+    "careersUrl": "https://jobs.lever.co/steerbridge",
+    "evidenceUrl": "https://github.com/SimplifyJobs/New-Grad-Positions/blob/dev/README.md"
+  },
+  {
+    "platform": "Ashby",
+    "token": "koahlabs",
+    "company": "Koah",
+    "region": "global",
+    "careersUrl": "https://jobs.ashbyhq.com/koahlabs",
+    "evidenceUrl": "https://github.com/SimplifyJobs/New-Grad-Positions/blob/dev/README.md"
+  },
+  {
+    "platform": "Greenhouse",
+    "token": "darkwolfsolutions",
+    "company": "Dark Wolf Solutions",
+    "region": "global",
+    "careersUrl": "https://job-boards.greenhouse.io/darkwolfsolutions",
+    "evidenceUrl": "https://github.com/SimplifyJobs/New-Grad-Positions/blob/dev/README.md"
+  },
+  {
+    "platform": "SmartRecruiters",
+    "token": "NextCenturyCorporation",
+    "company": "CACI",
+    "region": "global",
+    "careersUrl": "https://jobs.smartrecruiters.com/NextCenturyCorporation",
+    "evidenceUrl": "https://github.com/SimplifyJobs/New-Grad-Positions/blob/dev/README.md"
+  },
+  {
+    "platform": "SmartRecruiters",
+    "token": "MarlabsInc1",
+    "company": "Marlabs",
+    "region": "global",
+    "careersUrl": "https://jobs.smartrecruiters.com/MarlabsInc1",
+    "evidenceUrl": "https://github.com/SimplifyJobs/New-Grad-Positions/blob/dev/README.md"
+  },
+  {
+    "platform": "Ashby",
+    "token": "notion",
+    "company": "Notion",
+    "region": "global",
+    "careersUrl": "https://jobs.ashbyhq.com/notion",
+    "evidenceUrl": "https://github.com/SimplifyJobs/New-Grad-Positions/blob/dev/README.md"
+  },
+  {
+    "platform": "Ashby",
+    "token": "applied",
+    "company": "Applied Intuition",
+    "region": "global",
+    "careersUrl": "https://jobs.ashbyhq.com/applied",
+    "evidenceUrl": "https://github.com/SimplifyJobs/New-Grad-Positions/blob/dev/README.md"
+  },
+  {
+    "platform": "Lever",
+    "token": "weride",
+    "company": "weride",
+    "region": "global",
+    "careersUrl": "https://jobs.lever.co/weride",
+    "evidenceUrl": "https://github.com/SimplifyJobs/New-Grad-Positions/blob/dev/archived/README-2025.md"
+  },
+  {
+    "platform": "Ashby",
+    "token": "composio",
+    "company": "Composio",
+    "region": "global",
+    "careersUrl": "https://jobs.ashbyhq.com/composio",
+    "evidenceUrl": "https://github.com/SimplifyJobs/New-Grad-Positions/blob/dev/README.md"
+  },
+  {
+    "platform": "SmartRecruiters",
+    "token": "Zen31",
+    "company": "Zen3",
+    "region": "global",
+    "careersUrl": "https://jobs.smartrecruiters.com/Zen31",
+    "evidenceUrl": "https://github.com/SimplifyJobs/New-Grad-Positions/blob/dev/README.md"
+  },
+  {
+    "platform": "SmartRecruiters",
+    "token": "9to9SoftwareSolutionsLLC",
+    "company": "9to9 Software Solutions",
+    "region": "global",
+    "careersUrl": "https://jobs.smartrecruiters.com/9to9SoftwareSolutionsLLC",
+    "evidenceUrl": "https://github.com/SimplifyJobs/New-Grad-Positions/blob/dev/README.md"
+  },
+  {
+    "platform": "SmartRecruiters",
+    "token": "Socotec",
+    "company": "SOCOTEC Global",
+    "region": "global",
+    "careersUrl": "https://jobs.smartrecruiters.com/Socotec",
+    "evidenceUrl": "https://github.com/SimplifyJobs/New-Grad-Positions/blob/dev/README.md"
+  },
+  {
+    "platform": "Greenhouse",
+    "token": "newsbreak",
+    "company": "newsbreak",
+    "region": "global",
+    "careersUrl": "https://job-boards.greenhouse.io/newsbreak",
+    "evidenceUrl": "https://github.com/SimplifyJobs/New-Grad-Positions/blob/dev/archived/README-2025.md"
+  },
+  {
+    "platform": "Ashby",
+    "token": "nooks",
+    "company": "Nooks",
+    "region": "global",
+    "careersUrl": "https://jobs.ashbyhq.com/nooks",
+    "evidenceUrl": "https://github.com/SimplifyJobs/New-Grad-Positions/blob/dev/README.md"
+  },
+  {
+    "platform": "Ashby",
+    "token": "color-health",
+    "company": "Color",
+    "region": "global",
+    "careersUrl": "https://jobs.ashbyhq.com/color-health",
+    "evidenceUrl": "https://github.com/SimplifyJobs/New-Grad-Positions/blob/dev/README.md"
+  },
+  {
+    "platform": "Ashby",
+    "token": "bridger",
+    "company": "Bridger",
+    "region": "global",
+    "careersUrl": "https://jobs.ashbyhq.com/bridger",
+    "evidenceUrl": "https://github.com/SimplifyJobs/New-Grad-Positions/blob/dev/README.md"
+  },
+  {
+    "platform": "Ashby",
+    "token": "rollout",
+    "company": "Rollout",
+    "region": "global",
+    "careersUrl": "https://jobs.ashbyhq.com/rollout",
+    "evidenceUrl": "https://github.com/SimplifyJobs/New-Grad-Positions/blob/dev/README.md"
+  },
+  {
+    "platform": "Ashby",
+    "token": "stradahq",
+    "company": "Strada",
+    "region": "global",
+    "careersUrl": "https://jobs.ashbyhq.com/stradahq",
+    "evidenceUrl": "https://github.com/SimplifyJobs/New-Grad-Positions/blob/dev/README.md"
+  },
+  {
+    "platform": "Ashby",
+    "token": "hipp",
+    "company": "Hipp Health",
+    "region": "global",
+    "careersUrl": "https://jobs.ashbyhq.com/hipp",
+    "evidenceUrl": "https://github.com/SimplifyJobs/New-Grad-Positions/blob/dev/README.md"
+  },
+  {
+    "platform": "Ashby",
+    "token": "firetiger",
+    "company": "Firetiger",
+    "region": "global",
+    "careersUrl": "https://jobs.ashbyhq.com/firetiger",
+    "evidenceUrl": "https://github.com/SimplifyJobs/New-Grad-Positions/blob/dev/README.md"
+  },
+  {
+    "platform": "Ashby",
+    "token": "netic",
+    "company": "Cybernetic Labs",
+    "region": "global",
+    "careersUrl": "https://jobs.ashbyhq.com/netic",
+    "evidenceUrl": "https://github.com/SimplifyJobs/New-Grad-Positions/blob/dev/README.md"
+  },
+  {
+    "platform": "Ashby",
+    "token": "Lightfield",
+    "company": "Lightfield",
+    "region": "global",
+    "careersUrl": "https://jobs.ashbyhq.com/Lightfield",
+    "evidenceUrl": "https://github.com/SimplifyJobs/New-Grad-Positions/blob/dev/README.md"
+  },
+  {
+    "platform": "Ashby",
+    "token": "faros-ai",
+    "company": "Faros AI",
+    "region": "global",
+    "careersUrl": "https://jobs.ashbyhq.com/faros-ai",
+    "evidenceUrl": "https://github.com/SimplifyJobs/New-Grad-Positions/blob/dev/README.md"
+  },
+  {
+    "platform": "Greenhouse",
+    "token": "instalilyai",
+    "company": "InstaLILY",
+    "region": "global",
+    "careersUrl": "https://job-boards.greenhouse.io/instalilyai",
+    "evidenceUrl": "https://github.com/SimplifyJobs/New-Grad-Positions/blob/dev/README.md"
+  },
+  {
+    "platform": "Ashby",
+    "token": "pylon-labs",
+    "company": "Pylon",
+    "region": "global",
+    "careersUrl": "https://jobs.ashbyhq.com/pylon-labs",
+    "evidenceUrl": "https://github.com/SimplifyJobs/New-Grad-Positions/blob/dev/README.md"
+  },
+  {
+    "platform": "Ashby",
+    "token": "cerebras",
+    "company": "Cerebras",
+    "region": "global",
+    "careersUrl": "https://jobs.ashbyhq.com/cerebras",
+    "evidenceUrl": "https://github.com/SimplifyJobs/New-Grad-Positions/blob/dev/README.md"
+  },
+  {
+    "platform": "Ashby",
+    "token": "cylake-inc",
+    "company": "Cylake",
+    "region": "global",
+    "careersUrl": "https://jobs.ashbyhq.com/cylake-inc",
+    "evidenceUrl": "https://github.com/SimplifyJobs/New-Grad-Positions/blob/dev/README.md"
+  },
+  {
+    "platform": "Ashby",
+    "token": "julius",
+    "company": "Julius AI",
+    "region": "global",
+    "careersUrl": "https://jobs.ashbyhq.com/julius",
+    "evidenceUrl": "https://github.com/SimplifyJobs/New-Grad-Positions/blob/dev/README.md"
+  },
+  {
+    "platform": "Lever",
+    "token": "mytos",
+    "company": "Mytos",
+    "region": "global",
+    "careersUrl": "https://jobs.lever.co/mytos",
+    "evidenceUrl": "https://github.com/SimplifyJobs/New-Grad-Positions/blob/dev/README.md"
+  },
+  {
+    "platform": "Greenhouse",
+    "token": "wonderschool",
+    "company": "wonderschool",
+    "region": "global",
+    "careersUrl": "https://job-boards.greenhouse.io/wonderschool",
+    "evidenceUrl": "https://github.com/SimplifyJobs/New-Grad-Positions/blob/dev/archived/README-2025.md"
+  },
+  {
+    "platform": "Greenhouse",
+    "token": "sigmacomputing",
+    "company": "Sigma Computing",
+    "region": "global",
+    "careersUrl": "https://job-boards.greenhouse.io/sigmacomputing",
+    "evidenceUrl": "https://github.com/SimplifyJobs/New-Grad-Positions/blob/dev/README.md"
+  },
+  {
+    "platform": "Ashby",
+    "token": "realmalliance",
+    "company": "Realm",
+    "region": "global",
+    "careersUrl": "https://jobs.ashbyhq.com/realmalliance",
+    "evidenceUrl": "https://github.com/SimplifyJobs/New-Grad-Positions/blob/dev/README.md"
+  },
+  {
+    "platform": "Greenhouse",
+    "token": "aquaticcapitalmanagement",
+    "company": "aquaticcapitalmanagement",
+    "region": "global",
+    "careersUrl": "https://job-boards.greenhouse.io/aquaticcapitalmanagement",
+    "evidenceUrl": "https://github.com/SimplifyJobs/New-Grad-Positions/blob/dev/archived/README-2025.md"
+  },
+  {
+    "platform": "Ashby",
+    "token": "ellipsislabs",
+    "company": "Ellipsis Labs",
+    "region": "global",
+    "careersUrl": "https://jobs.ashbyhq.com/ellipsislabs",
+    "evidenceUrl": "https://github.com/SimplifyJobs/New-Grad-Positions/blob/dev/README.md"
+  },
+  {
+    "platform": "Ashby",
+    "token": "n1",
+    "company": "n1",
+    "region": "global",
+    "careersUrl": "https://jobs.ashbyhq.com/n1",
+    "evidenceUrl": "https://github.com/SimplifyJobs/New-Grad-Positions/blob/dev/archived/README-2025.md"
+  },
+  {
+    "platform": "Ashby",
+    "token": "automat",
+    "company": "Automat",
+    "region": "global",
+    "careersUrl": "https://jobs.ashbyhq.com/automat",
+    "evidenceUrl": "https://github.com/SimplifyJobs/New-Grad-Positions/blob/dev/README.md"
+  },
+  {
+    "platform": "Greenhouse",
+    "token": "addepar1",
+    "company": "Addepar",
+    "region": "global",
+    "careersUrl": "https://job-boards.greenhouse.io/addepar1",
+    "evidenceUrl": "https://github.com/SimplifyJobs/New-Grad-Positions/blob/dev/README.md"
+  },
+  {
+    "platform": "Ashby",
+    "token": "uncountable",
+    "company": "Uncountable",
+    "region": "global",
+    "careersUrl": "https://jobs.ashbyhq.com/uncountable",
+    "evidenceUrl": "https://github.com/SimplifyJobs/New-Grad-Positions/blob/dev/README.md"
+  },
+  {
+    "platform": "Greenhouse",
+    "token": "moxxidigital",
+    "company": "Moxxi Digital",
+    "region": "global",
+    "careersUrl": "https://job-boards.greenhouse.io/moxxidigital",
+    "evidenceUrl": "https://github.com/SimplifyJobs/New-Grad-Positions/blob/dev/README.md"
+  },
+  {
+    "platform": "Greenhouse",
+    "token": "duolingounirecruitment",
+    "company": "Duolingo",
+    "region": "global",
+    "careersUrl": "https://job-boards.greenhouse.io/duolingounirecruitment",
+    "evidenceUrl": "https://github.com/SimplifyJobs/New-Grad-Positions/blob/dev/README.md"
+  },
+  {
+    "platform": "Lever",
+    "token": "runlaminar",
+    "company": "Laminar",
+    "region": "global",
+    "careersUrl": "https://jobs.lever.co/runlaminar",
+    "evidenceUrl": "https://github.com/SimplifyJobs/New-Grad-Positions/blob/dev/README.md"
+  },
+  {
+    "platform": "Greenhouse",
+    "token": "blenheimchalcot",
+    "company": "Blenheim Chalcot",
+    "region": "global",
+    "careersUrl": "https://job-boards.greenhouse.io/blenheimchalcot",
+    "evidenceUrl": "https://github.com/SimplifyJobs/New-Grad-Positions/blob/dev/README.md"
+  },
+  {
+    "platform": "Lever",
+    "token": "datalabusa",
+    "company": "Datalab USA",
+    "region": "global",
+    "careersUrl": "https://jobs.lever.co/datalabusa",
+    "evidenceUrl": "https://github.com/SimplifyJobs/New-Grad-Positions/blob/dev/README.md"
+  },
+  {
+    "platform": "SmartRecruiters",
+    "token": "SmarterAgent",
+    "company": "Smarter Agent",
+    "region": "global",
+    "careersUrl": "https://jobs.smartrecruiters.com/SmarterAgent",
+    "evidenceUrl": "https://github.com/SimplifyJobs/New-Grad-Positions/blob/dev/README.md"
+  },
+  {
+    "platform": "Ashby",
+    "token": "backbone",
+    "company": "Backbone Systems",
+    "region": "global",
+    "careersUrl": "https://jobs.ashbyhq.com/backbone",
+    "evidenceUrl": "https://github.com/SimplifyJobs/New-Grad-Positions/blob/dev/README.md"
+  },
+  {
+    "platform": "Ashby",
+    "token": "Preference-Model",
+    "company": "Preference Model",
+    "region": "global",
+    "careersUrl": "https://jobs.ashbyhq.com/Preference-Model",
+    "evidenceUrl": "https://github.com/SimplifyJobs/New-Grad-Positions/blob/dev/README.md"
+  },
+  {
+    "platform": "Ashby",
+    "token": "snowflake",
+    "company": "Snowflake",
+    "region": "global",
+    "careersUrl": "https://jobs.ashbyhq.com/snowflake",
+    "evidenceUrl": "https://github.com/SimplifyJobs/New-Grad-Positions/blob/dev/README.md"
+  },
+  {
+    "platform": "Greenhouse",
+    "token": "transmarketgroup",
+    "company": "TransMarket Group",
+    "region": "global",
+    "careersUrl": "https://job-boards.greenhouse.io/transmarketgroup",
+    "evidenceUrl": "https://github.com/SimplifyJobs/New-Grad-Positions/blob/dev/README.md"
+  },
+  {
+    "platform": "Greenhouse",
+    "token": "freeformfuturecorp",
+    "company": "Freeform",
+    "region": "global",
+    "careersUrl": "https://job-boards.greenhouse.io/freeformfuturecorp",
+    "evidenceUrl": "https://github.com/SimplifyJobs/New-Grad-Positions/blob/dev/README.md"
+  },
+  {
+    "platform": "Ashby",
+    "token": "aescape",
+    "company": "Aescape",
+    "region": "global",
+    "careersUrl": "https://jobs.ashbyhq.com/aescape",
+    "evidenceUrl": "https://github.com/SimplifyJobs/New-Grad-Positions/blob/dev/README.md"
+  },
+  {
+    "platform": "Lever",
+    "token": "cirrus",
+    "company": "Cirrus Logic",
+    "region": "eu",
+    "careersUrl": "https://jobs.eu.lever.co/cirrus",
+    "evidenceUrl": "https://github.com/SimplifyJobs/New-Grad-Positions/blob/dev/README.md"
+  },
+  {
+    "platform": "SmartRecruiters",
+    "token": "GDMSI",
+    "company": "General Dynamics UK",
+    "region": "global",
+    "careersUrl": "https://jobs.smartrecruiters.com/GDMSI",
+    "evidenceUrl": "https://github.com/SimplifyJobs/New-Grad-Positions/blob/dev/README.md"
+  },
+  {
+    "platform": "Greenhouse",
+    "token": "katalyst",
+    "company": "Katalyst Space Technologies",
+    "region": "global",
+    "careersUrl": "https://job-boards.greenhouse.io/katalyst",
+    "evidenceUrl": "https://github.com/SimplifyJobs/New-Grad-Positions/blob/dev/README.md"
+  },
+  {
+    "platform": "Greenhouse",
+    "token": "alarmcom",
+    "company": "Alarm.com",
+    "region": "global",
+    "careersUrl": "https://job-boards.greenhouse.io/alarmcom",
+    "evidenceUrl": "https://github.com/SimplifyJobs/New-Grad-Positions/blob/dev/README.md"
+  },
+  {
+    "platform": "Greenhouse",
+    "token": "generalmatter",
+    "company": "General Matter",
+    "region": "global",
+    "careersUrl": "https://job-boards.greenhouse.io/generalmatter",
+    "evidenceUrl": "https://github.com/SimplifyJobs/New-Grad-Positions/blob/dev/README.md"
+  },
+  {
+    "platform": "Ashby",
+    "token": "blissway",
+    "company": "Blissway",
+    "region": "global",
+    "careersUrl": "https://jobs.ashbyhq.com/blissway",
+    "evidenceUrl": "https://github.com/SimplifyJobs/New-Grad-Positions/blob/dev/README.md"
+  },
+  {
+    "platform": "Ashby",
+    "token": "morse-micro",
+    "company": "Morse Micro",
+    "region": "global",
+    "careersUrl": "https://jobs.ashbyhq.com/morse-micro",
+    "evidenceUrl": "https://github.com/SimplifyJobs/New-Grad-Positions/blob/dev/README.md"
+  },
+  {
+    "platform": "Ashby",
+    "token": "icon",
+    "company": "Icon",
+    "region": "global",
+    "careersUrl": "https://jobs.ashbyhq.com/icon",
+    "evidenceUrl": "https://github.com/SimplifyJobs/New-Grad-Positions/blob/dev/README.md"
+  },
+  {
+    "platform": "Ashby",
+    "token": "NorthwoodSpace",
+    "company": "Northwood Space",
+    "region": "global",
+    "careersUrl": "https://jobs.ashbyhq.com/NorthwoodSpace",
+    "evidenceUrl": "https://github.com/SimplifyJobs/New-Grad-Positions/blob/dev/README.md"
+  },
+  {
+    "platform": "Ashby",
+    "token": "candidhealth",
+    "company": "candidhealth",
+    "region": "global",
+    "careersUrl": "https://jobs.ashbyhq.com/candidhealth",
+    "evidenceUrl": "https://github.com/SimplifyJobs/New-Grad-Positions/blob/dev/archived/README-2025.md"
+  },
+  {
+    "platform": "Greenhouse",
+    "token": "twilio",
+    "company": "twilio",
+    "region": "global",
+    "careersUrl": "https://job-boards.greenhouse.io/twilio",
+    "evidenceUrl": "https://github.com/SimplifyJobs/New-Grad-Positions/blob/dev/archived/README-2025.md"
+  },
+  {
+    "platform": "Ashby",
+    "token": "Jerry",
+    "company": "Jerry",
+    "region": "global",
+    "careersUrl": "https://jobs.ashbyhq.com/Jerry",
+    "evidenceUrl": "https://github.com/SimplifyJobs/New-Grad-Positions/blob/dev/archived/README-2025.md"
+  },
+  {
+    "platform": "Greenhouse",
+    "token": "fourkites",
+    "company": "fourkites",
+    "region": "global",
+    "careersUrl": "https://job-boards.greenhouse.io/fourkites",
+    "evidenceUrl": "https://github.com/SimplifyJobs/New-Grad-Positions/blob/dev/archived/README-2025.md"
+  },
+  {
+    "platform": "Lever",
+    "token": "plusgrade",
+    "company": "plusgrade",
+    "region": "global",
+    "careersUrl": "https://jobs.lever.co/plusgrade",
+    "evidenceUrl": "https://github.com/SimplifyJobs/New-Grad-Positions/blob/dev/archived/README-2025.md"
+  },
+  {
+    "platform": "Greenhouse",
+    "token": "openeye",
+    "company": "openeye",
+    "region": "global",
+    "careersUrl": "https://job-boards.greenhouse.io/openeye",
+    "evidenceUrl": "https://github.com/SimplifyJobs/New-Grad-Positions/blob/dev/archived/README-2025.md"
+  },
+  {
+    "platform": "Ashby",
+    "token": "sentry",
+    "company": "sentry",
+    "region": "global",
+    "careersUrl": "https://jobs.ashbyhq.com/sentry",
+    "evidenceUrl": "https://github.com/SimplifyJobs/New-Grad-Positions/blob/dev/archived/README-2025.md"
+  },
+  {
+    "platform": "Greenhouse",
+    "token": "7shifts",
+    "company": "7shifts",
+    "region": "global",
+    "careersUrl": "https://job-boards.greenhouse.io/7shifts",
+    "evidenceUrl": "https://github.com/SimplifyJobs/New-Grad-Positions/blob/dev/archived/README-2025.md"
+  },
+  {
+    "platform": "Greenhouse",
+    "token": "relativity",
+    "company": "relativity",
+    "region": "global",
+    "careersUrl": "https://boards.greenhouse.io/relativity",
+    "evidenceUrl": "https://github.com/SimplifyJobs/New-Grad-Positions/blob/dev/archived/README-2025.md"
+  },
+  {
+    "platform": "Ashby",
+    "token": "numeric",
+    "company": "numeric",
+    "region": "global",
+    "careersUrl": "https://jobs.ashbyhq.com/numeric",
+    "evidenceUrl": "https://github.com/SimplifyJobs/New-Grad-Positions/blob/dev/archived/README-2025.md"
+  },
+  {
+    "platform": "Ashby",
+    "token": "mandolin",
+    "company": "mandolin",
+    "region": "global",
+    "careersUrl": "https://jobs.ashbyhq.com/mandolin",
+    "evidenceUrl": "https://github.com/SimplifyJobs/New-Grad-Positions/blob/dev/archived/README-2025.md"
+  },
+  {
+    "platform": "Greenhouse",
+    "token": "radiant",
+    "company": "radiant",
+    "region": "global",
+    "careersUrl": "https://job-boards.greenhouse.io/radiant",
+    "evidenceUrl": "https://github.com/SimplifyJobs/New-Grad-Positions/blob/dev/archived/README-2025.md"
+  },
+  {
+    "platform": "Greenhouse",
+    "token": "doordashcanada",
+    "company": "doordashcanada",
+    "region": "global",
+    "careersUrl": "https://boards.greenhouse.io/doordashcanada",
+    "evidenceUrl": "https://github.com/SimplifyJobs/New-Grad-Positions/blob/dev/archived/README-2025.md"
+  },
+  {
+    "platform": "Greenhouse",
+    "token": "heygen",
+    "company": "heygen",
+    "region": "global",
+    "careersUrl": "https://job-boards.greenhouse.io/heygen",
+    "evidenceUrl": "https://github.com/SimplifyJobs/New-Grad-Positions/blob/dev/archived/README-2025.md"
+  },
+  {
+    "platform": "Lever",
+    "token": "webfx",
+    "company": "webfx",
+    "region": "global",
+    "careersUrl": "https://jobs.lever.co/webfx",
+    "evidenceUrl": "https://github.com/SimplifyJobs/New-Grad-Positions/blob/dev/archived/README-2025.md"
+  },
+  {
+    "platform": "Greenhouse",
+    "token": "capitalrx",
+    "company": "capitalrx",
+    "region": "global",
+    "careersUrl": "https://job-boards.greenhouse.io/capitalrx",
+    "evidenceUrl": "https://github.com/SimplifyJobs/New-Grad-Positions/blob/dev/archived/README-2025.md"
+  },
+  {
+    "platform": "Lever",
+    "token": "meetalbert",
+    "company": "Albert",
+    "region": "global",
+    "careersUrl": "https://jobs.lever.co/meetalbert",
+    "evidenceUrl": "https://github.com/poteto/hiring-without-whiteboards/blob/main/README.md"
+  },
+  {
+    "platform": "Greenhouse",
+    "token": "b12",
+    "company": "B12",
+    "region": "global",
+    "careersUrl": "https://boards.greenhouse.io/b12",
+    "evidenceUrl": "https://github.com/poteto/hiring-without-whiteboards/blob/main/README.md"
+  },
+  {
+    "platform": "Lever",
+    "token": "BDG",
+    "company": "Bustle",
+    "region": "global",
+    "careersUrl": "https://jobs.lever.co/BDG",
+    "evidenceUrl": "https://github.com/poteto/hiring-without-whiteboards/blob/main/README.md"
+  },
+  {
+    "platform": "Greenhouse",
+    "token": "emarketer",
+    "company": "eMarketer",
+    "region": "global",
+    "careersUrl": "https://job-boards.greenhouse.io/emarketer",
+    "evidenceUrl": "https://github.com/poteto/hiring-without-whiteboards/blob/main/README.md"
+  },
+  {
+    "platform": "Greenhouse",
+    "token": "scout24",
+    "company": "ImmobilienScout24",
+    "region": "global",
+    "careersUrl": "https://boards.greenhouse.io/scout24",
+    "evidenceUrl": "https://github.com/poteto/hiring-without-whiteboards/blob/main/README.md"
+  },
+  {
+    "platform": "Greenhouse",
+    "token": "seesaw",
+    "company": "Seesaw",
+    "region": "global",
+    "careersUrl": "https://boards.greenhouse.io/seesaw",
+    "evidenceUrl": "https://github.com/poteto/hiring-without-whiteboards/blob/main/README.md"
+  },
+  {
+    "platform": "Lever",
+    "token": "anomali",
+    "company": "Anomali",
+    "region": "global",
+    "careersUrl": "https://jobs.lever.co/anomali",
+    "evidenceUrl": "https://github.com/remoteintech/remote-jobs/blob/main/src/companies/anomali.md"
+  },
+  {
+    "platform": "Lever",
+    "token": "appen-2",
+    "company": "Appen",
+    "region": "global",
+    "careersUrl": "https://jobs.lever.co/appen-2",
+    "evidenceUrl": "https://github.com/remoteintech/remote-jobs/blob/main/src/companies/appen.md"
+  },
+  {
+    "platform": "Greenhouse",
+    "token": "circleci",
+    "company": "CircleCI",
+    "region": "global",
+    "careersUrl": "https://boards.greenhouse.io/circleci",
+    "evidenceUrl": "https://github.com/remoteintech/remote-jobs/blob/main/src/companies/circleci.md"
+  },
+  {
+    "platform": "Ashby",
+    "token": "Deel",
+    "company": "Deel",
+    "region": "global",
+    "careersUrl": "https://jobs.ashbyhq.com/Deel",
+    "evidenceUrl": "https://github.com/remoteintech/remote-jobs/blob/main/src/companies/deel.md"
+  },
+  {
+    "platform": "Lever",
+    "token": "findem",
+    "company": "Findem",
+    "region": "global",
+    "careersUrl": "https://jobs.lever.co/findem",
+    "evidenceUrl": "https://github.com/remoteintech/remote-jobs/blob/main/src/companies/findem.md"
+  },
+  {
+    "platform": "Ashby",
+    "token": "kindred",
+    "company": "Kindred",
+    "region": "global",
+    "careersUrl": "https://jobs.ashbyhq.com/kindred",
+    "evidenceUrl": "https://github.com/remoteintech/remote-jobs/blob/main/src/companies/kindred.md"
+  },
+  {
+    "platform": "Lever",
+    "token": "kraken",
+    "company": "Kraken",
+    "region": "global",
+    "careersUrl": "https://jobs.lever.co/kraken",
+    "evidenceUrl": "https://github.com/remoteintech/remote-jobs/blob/main/src/companies/kraken.md"
+  },
+  {
+    "platform": "Lever",
+    "token": "lifen",
+    "company": "Lifen",
+    "region": "global",
+    "careersUrl": "https://jobs.lever.co/lifen",
+    "evidenceUrl": "https://github.com/remoteintech/remote-jobs/blob/main/src/companies/lifen.md"
+  },
+  {
+    "platform": "Ashby",
+    "token": "luxor",
+    "company": "Luxor Technology",
+    "region": "global",
+    "careersUrl": "https://jobs.ashbyhq.com/luxor",
+    "evidenceUrl": "https://github.com/remoteintech/remote-jobs/blob/main/src/companies/luxor.md"
+  },
+  {
+    "platform": "Greenhouse",
+    "token": "consensys",
+    "company": "MetaMask",
+    "region": "global",
+    "careersUrl": "https://boards.greenhouse.io/consensys",
+    "evidenceUrl": "https://github.com/remoteintech/remote-jobs/blob/main/src/companies/metamask.md"
+  },
+  {
+    "platform": "Greenhouse",
+    "token": "modernhealth",
+    "company": "Modern Health",
+    "region": "global",
+    "careersUrl": "https://boards.greenhouse.io/modernhealth",
+    "evidenceUrl": "https://github.com/remoteintech/remote-jobs/blob/main/src/companies/modern-health.md"
+  },
+  {
+    "platform": "Lever",
+    "token": "myollie",
+    "company": "Ollie",
+    "region": "global",
+    "careersUrl": "https://jobs.lever.co/myollie",
+    "evidenceUrl": "https://github.com/remoteintech/remote-jobs/blob/main/src/companies/ollie.md"
+  },
+  {
+    "platform": "SmartRecruiters",
+    "token": "PayScale",
+    "company": "PayScale",
+    "region": "global",
+    "careersUrl": "https://jobs.smartrecruiters.com/PayScale",
+    "evidenceUrl": "https://github.com/remoteintech/remote-jobs/blob/main/src/companies/payscale.md"
+  },
+  {
+    "platform": "Greenhouse",
+    "token": "recharge",
+    "company": "ReCharge Payments",
+    "region": "global",
+    "careersUrl": "https://boards.greenhouse.io/recharge",
+    "evidenceUrl": "https://github.com/remoteintech/remote-jobs/blob/main/src/companies/recharge.md"
+  },
+  {
+    "platform": "SmartRecruiters",
+    "token": "Renaissance",
+    "company": "Renaissance",
+    "region": "global",
+    "careersUrl": "https://careers.smartrecruiters.com/Renaissance",
+    "evidenceUrl": "https://github.com/remoteintech/remote-jobs/blob/main/src/companies/renaissance.md"
+  },
+  {
+    "platform": "SmartRecruiters",
+    "token": "SeaplaneIOInc",
+    "company": "Seaplane",
+    "region": "global",
+    "careersUrl": "https://careers.smartrecruiters.com/SeaplaneIOInc",
+    "evidenceUrl": "https://github.com/remoteintech/remote-jobs/blob/main/src/companies/seaplane.md"
+  },
+  {
+    "platform": "Ashby",
+    "token": "sketch",
+    "company": "Sketch",
+    "region": "global",
+    "careersUrl": "https://jobs.ashbyhq.com/sketch",
+    "evidenceUrl": "https://github.com/remoteintech/remote-jobs/blob/main/src/companies/sketch.md"
+  },
+  {
+    "platform": "Greenhouse",
+    "token": "zupinnovation",
+    "company": "Zup",
+    "region": "global",
+    "careersUrl": "https://boards.greenhouse.io/zupinnovation",
+    "evidenceUrl": "https://github.com/remoteintech/remote-jobs/blob/main/src/companies/zup.md"
+  }
+]
