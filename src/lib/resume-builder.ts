@@ -210,17 +210,30 @@ export async function buildResume(
       requirementsToReview: [] as string[],
     };
 
+  // Share one bounded route budget rather than timing out a healthy stage at 15 seconds.
+  const generationDeadline=Date.now()+50000;
+  const stageOptions=()=>{
+    const remaining=generationDeadline-Date.now();
+    if(remaining<500)throw new AiError('CV generation reached its request deadline. No unverified CV was saved; retry shortly.',504);
+    return {timeoutMs:Math.min(30000,remaining)};
+  };
   const analysis = parseResumeAnalysis(
     await aiJson(
       'Analyse the job before writing. Return {"priorities":[{"requirement":"verbatim job-description excerpt","evidence":[0]}],"selectedEvidence":[0,1]}. Identify up to 8 actual requirements, map each to candidate evidence indices, and use an empty evidence array for unsupported requirements. Select the strongest evidence for a concise professional CV: actual work experience, skills, education and at most 3 relevant complete projects. Prefer evidence that demonstrates the job tasks, rather than keyword repetition. Include relevant transferable work but never assume the candidate possesses a job requirement. Keep education and employment context. Use only valid zero-based indices and literal requirement excerpts. Do not write the CV in this response.',
       { target, evidence },
-      { timeoutMs: 15000 },
+      stageOptions(),
     ),
     target,
     evidence,
   );
+  // Keep supplied core qualifications available even if relevance selection omits them.
+  // The writer and factual verifier still receive only original evidence, never new claims.
+  for(const section of ['skills','experience','education']) {
+    const index=evidence.findIndex(item=>item.section===section);
+    if(index>=0 && !analysis.selectedEvidence.includes(index))analysis.selectedEvidence.push(index);
+  }
   const generated = await aiJson(
-    'Write a concise, coherent CV and cover-letter body using the job analysis and selected evidence, not a transcription of the uploaded CV. Return {"items":[{"section":"summary|skills|experience|projects|education|contributions|training|certifications|coverLetter","text":"complete entry, paragraph or skills list","sources":[0]}]}. Sources are the original evidence IDs supplied with each selected record. Write a specific 2–3 sentence professional summary grounded in real qualifications; prioritise relevant accomplishments and use clear active language. Select relevant skills, preserve employer/title/date context in experience, and keep exact project names on the first line without Markdown, their own technologies and achievement bullets together in a single item per project. Include at most 3 selected projects. Do not repeat the candidate name, contact information, headings, generic objectives or the entire raw CV. Omit irrelevant detail, repetition and filler. A cover letter must have two concise, evidence-cited body paragraphs connecting actual work to this job, without greetings/closings or unsupported enthusiasm. Every factual statement must be supported by its cited selected evidence. Do not invent qualifications, metrics, years, employers, titles, technologies, proficiency or achievements, or move claims between projects. Job requirements are not candidate qualifications. Keep the CV under 900 words and the two letter paragraphs under 220 words combined. Include education when available. Unsupported requirements stay out of the documents.',
+    'Write a concise, coherent CV and cover-letter body using the job analysis and selected evidence, not a transcription of the uploaded CV. Return {"items":[{"section":"summary|skills|experience|projects|education|contributions|training|certifications|coverLetter","text":"complete entry, paragraph or skills list","sources":[0]}]}. Sources are the original evidence IDs supplied with each selected record. Write a specific 2–3 sentence professional summary grounded in real qualifications; prioritise relevant accomplishments and use clear active language. Select relevant skills, preserve employer/title/date context in experience, and keep exact project names on the first line without Markdown, their own technologies and achievement bullets together in a single item per project. Include at most 3 selected projects. Do not repeat the candidate name, contact information, headings, generic objectives or the entire raw CV. Omit irrelevant detail, repetition and filler. Return exactly two separate items with section coverLetter, one body paragraph in each item, each at least 35 characters. Include skills, experience and education section items whenever those evidence sections are supplied. A cover letter must have two concise, evidence-cited body paragraphs connecting actual work to this job, without greetings/closings or unsupported enthusiasm. Every factual statement must be supported by its cited selected evidence. Do not invent qualifications, metrics, years, employers, titles, technologies, proficiency or achievements, or move claims between projects. Job requirements are not candidate qualifications. Keep the CV under 900 words and the two letter paragraphs under 220 words combined. Include education when available. Unsupported requirements stay out of the documents.',
     {
       target,
       analysis,
@@ -229,6 +242,7 @@ export async function buildResume(
         ...evidence[id],
       })),
     },
+    stageOptions(),
   );
   const selected = new Set(analysis.selectedEvidence);
   const parsed = parseResumeClaims(generated, evidence);
@@ -259,7 +273,7 @@ export async function buildResume(
         evidence: claim.sources.map((id) => evidence[id].text),
       })),
     },
-    { timeoutMs: 15000 },
+    stageOptions(),
   )) as { supported?: unknown } | null;
   if (
     !checked ||

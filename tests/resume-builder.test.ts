@@ -228,3 +228,27 @@ test("CV and cover letter export as editable Word documents and styled PDFs with
   );
   assert.throws(() => validateTemplate("invalid"), /style/);
 });
+
+test('AI selection cannot accidentally hide supplied experience and education from the writer',async()=>{
+ process.env.AI_PROVIDER='openai';process.env.OPENAI_API_KEY='fixture-core-evidence';let calls=0;
+ const reply=(data:unknown)=>Response.json({choices:[{message:{content:JSON.stringify(data)}}]});
+ globalThis.fetch=async(_url,init)=>{
+  calls++;
+  if(calls===1)return reply({priorities:[{requirement:'Build accessible React interfaces.',evidence:[0]}],selectedEvidence:[0]});
+  if(calls===2){
+   const body=JSON.parse(String(init?.body));const data=JSON.parse(body.messages[1].content);
+   const experience=data.evidence.find((e:{section:string})=>e.section==='experience');const education=data.evidence.find((e:{section:string})=>e.section==='education');
+   assert.ok(experience);assert.ok(education);
+   return reply({items:[
+    {section:'summary',text:'Frontend skills include React and TypeScript with experience building accessible interfaces.',sources:[0,experience.id]},
+    {section:'skills',text:'React, TypeScript',sources:[0]},
+    {section:'experience',text:experience.text,sources:[experience.id]},
+    {section:'education',text:education.text,sources:[education.id]},
+    {section:'coverLetter',text:'My skills include React and TypeScript for frontend development.',sources:[0]},
+    {section:'coverLetter',text:'I built accessible React interfaces at Example Co.',sources:[experience.id]},
+   ]});
+  }
+  return reply({supported:[0,1,2,3,4,5]});
+ };
+ const result=await buildResume(profile,target,true);assert.match(result.content.education,/BSc/);assert.match(result.content.experience,/Example Co/);assert.equal(calls,3);
+});

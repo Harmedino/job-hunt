@@ -53,6 +53,7 @@ async function providerRequest(
   const label = provider === "gemini" ? "Google Gemini" : "OpenAI";
   const deadline = Date.now() + timeoutMs;
   let response: Response | undefined;
+  let lastProviderResponse: Response | undefined;
   for (let attempt = 0; attempt < 2; attempt++) {
     const remaining = deadline - Date.now();
     if (remaining <= 0) break;
@@ -67,10 +68,14 @@ async function providerRequest(
     } catch {
       if (attempt || deadline - Date.now() < 750) break;
     }
+    if (response) lastProviderResponse = response;
     if (response && ![408, 500, 502, 503, 504].includes(response.status)) break;
     if (attempt || deadline - Date.now() < 750) break;
     await new Promise((resolve) => setTimeout(resolve, 500));
   }
+  // Keep an observed provider failure when a later transport retry never responds.
+  // Otherwise an overload becomes a misleading generic connection timeout.
+  response ??= lastProviderResponse;
   if (!response)
     throw new AiError(
       `${label} could not be reached before the request deadline. Retry with a shorter input or check network access.`,

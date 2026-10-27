@@ -243,3 +243,10 @@ test("Gemini retries transient overload once on the same provider and reports pe
   await assert.rejects(() => aiJson("JSON", {}), /rate limit/);
   assert.equal(calls, 1);
 });
+
+test('a timed-out retry preserves the actual Gemini provider overload without leaking keys',async()=>{
+ process.env.AI_PROVIDER='gemini';process.env.GEMINI_API_KEY='fixture-overload-key';let calls=0;
+ globalThis.fetch=async()=>{calls++;if(calls===1)return new Response('private provider body',{status:503});throw new DOMException('fixture-overload-key','TimeoutError');};
+ await assert.rejects(()=>aiJson('JSON',{}),error=>error instanceof Error && /temporarily overloaded.*503/.test(error.message) && !/fixture-overload-key|private provider body/.test(error.message));
+ assert.equal(calls,2);
+});
