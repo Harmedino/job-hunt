@@ -241,7 +241,8 @@ test("search follows short pages, adds role variants, bounds concurrency and kee
     });
   };
   const result = await discover();
-  assert.equal(queries.size, 10);
+  assert.equal(queries.size, 17);
+  for(const role of ["backend","full stack","Node.js","Laravel","PHP"])assert.ok(queries.has(role));
   assert.ok(peak <= 3);
   assert.equal(result.jobs.filter((j) => j.source === "Himalayas").length, 4);
   assert.equal(

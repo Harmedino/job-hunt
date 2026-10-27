@@ -141,6 +141,13 @@ const adapters: JobAdapter[] = [
       // country=NG filters applicant eligibility; employers still come from around the world.
       const queries = [
         "frontend",
+        "backend",
+        "full stack",
+        "software engineer",
+        "Node.js",
+        "Express",
+        "Laravel",
+        "PHP",
         "React",
         "Angular",
         "Next.js",

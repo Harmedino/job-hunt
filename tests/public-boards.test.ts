@@ -355,3 +355,20 @@ test(
     }
   },
 );
+
+test('only a complete successful company inventory closes missing jobs; outages preserve the vacancy and application history',{skip:!process.env.TEST_MONGODB_URI,timeout:30000},async()=>{
+ const {MongoClient}=await import('mongodb');const {closeDb}=await import('../src/lib/db');
+ const uri=process.env.MONGODB_URI,name=process.env.MONGODB_DB;
+ const client=new MongoClient(process.env.TEST_MONGODB_URI!);const database=client.db(`job_hunt_board_closure_test_${process.pid}`);
+ process.env.MONGODB_URI=process.env.TEST_MONGODB_URI;process.env.MONGODB_DB=database.databaseName;process.env.GREENHOUSE_BOARDS='closure-fixture';
+ try{
+  const job={id:'closure-job',boardKey:'Greenhouse:global:closure-fixture',url:'https://example.org/jobs/closure',title:'React Developer'};
+  await database.collection('jobs').insertOne({...job});await database.collection('applications').insertOne({id:'closure-application',job:{...job},status:'Saved'});
+  globalThis.fetch=async input=>String(input).includes('/boards/closure-fixture/jobs')?Response.json({jobs:[]}):new Response('rate limited',{status:429,headers:{'Retry-After':'3600'}});
+  await readPublicBoards('Greenhouse');assert.ok((await database.collection('jobs').findOne({id:job.id}))!.closedAt);
+  assert.equal((await database.collection('applications').findOne({id:'closure-application'}))!.job.title,job.title);
+  await database.collection('jobs').updateOne({id:job.id},{$unset:{closedAt:''}});clearPublicBoardCache();
+  globalThis.fetch=async()=>new Response('outage',{status:429,headers:{'Retry-After':'3600'}});
+  await readPublicBoards('Greenhouse');assert.equal((await database.collection('jobs').findOne({id:job.id}))!.closedAt,undefined);
+ }finally{await database.dropDatabase();await client.close();await closeDb();if(uri===undefined)delete process.env.MONGODB_URI;else process.env.MONGODB_URI=uri;if(name===undefined)delete process.env.MONGODB_DB;else process.env.MONGODB_DB=name;}
+});
