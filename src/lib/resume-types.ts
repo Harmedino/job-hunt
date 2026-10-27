@@ -64,7 +64,10 @@ export const resumeTemplates = {
   compact: "Compact minimal",
 } as const;
 export type ResumeTemplate = keyof typeof resumeTemplates;
+export function orderedResumeSections(value?:readonly ResumeSection[]):ResumeSection[] {return [...new Set([...(value||[]),...Object.keys(resumeSections) as ResumeSection[]])].filter(key=>key in resumeSections);}
+export function validateSectionOrder(value:unknown):ResumeSection[]{if(value===undefined)return orderedResumeSections();if(!Array.isArray(value)||value.length>8||value.some(key=>typeof key!=='string'||!Object.hasOwn(resumeSections,key))||new Set(value).size!==value.length)throw new ResumeInputError('Invalid CV section order.');return orderedResumeSections(value);}
 export type ResumeDraft = {
+  sectionOrder?:ResumeSection[];
   analysis?: ResumeAnalysis;
   aiGeneration?: { provider: string; model: string; verifiedAt: string; modelsUsed?: string[] };
   layoutVersion?: 2;

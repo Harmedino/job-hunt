@@ -2,6 +2,8 @@ import { resumeEntries, isEntrySection } from "./resume-layout";
 import { Document, Packer, Paragraph, TextRun, HeadingLevel } from "docx";
 import {
   resumeSections,
+  orderedResumeSections,
+  type ResumeSection,
   legacyResumeSections,
   type ResumeContent,
   type ResumeTarget,
@@ -15,6 +17,7 @@ export async function resumeDocx(
   template: ResumeTemplate = "classic",
   coverLetter?: string,
   legacy = false,
+  sectionOrder?:ResumeSection[],
 ) {
   const compact = template === "compact";
   const accent = template === "modern" ? "1F5E5E" : "222D33";
@@ -67,7 +70,7 @@ export async function resumeDocx(
     );
   } else {
     const sections = legacy ? legacyResumeSections : resumeSections;
-    for (const key of Object.keys(sections) as (keyof ResumeContent)[]) {
+    for (const key of (legacy ? Object.keys(sections) : orderedResumeSections(sectionOrder)) as (keyof ResumeContent)[]) {
       const text = content[key] || "";
       if (!text.trim()) continue;
       children.push(

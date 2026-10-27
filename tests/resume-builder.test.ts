@@ -252,3 +252,17 @@ test('AI selection cannot accidentally hide supplied experience and education fr
  };
  const result=await buildResume(profile,target,true);assert.match(result.content.education,/BSc/);assert.match(result.content.experience,/Example Co/);assert.equal(calls,3);
 });
+
+test('a transient verifier failure resumes the exact completed stages and still verifies every claim',async()=>{
+ process.env.OPENAI_API_KEY='unit-test-placeholder';
+ const supplied={...profile,education:'',projects:''};
+ let checkpoint:import('../src/lib/resume-builder').ResumeGenerationCheckpoint|undefined,calls=0;
+ const values=[{priorities:[{requirement:'Build accessible React interfaces.',evidence:[1]}],selectedEvidence:[0,1]},{items:[{section:'summary',text:'Frontend developer with React and TypeScript skills and experience building accessible interfaces.',sources:[0,1]},{section:'skills',text:'React, TypeScript',sources:[0]},{section:'experience',text:profile.experience,sources:[1]},{section:'coverLetter',text:'I built accessible React interfaces at Example Co (2023–2024).',sources:[1]},{section:'coverLetter',text:'My supplied skills include React and TypeScript for frontend development.',sources:[0]}]}];
+ globalThis.fetch=async()=>{calls++;if(calls<=2)return Response.json({choices:[{message:{content:JSON.stringify(values[calls-1])}}]});return Response.json({error:{message:'temporarily unavailable'}},{status:503});};
+ await assert.rejects(()=>buildResume(supplied,target,true,{onCheckpoint:async value=>{checkpoint=value;}}));
+ assert.equal(calls,4);assert.ok(checkpoint?.generated);assert.ok(checkpoint?.analysis);
+ globalThis.fetch=async(_url,init)=>{calls++;const payload=JSON.parse(String(init?.body));assert.match(payload.messages[0].content,/Check each claim/);return Response.json({choices:[{message:{content:JSON.stringify({supported:[0,1,2,3,4]})}}]});};
+ const result=await buildResume(supplied,target,true,{checkpoint,onCheckpoint:async value=>{checkpoint=value;}});assert.equal(calls,5);assert.match(result.content.experience,/Example Co/);
+ globalThis.fetch=async()=>Response.json({choices:[{message:{content:JSON.stringify({supported:[]})}}]});
+ await assert.rejects(()=>buildResume(supplied,target,true,{checkpoint,onCheckpoint:async value=>{checkpoint=value;}}),/factual checks/);assert.equal(checkpoint?.generated,undefined);
+});

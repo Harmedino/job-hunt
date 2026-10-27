@@ -14,7 +14,7 @@ export async function GET(
         .trim()
         .slice(0, 100) || "tailored-cv";
     return new Response(
-      await resumePdf(draft.content, draft.target, draft.template, undefined, draft.layoutVersion !== 2),
+      await resumePdf(draft.content, draft.target, draft.template, undefined, draft.layoutVersion !== 2, draft.sectionOrder),
       {
         headers: {
           ...privateHeaders,

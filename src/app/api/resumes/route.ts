@@ -1,3 +1,5 @@
+import {resumeRecoveryKey} from "@/lib/resume-recovery";
+import type {ResumeGenerationCheckpoint} from "@/lib/resume-builder";
 import { cleanResumeLayout } from "@/lib/resume-layout";
 import { randomUUID } from "node:crypto";
 import { db } from "@/lib/db";
@@ -8,6 +10,7 @@ import {
   validateResumeContent,
   validateCoverLetter,
   validateTemplate,
+  validateSectionOrder,
   type ResumeDraft,
 } from "@/lib/resume-types";
 import {
@@ -72,6 +75,7 @@ export async function POST(request: Request) {
           body.template === undefined
             ? original.template
             : validateTemplate(body.template),
+        sectionOrder:body.sectionOrder===undefined?original.sectionOrder:validateSectionOrder(body.sectionOrder),
         manualEdits: true,
       };
     } else if (body.action === "generate") {
@@ -92,7 +96,17 @@ export async function POST(request: Request) {
         throw new ResumeInputError(
           "Save your name, email and qualifications in My Profile first. Import your uploaded CV to fill the profile fields.",
         );
-      const built = await buildResume(profile, target, body.useAi);
+      if(body.retry!==undefined && typeof body.retry!=='boolean')throw new ResumeInputError('Invalid retry request.');
+      const key=resumeRecoveryKey(profile,target);
+      const recovery=database.collection('resume_generation_recovery');
+      let checkpoint:ResumeGenerationCheckpoint|undefined;
+      if(body.useAi){
+        await recovery.createIndex({key:1},{unique:true});
+        await recovery.createIndex({expiresAt:1},{expireAfterSeconds:0});
+        if(body.retry)checkpoint=(await recovery.findOne({key,expiresAt:{$gt:new Date()}}))?.checkpoint as ResumeGenerationCheckpoint|undefined;
+      }
+      const built = await buildResume(profile, target, body.useAi, {checkpoint,onCheckpoint:body.useAi?async value=>{await recovery.updateOne({key},{$set:{checkpoint:value,expiresAt:new Date(Date.now()+30*60000)}},{upsert:true});}:undefined});
+      if(body.useAi)await recovery.deleteOne({key});
       draft = {
         id,
         familyId: id,

@@ -9,6 +9,8 @@ import { PDFDocument, rgb, type PDFFont } from "pdf-lib";
 import fontkit from "@pdf-lib/fontkit";
 import {
   resumeSections,
+  orderedResumeSections,
+  type ResumeSection,
   legacyResumeSections,
   type ResumeContent,
   type ResumeTarget,
@@ -26,6 +28,7 @@ export async function resumePdf(
   template: ResumeTemplate = "classic",
   coverLetter?: string,
   legacy = false,
+  sectionOrder?:ResumeSection[],
 ) {
   const pdf = await PDFDocument.create();
   pdf.registerFontkit(fontkit);
@@ -143,7 +146,7 @@ export async function resumePdf(
   } else {
     draw(target.title, 11, regular, accent);
     const sections = legacy ? legacyResumeSections : resumeSections;
-    for (const key of Object.keys(sections) as (keyof ResumeContent)[]) {
+    for (const key of (legacy ? Object.keys(sections) : orderedResumeSections(sectionOrder)) as (keyof ResumeContent)[]) {
       const text = content[key] || "";
       if (!text.trim()) continue;
       const entries =

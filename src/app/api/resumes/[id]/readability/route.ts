@@ -8,7 +8,7 @@ export async function GET(
 ) {
   try {
     const draft = await loadResume((await params).id);
-    const pdf = await resumePdf(draft.content, draft.target, draft.template);
+    const pdf = await resumePdf(draft.content, draft.target, draft.template, undefined, draft.layoutVersion !== 2, draft.sectionOrder);
     const text = await extractCv(
       new File([new Uint8Array(pdf)], "readability.pdf", {
         type: "application/pdf",

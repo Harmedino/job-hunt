@@ -4,6 +4,7 @@ import {
   validateResumeContent,
   validateCoverLetter,
   validateTemplate,
+  validateSectionOrder,
   ResumeInputError,
 } from "@/lib/resume-types";
 export async function GET(request: Request) {
@@ -15,7 +16,7 @@ export async function GET(request: Request) {
     )
       .collection("resume_working_copies")
       .findOne(
-        { draftId: id, expiresAt: { $gt: new Date() } },
+        { draftId: id, cleared:{$ne:true}, expiresAt: { $gt: new Date() } },
         { projection: { _id: 0 } },
       );
     return Response.json({ copy }, { headers: privateHeaders });
@@ -38,6 +39,7 @@ export async function POST(request: Request) {
       content: validateResumeContent(body.content),
       coverLetter: validateCoverLetter(body.coverLetter),
       template: validateTemplate(body.template),
+      sectionOrder:validateSectionOrder(body.sectionOrder),
       revision: body.revision,
       updatedAt: new Date().toISOString(),
       expiresAt: new Date(Date.now() + 30 * 86400000),
@@ -68,3 +70,5 @@ export async function POST(request: Request) {
     return resumeError(e);
   }
 }
+
+export async function DELETE(request:Request){try{const body=await request.json();await loadResume(body.draftId);if(!Number.isSafeInteger(body.revision)||body.revision<0||body.revision>Date.now()+60000)throw new ResumeInputError('Invalid autosave revision.');const c=(await db()).collection('resume_working_copies');await c.createIndex({draftId:1},{unique:true});await c.updateOne({draftId:body.draftId},[{$replaceWith:{$cond:[{$gte:[body.revision,{$ifNull:['$revision',-1]}]},{$literal:{draftId:body.draftId,revision:body.revision,cleared:true,expiresAt:new Date(Date.now()+30*86400000)}},'$$ROOT']}}],{upsert:true});return Response.json({ok:true},{headers:privateHeaders});}catch(e){return resumeError(e);}}
