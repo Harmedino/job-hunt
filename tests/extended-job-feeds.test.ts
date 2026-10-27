@@ -234,3 +234,18 @@ test("authorized API tokens stay server-side and credential-bearing requests are
   assert.equal(result.jobs.length, 1);
   assert.doesNotMatch(JSON.stringify(result), /private-test-token/);
 });
+
+test('Findwork avoids optional ordering, trims key whitespace and falls back to the canonical list only on query rejection',async()=>{
+ process.env.FINDWORK_API_KEY='  fixture-with-whitespace  ';
+ const requested:string[]=[];
+ globalThis.fetch=async(input,init)=>{
+  const url=new URL(String(input));requested.push(url.href);
+  assert.equal(new Headers(init?.headers).get('Authorization'),'Token fixture-with-whitespace');
+  assert.equal(init?.cache,'no-store');assert.equal(url.searchParams.has('order_by'),false);
+  if(url.searchParams.has('remote'))return new Response('private upstream response',{status:400});
+  return Response.json({results:[]});
+ };
+ assert.deepEqual((await source('Findwork').read()).jobs,[]);assert.equal(requested.length,2);assert.equal(requested[1],'https://findwork.dev/api/jobs/');
+ let calls=0;globalThis.fetch=async()=>{calls++;return new Response('private',{status:401});};
+ await assert.rejects(()=>source('Findwork').read(),/HTTP 401/);assert.equal(calls,1);
+});

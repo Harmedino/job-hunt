@@ -438,23 +438,19 @@ export const additionalJobAdapters: JobAdapter[] = [
       result.flatMap((r) => (r.status === "fulfilled" ? [r.value] : [])),
     );
   }),
-  adapter("Findwork", async () =>
-    feed(
-      rows(
-        obj(
-          await request(
-            "https://findwork.dev/api/jobs/?remote=true&order_by=-date",
-            {
-              headers: {
-                Authorization: `Token ${process.env.FINDWORK_API_KEY}`,
-              },
-            },
-            false,
-          ),
-        ).results,
-      ).map((j) => normalizeExtra("Findwork", j)),
-    ),
-  ),
+  adapter("Findwork", async () => {
+    const headers={Authorization:`Token ${process.env.FINDWORK_API_KEY?.trim()}`};
+    let data:unknown;
+    try {
+      // Let the provider choose its default ordering; the workspace sorts real publication dates.
+      data=await request("https://findwork.dev/api/jobs/?remote=true",{headers},false);
+    } catch(error) {
+      if (!(error instanceof Error) || error.message !== 'HTTP 400') throw error;
+      // The unfiltered official list is a supported fallback for rejected optional query filters.
+      data=await request("https://findwork.dev/api/jobs/",{headers},false);
+    }
+    return feed(rows(obj(data).results).map(j=>normalizeExtra('Findwork',j)));
+  }),
   adapter("Adzuna", async () => {
     const country = process.env.ADZUNA_COUNTRY || "gb";
     if (!/^[a-z]{2}$/.test(country)) throw new Error("Invalid response");
