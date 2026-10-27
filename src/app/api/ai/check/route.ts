@@ -2,9 +2,11 @@ import { AiError, aiJson, aiModel, aiConnection } from "@/lib/ai";
 export const maxDuration = 30;
 export async function POST() {
   try {
+    let usedModel=aiModel();
     const result = (await aiJson(
       'Return {"ok":true}. This is a connectivity check with no personal data.',
       {},
+      {onModelUsed:model=>{usedModel=model;}},
     )) as { ok?: boolean } | null;
     if (result?.ok !== true)
       throw new AiError("AI returned an unexpected response. Please retry.");
@@ -12,8 +14,9 @@ export async function POST() {
       {
         ok: true,
         provider: aiConnection().provider,
-        model: aiModel(),
-        message: `${aiConnection().label} connection verified. CV extraction, tailored CV and cover-letter writing, and job-specific evidence ranking are available.`,
+        model: usedModel,
+        recovered:usedModel!==aiModel(),
+        message: `${aiConnection().label} connection verified using ${usedModel}${usedModel!==aiModel()?" after automatic recovery":""}. Full CV requests still require successful factual checks.`,
       },
       { headers: { "Cache-Control": "no-store" } },
     );

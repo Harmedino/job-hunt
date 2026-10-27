@@ -212,10 +212,12 @@ export async function buildResume(
 
   // Share one bounded route budget rather than timing out a healthy stage at 15 seconds.
   const generationDeadline=Date.now()+50000;
+  const modelsUsed=new Set<string>();
+  let preferredGeminiModel:string|undefined;
   const stageOptions=()=>{
     const remaining=generationDeadline-Date.now();
     if(remaining<500)throw new AiError('CV generation reached its request deadline. No unverified CV was saved; retry shortly.',504);
-    return {timeoutMs:Math.min(30000,remaining)};
+    return {timeoutMs:Math.min(30000,remaining),preferredGeminiModel,onModelUsed:(model:string)=>{modelsUsed.add(model);preferredGeminiModel=model;}};
   };
   const analysis = parseResumeAnalysis(
     await aiJson(
@@ -351,6 +353,7 @@ export async function buildResume(
     ),
   ];
   const provider = aiConnection();
+  if(provider.provider === "gemini" && [...modelsUsed].some(model=>model!==provider.model))warnings.push("Automatic Gemini recovery used an alternate Google model. All saved claims passed factual checks.");
   return {
     content: cleanResumeLayout(content),
     coverLetter: profileCoverLetter(
@@ -362,7 +365,8 @@ export async function buildResume(
     analysis,
     aiGeneration: {
       provider: provider.label,
-      model: provider.model,
+      model: preferredGeminiModel || provider.model,
+      modelsUsed:[...modelsUsed],
       verifiedAt: new Date().toISOString(),
     },
     method: "AI-written CV · job analysis and factual checks completed",

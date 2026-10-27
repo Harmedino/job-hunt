@@ -250,3 +250,31 @@ test('a timed-out retry preserves the actual Gemini provider overload without le
  await assert.rejects(()=>aiJson('JSON',{}),error=>error instanceof Error && /temporarily overloaded.*503/.test(error.message) && !/fixture-overload-key|private provider body/.test(error.message));
  assert.equal(calls,2);
 });
+
+test('automatic Gemini recovery reports the actual model and reuses it within a CV flow',async()=>{
+ process.env.AI_PROVIDER='gemini';process.env.GEMINI_MODEL='auto';process.env.GEMINI_API_KEY='fixture-recovery-key';
+ const models:string[]=[];let used='';
+ globalThis.fetch=async(input,init)=>{const model=new URL(String(input)).pathname.split('/').pop()!.split(':')[0];models.push(model);assert.equal(new Headers(init?.headers).get('x-goog-api-key'),'fixture-recovery-key');return models.length===1?new Response('private upstream body',{status:503}):response({ok:true});};
+ assert.deepEqual(await aiJson('JSON',{}, {onModelUsed:model=>{used=model;}}),{ok:true});
+ assert.deepEqual(models,['gemini-flash-latest','gemini-flash-lite-latest']);assert.equal(used,'gemini-flash-lite-latest');
+ models.length=0;globalThis.fetch=async(input)=>{models.push(new URL(String(input)).pathname.split('/').pop()!.split(':')[0]);return response({ok:true});};
+ await aiJson('JSON',{}, {preferredGeminiModel:used});assert.deepEqual(models,['gemini-flash-lite-latest']);
+});
+test('explicit Gemini model pins disable alternate-model recovery',async()=>{
+ process.env.AI_PROVIDER='gemini';process.env.GEMINI_API_KEY='fixture-pinned-key';process.env.GEMINI_MODEL='chosen-pinned-model';let calls=0;
+ globalThis.fetch=async(input)=>{calls++;assert.match(String(input),/models\/chosen-pinned-model:generateContent$/);return new Response('private',{status:503});};
+ await assert.rejects(()=>aiJson('JSON',{}),/temporarily overloaded/);assert.equal(calls,2);
+});
+test('automatic recovery never retries auth, quota, invalid-model, blocked or malformed output on another model',async()=>{
+ process.env.AI_PROVIDER='gemini';process.env.GEMINI_API_KEY='fixture-no-recovery';process.env.GEMINI_MODEL='auto';
+ for(const status of [400,401,403,404,429]) {let calls=0;globalThis.fetch=async()=>{calls++;return new Response('private',{status});};await assert.rejects(()=>aiJson('JSON',{}));assert.equal(calls,1);}
+ let calls=0;globalThis.fetch=async()=>{calls++;return response({ok:true},'SAFETY');};await assert.rejects(()=>aiJson('JSON',{}),/incomplete/);assert.equal(calls,1);
+});
+test('automatic recovery reserves deadline time when the primary model stalls',async()=>{
+ process.env.AI_PROVIDER='gemini';process.env.GEMINI_API_KEY='fixture-deadline';process.env.GEMINI_MODEL='auto';let calls=0;
+ const keepAlive=setInterval(()=>{},20);
+ try{
+  globalThis.fetch=async(_input,init)=>{calls++;if(calls===1)return new Promise((_resolve,reject)=>init!.signal!.addEventListener('abort',()=>reject(new DOMException('stalled','TimeoutError')),{once:true}));return response({ok:true});};
+  assert.deepEqual(await aiJson('JSON',{}, {timeoutMs:1000}),{ok:true});assert.equal(calls,2);
+ }finally{clearInterval(keepAlive);}
+});

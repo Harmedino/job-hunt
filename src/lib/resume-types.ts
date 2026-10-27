@@ -66,7 +66,7 @@ export const resumeTemplates = {
 export type ResumeTemplate = keyof typeof resumeTemplates;
 export type ResumeDraft = {
   analysis?: ResumeAnalysis;
-  aiGeneration?: { provider: string; model: string; verifiedAt: string };
+  aiGeneration?: { provider: string; model: string; verifiedAt: string; modelsUsed?: string[] };
   layoutVersion?: 2;
   coverLetter?: string;
   template?: ResumeTemplate;
