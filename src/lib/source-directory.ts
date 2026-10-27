@@ -31,6 +31,7 @@ export const publishers = [
   },
 ];
 const communities = [
+  { slug: "forhire", name: "r/forhire · review community rules" },
   { slug: "remotejobs", name: "r/remotejobs" },
   { slug: "remotejs", name: "r/remotejs" },
   { slug: "cybersecurity", name: "r/cybersecurity · hiring discussions" },
@@ -152,31 +153,7 @@ export async function researchSources() {
   const results = await Promise.all(
     candidateSources.map(async (candidate): Promise<ResearchSource[]> => {
       try {
-        if (candidate.platform === "Reddit") {
-          const r = await fetch(candidate.provenanceUrl, {
-            signal: AbortSignal.timeout(12000),
-            headers: {
-              "User-Agent": "PersonalJobFinder/1.0 (public community metadata)",
-            },
-            cache: "no-store",
-          });
-          if (!r.ok) throw new Error(`HTTP ${r.status}`);
-          const body = await r.json();
-          if (
-            body.kind !== "t5" ||
-            String(body.data?.display_name).toLowerCase() !== candidate.id ||
-            body.data?.subreddit_type !== "public"
-          )
-            throw new Error("Public community could not be confirmed.");
-          return [
-            {
-              ...candidate,
-              status: "Community exists",
-              checkedAt,
-              note: "Public community metadata confirmed. This does not verify recent hiring activity or individual jobs. Automated post collection is not connected; permitted API access is required.",
-            },
-          ];
-        }
+        if (candidate.platform === "Reddit") return [{...candidate, checkedAt, status:"Not checked" as const, note:"Manual import only. Reddit developer access has not been approved for this application. Read community rules and verify the employer before saving a lead."}];
         const page = await publisherHtml(candidate.url);
         const links = publisherSocialLinks(page.html, page.url);
         const source = {

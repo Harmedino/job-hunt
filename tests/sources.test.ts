@@ -25,8 +25,8 @@ test("research records failures without fabricating social links", async () => {
   };
   try {
     const result = await researchSources();
-    assert.equal(result.sources.length, 8);
-    assert.ok(result.sources.every((s) => s.status === "Check failed"));
+    assert.equal(result.sources.length, 9);
+    assert.ok(result.sources.every((s) => s.platform === "Reddit" ? s.status === "Not checked" : s.status === "Check failed"));
     assert.ok(
       result.sources.every(
         (s) => !["X", "Facebook", "WhatsApp"].includes(s.platform),
@@ -82,8 +82,8 @@ test("publisher provenance is retained and external redirects are rejected", asy
       "Check failed",
     );
     assert.equal(
-      result.sources.filter((s) => s.status === "Community exists").length,
-      3,
+      result.sources.filter((s) => s.platform === "Reddit" && s.status === "Not checked").length,
+      4,
     );
   } finally {
     globalThis.fetch = original;

@@ -11,6 +11,7 @@ export function proxy(request: NextRequest) {
     path === "/api/cron" ||
     path === "/login" ||
     path === "/privacy" ||
+    ["/manifest.webmanifest", "/share-worker.js", "/launchpad.svg"].includes(path) ||
     path === "/api/auth/login" ||
     path === "/api/auth/logout"
   )
