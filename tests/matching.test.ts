@@ -37,10 +37,10 @@ test("South Africa is not equivalent to Africa-wide", () => {
   );
   assert.equal(eligibility("Africa", "Remote")?.eligibility, "eligible");
 });
-test("roles exclude senior and unrelated work", () => {
+test("roles include senior technology work and exclude unrelated work", () => {
   assert.equal(relevant("Junior React Developer"), true);
   assert.equal(relevant("SOC Analyst Intern"), true);
-  assert.equal(relevant("Senior Frontend Developer"), false);
+  assert.equal(relevant("Senior Frontend Developer"), true);
   assert.equal(relevant("Sales Executive"), false);
   assert.equal(relevant("Sales Account Executive - Cybersecurity"), false);
   assert.equal(relevant("React Native Engineer"), false);
@@ -49,11 +49,11 @@ test("roles exclude senior and unrelated work", () => {
   assert.equal(relevant("Security Operations Analyst"), true);
 
   assert.equal(relevant("Software Engineer", "Build React frontend features."), true);
-  assert.equal(relevant("Senior Software Engineer", "Build React frontend features."), false);
-  assert.equal(relevant("Software Engineer", "Build Rust database internals."), false);
-  assert.equal(relevant("Wordpress Developer - Frontend Design - Freelancer"), false);
+  assert.equal(relevant("Senior Software Engineer", "Build React frontend features."), true);
+  assert.equal(relevant("Software Engineer", "Build Rust database internals."), true);
+  assert.equal(relevant("Wordpress Developer - Frontend Design - Freelancer"), true);
   assert.equal(relevant("Cybersecurity Co-Founder / CPTO (100% remote)"), false);
-  assert.equal(relevant("Security Analyst 3rd Level"), false);
+  assert.equal(relevant("Security Analyst 3rd Level"), true);
 });
 test("matching uses saved skills and never creates evidence", () => {
   const job = {

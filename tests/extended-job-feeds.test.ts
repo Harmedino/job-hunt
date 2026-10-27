@@ -8,10 +8,12 @@ import { jobPlatforms, platformEnabled } from "../src/lib/job-platforms";
 import { discover } from "../src/lib/discovery";
 import { GET as platformState } from "../src/app/api/platforms/route";
 import { eligibility } from "../src/lib/matching";
+import { clearPublicBoardCache } from "../src/lib/public-board-feeds";
 const originalFetch = globalThis.fetch;
 const keys = [...new Set(jobPlatforms.flatMap((p) => p.settings || []))];
 const saved = Object.fromEntries(keys.map((key) => [key, process.env[key]]));
 beforeEach(() => {
+  clearPublicBoardCache();
   for (const key of keys) delete process.env[key];
 });
 afterEach(() => {
@@ -50,12 +52,12 @@ test("catalog provides 20+ unique search connectors, distinguishes manual sites 
     false,
   );
   const state = await (await platformState()).json();
-  assert.equal(state.enabled, 11);
+  assert.equal(state.enabled, 15);
   assert.equal(state.automated, 22);
   assert.ok(state.manual >= 10);
   process.env.FINDWORK_API_KEY = "do-not-expose-this-secret";
   const configured = await (await platformState()).json();
-  assert.equal(configured.enabled, 12);
+  assert.equal(configured.enabled, 16);
   assert.doesNotMatch(JSON.stringify(configured), /do-not-expose/);
 });
 test("additional API normalization keeps true publication dates and explicit remote/location evidence", () => {
@@ -121,14 +123,14 @@ test("one new public provider can return jobs when other providers fail; missing
   assert.equal(result.jobs[0].eligibility, "eligible");
   assert.equal(
     result.sources.filter((s) => s.status === "not_configured").length,
-    11,
+    7,
   );
   assert.equal(result.successfulSources.length, 1);
   assert.doesNotMatch(JSON.stringify(result), /secret proxy/);
   assert.ok(
     requested.every(
       (url) =>
-        !/findwork|adzuna|jooble|reed\.co|usajobs|web3\.career|itjobs|greenhouse|lever\.co|ashbyhq|smartrecruiters/.test(
+        !/findwork|adzuna|jooble|reed\.co|usajobs|web3\.career|itjobs/.test(
           url,
         ),
     ),
@@ -139,7 +141,7 @@ test("public employer boards reject URL injection and never use an update date a
   globalThis.fetch = async () => {
     throw new Error("No network request allowed for invalid board");
   };
-  await assert.rejects(() => source("Greenhouse").read(), /Invalid response/);
+  await assert.rejects(() => source("Greenhouse").read(), /Invalid GREENHOUSE_BOARDS/);
   process.env.GREENHOUSE_BOARDS = "public-board";
   globalThis.fetch = async (input) => {
     assert.equal(new URL(String(input)).hostname, "boards-api.greenhouse.io");

@@ -1,3 +1,5 @@
+import { readPublicBoards } from "./public-board-feeds";
+import { boardPlatforms } from "./public-board-registry";
 import { XMLParser } from "fast-xml-parser";
 import { plainText } from "./matching";
 import { jobPlatforms } from "./job-platforms";
@@ -242,96 +244,6 @@ function adapter(name: string, read: () => Promise<JobFeed>): JobAdapter {
 function basic(key: string) {
   return `Basic ${Buffer.from(`${process.env[key]}:`).toString("base64")}`;
 }
-async function employerBoards(platform: string): Promise<JobFeed> {
-  const variable = {
-    Greenhouse: "GREENHOUSE_BOARDS",
-    Lever: "LEVER_BOARDS",
-    Ashby: "ASHBY_BOARDS",
-    SmartRecruiters: "SMARTRECRUITERS_BOARDS",
-  }[platform];
-  const boards = (process.env[variable || ""] || "")
-    .split(",")
-    .map((v) => v.trim())
-    .filter((v) => /^[a-zA-Z0-9_-]{1,100}$/.test(v))
-    .slice(0, 8);
-  if (!boards.length) throw new Error("Invalid response");
-  const results = await Promise.allSettled(
-    boards.map(async (board) => {
-      const key = encodeURIComponent(board);
-      const endpoint =
-        platform === "Greenhouse"
-          ? `https://boards-api.greenhouse.io/v1/boards/${key}/jobs?content=true`
-          : platform === "Lever"
-            ? `https://api.lever.co/v0/postings/${key}?mode=json&limit=100`
-            : platform === "Ashby"
-              ? `https://api.ashbyhq.com/posting-api/job-board/${key}`
-              : `https://api.smartrecruiters.com/v1/companies/${key}/postings?limit=100`;
-      const data = await request(endpoint);
-      if (platform === "Lever")
-        return rows(data).map((j) => {
-          const c = obj(j.categories);
-          return job(platform, {
-            title: str(j.text),
-            company: board,
-            location: str(c.location),
-            description: plainText(
-              str(j.descriptionPlain) || str(j.description),
-            ),
-            date: epoch(j.createdAt, 1),
-            url: str(j.hostedUrl),
-            remote: j.workplaceType === "remote",
-          });
-        });
-      if (platform === "Greenhouse")
-        return rows(obj(data).jobs).map((j) =>
-          job(platform, {
-            title: str(j.title),
-            company: str(j.company_name) || board,
-            location: str(obj(j.location).name),
-            description: plainText(str(j.content)),
-            date: str(j.first_published),
-            url: str(j.absolute_url),
-            remote: remoteText(j.title, obj(j.location).name, j.content),
-          }),
-        );
-      if (platform === "Ashby")
-        return rows(obj(data).jobs)
-          .filter((j) => j.isListed !== false)
-          .map((j) =>
-            job(platform, {
-              title: str(j.title),
-              company: str(obj(data).organizationName) || board,
-              location: str(j.location),
-              description: plainText(
-                str(j.descriptionPlain) || str(j.descriptionHtml),
-              ),
-              date: str(j.publishedAt),
-              url: str(j.jobUrl),
-              remote: j.isRemote === true && j.workplaceType !== "Hybrid",
-            }),
-          );
-      return rows(obj(data).content).map((j) =>
-        job(platform, {
-          title: str(j.name),
-          company: str(obj(j.company).name),
-          location: named(obj(j.location).city) || str(obj(j.location).country),
-          description: "",
-          date: str(j.releasedDate),
-          url:
-            str(j.ref) && typeof j.id === "string"
-              ? `https://jobs.smartrecruiters.com/${key}/${encodeURIComponent(j.id)}`
-              : "",
-          remote: obj(j.location).remote === true,
-        }),
-      );
-    }),
-  );
-  if (results.every((r) => r.status === "rejected"))
-    throw new Error("Request failed or timed out");
-  return feed(
-    results.flatMap((r) => (r.status === "fulfilled" ? r.value : [])),
-  );
-}
 export const additionalJobAdapters: JobAdapter[] = [
   adapter("Jobicy", async () => {
     const jobs: RawJob[] = [];
@@ -552,7 +464,7 @@ export const additionalJobAdapters: JobAdapter[] = [
       what: "remote frontend",
       results_per_page: "50",
       sort_by: "date",
-      max_days_old: "3",
+      max_days_old: "30",
     });
     return feed(
       rows(
@@ -603,7 +515,7 @@ export const additionalJobAdapters: JobAdapter[] = [
   adapter("USAJOBS", async () => {
     const d = obj(
       await request(
-        "https://data.usajobs.gov/api/Search?Keyword=frontend&RemoteIndicator=true&DatePosted=3&ResultsPerPage=100",
+        "https://data.usajobs.gov/api/Search?Keyword=frontend&RemoteIndicator=true&DatePosted=30&ResultsPerPage=100",
         {
           headers: {
             Host: "data.usajobs.gov",
@@ -653,7 +565,5 @@ export const additionalJobAdapters: JobAdapter[] = [
       ).map((j) => normalizeExtra("ITJobs Portugal", j)),
     ),
   ),
-  ...["Greenhouse", "Lever", "Ashby", "SmartRecruiters"].map((name) =>
-    adapter(name, () => employerBoards(name)),
-  ),
+  ...boardPlatforms.map((name) => ({ name, read: () => readPublicBoards(name) })),
 ];

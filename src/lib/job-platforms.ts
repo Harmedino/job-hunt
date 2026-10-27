@@ -152,32 +152,32 @@ export const jobPlatforms: JobPlatform[] = [
     url: "https://www.greenhouse.com",
     docs: "https://docs.greenhouse.io/job-board",
     access: "employer-boards",
-    settings: ["GREENHOUSE_BOARDS"],
-    note: "Official public employer-board API. Configure comma-separated public board tokens; no global job-board index is implied.",
+
+    note: "Public employer boards discovered automatically. Optional GREENHOUSE_BOARDS adds company tokens. No API key required.",
   },
   {
     name: "Lever",
     url: "https://www.lever.co",
     docs: "https://github.com/lever/postings-api",
     access: "employer-boards",
-    settings: ["LEVER_BOARDS"],
-    note: "Official public employer postings. Missing publication dates are excluded from fresh results.",
+
+    note: "Public employer boards discovered automatically. Optional LEVER_BOARDS adds tokens (eu:token for EU boards). Undated roles appear under Active public boards.",
   },
   {
     name: "Ashby",
     url: "https://www.ashbyhq.com",
     docs: "https://developers.ashbyhq.com/docs/public-job-posting-api",
     access: "employer-boards",
-    settings: ["ASHBY_BOARDS"],
-    note: "Official public employer-board API. Only configured boards are checked.",
+
+    note: "Public employer boards discovered automatically. Optional ASHBY_BOARDS adds company tokens. No API key required.",
   },
   {
     name: "SmartRecruiters",
     url: "https://www.smartrecruiters.com",
     docs: "https://developers.smartrecruiters.com/docs/posting-api",
     access: "employer-boards",
-    settings: ["SMARTRECRUITERS_BOARDS"],
-    note: "Official public company-postings API; checks only configured employers.",
+
+    note: "Public company postings discovered automatically, with paginated listings and full job details. Optional SMARTRECRUITERS_BOARDS adds company tokens.",
   },
   ...[
     ["LinkedIn", "https://www.linkedin.com/jobs/"],

@@ -7,6 +7,9 @@ export type RawJob = {
   url: string;
   date: string;
   source: string;
+  lastVerifiedAt?: string;
+  requisitionId?: string;
+  boardKey?: string;
   remote?: boolean;
   expiresAt?: string;
   countries?: string[];
@@ -14,7 +17,20 @@ export type RawJob = {
   seniority?: string[];
   employmentType?: string;
 };
-export type JobFeed = { jobs: RawJob[]; partial?: boolean };
+export type BoardCoverage = {
+  total: number;
+  checked: number;
+  verified: number;
+  failed: number;
+  unvisited: number;
+};
+export type JobFeed = {
+  jobs: RawJob[];
+  partial?: boolean;
+  boards?: BoardCoverage;
+  sourceError?: string;
+  completedBoards?: { key:string; urls:string[] }[];
+};
 export type JobAdapter = {
   name: string;
   read: () => Promise<JobFeed>;

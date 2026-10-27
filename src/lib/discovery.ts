@@ -1,7 +1,8 @@
 import { JOB_WINDOW_MS } from "./job-freshness";
-import { createHash } from "node:crypto";
+import { jobIdentity } from "./job-identity";
+import { classifyLocation, inferExperience, inferJobType } from "./job-intelligence";
 import { XMLParser } from "fast-xml-parser";
-import { eligibility, plainText, relevant, fullyRemote } from "./matching";
+import { plainText, relevant, fullyRemote } from "./matching";
 import type { Job } from "./types";
 import type { SourceReport } from "./discovery-types";
 import type { RawJob as Raw, JobAdapter } from "./discovery-feed";
@@ -166,7 +167,6 @@ const adapters: JobAdapter[] = [
                   q,
                   country: "NG",
                   timezone: "1",
-                  seniority: "Entry-level,Mid-level",
                   sort: "recent",
                   page: String(page),
                 });
@@ -239,7 +239,11 @@ export async function discover() {
   const failures: string[] = [];
   const successfulSources: string[] = [];
   const results = await Promise.allSettled(
-    adapters.map((source) => source.requiredEnv?.some(key => !process.env[key]?.trim()) ? Promise.resolve(null) : source.read()),
+    adapters.map((source) =>
+      source.requiredEnv?.some((key) => !process.env[key]?.trim())
+        ? Promise.resolve(null)
+        : source.read(),
+    ),
   );
   const jobs: Job[] = [];
   const reports: SourceReport[] = [];
@@ -279,6 +283,13 @@ export async function discover() {
       report.error = `Needs ${adapters[index].requiredEnv?.join(", ")} in server settings.`;
       return;
     }
+    if (result.value.boards) report.boards = result.value.boards;
+    if (result.value.sourceError) {
+      report.status = "error";
+      report.error = result.value.sourceError;
+      failures.push(`${source} unavailable: ${report.error}`);
+      return;
+    }
     successfulSources.push(source);
     report.status = result.value.partial ? "partial" : "ok";
     report.fetched = result.value.jobs.length;
@@ -295,11 +306,7 @@ export async function discover() {
         continue;
       }
       if (
-        j.employmentType === "Volunteer" ||
-        (j.seniority?.length &&
-          j.seniority.every((level) =>
-            /^(?:senior|manager|director|executive)$/i.test(level),
-          ))
+        j.employmentType === "Volunteer"
       ) {
         report.excluded.role++;
         continue;
@@ -320,40 +327,27 @@ export async function discover() {
         report.excluded.invalid++;
         continue;
       }
+      const activeBoard =
+        !!j.lastVerifiedAt &&
+        ["Greenhouse", "Lever", "Ashby", "SmartRecruiters"].includes(source);
       const age = Date.now() - Date.parse(j.date);
       if (
-        !Number.isFinite(age) ||
-        age < 0 ||
-        age > JOB_WINDOW_MS ||
+        (!activeBoard &&
+          (!Number.isFinite(age) || age < 0 || age > JOB_WINDOW_MS)) ||
+        (Number.isFinite(age) && age < 0) ||
         (j.expiresAt && Date.parse(j.expiresAt) < Date.now())
       ) {
         report.excluded.age++;
         continue;
       }
-      if (
-        j.countries?.length &&
-        !j.countries.some((s) =>
-          /^(?:nigeria|africa|worldwide|anywhere|global)$/i.test(s.trim()),
-        )
-      ) {
-        report.excluded.location++;
-        continue;
-      }
-      if (j.timezones && !j.timezones.includes(1)) {
-        report.excluded.location++;
-        continue;
-      }
-      const eligible = eligibility(j.location, `${j.title} ${j.description}`);
-      if (!eligible) {
-        report.excluded.location++;
-        continue;
-      }
+      const eligible = classifyLocation(j.location, `${j.title} ${j.description}`, j.countries, j.timezones);
+      if (eligible.eligibility === 'restricted') { report.excluded.location++; continue; }
       if (source === "Himalayas" && j.timezones === undefined) {
         eligible.eligibility = "review";
         eligible.eligibilityReason =
           "Country restrictions were checked, but timezone eligibility needs confirmation on the original posting.";
       }
-      const key = `${j.company.toLowerCase().trim()}|${j.title.toLowerCase().trim()}`;
+      const key = jobIdentity(j);
       if (seen.has(key)) {
         report.excluded.duplicate++;
         continue;
@@ -362,14 +356,21 @@ export async function discover() {
       report.accepted++;
       report[eligible.eligibility]++;
       jobs.push({
-        id: createHash("sha256").update(key).digest("hex").slice(0, 24),
+        id: key,
+        applicantCountries:j.countries,
+        timezoneRestrictions:j.timezones,
+        requisitionId:j.requisitionId,
+        boardKey:j.boardKey,
+        jobType:inferJobType(j.employmentType || j.title+" "+j.description),
+        experienceLevel:inferExperience(j.seniority?.join(" ") || j.title),
         title: j.title,
         company: j.company,
         location: j.location,
         salary: j.salary,
         description: j.description.slice(0, 25000),
         url: j.url,
-        postedAt: new Date(j.date).toISOString(),
+        postedAt: Number.isFinite(age) ? new Date(j.date).toISOString() : "",
+        ...(activeBoard ? { lastVerifiedAt: j.lastVerifiedAt } : {}),
         source,
         discoveredAt: new Date().toISOString(),
         ...eligible,

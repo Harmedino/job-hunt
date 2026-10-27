@@ -404,7 +404,7 @@ test(
       (await (await cachedJobs()).json()).sources.filter(
         (s: { status: string }) => s.status === "error",
       ).length,
-      jobPlatforms.filter(p => p.access === "public").length,
+      jobPlatforms.filter(p => p.access === "public" || p.access === "employer-boards").length,
     );
     await database
       .collection("discovery_state")
@@ -419,7 +419,7 @@ test(
 );
 
 test(
-  "discovery cache removes postings older than 72 hours while preserving application history",
+  "discovery cache removes postings older than 30 days while preserving application history",
   { skip: !enabled, timeout: 30000 },
   async () => {
     const database = await db();
@@ -431,7 +431,7 @@ test(
       description: "React interfaces",
       url: "https://remotive.com/remote-jobs/old-window-fixture",
       source: "Remotive",
-      postedAt: new Date(Date.now() - 80 * 3600000).toISOString(),
+      postedAt: new Date(Date.now() - 31 * 24 * 3600000).toISOString(),
       discoveredAt: new Date().toISOString(),
       eligibility: "eligible",
       eligibilityReason: "Fixture",

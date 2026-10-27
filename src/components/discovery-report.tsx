@@ -36,6 +36,15 @@ export default function DiscoveryReport({
                     : `${s.fetched} checked · ${s.eligible} location-supported · ${s.review} need review`}
               </span>
             </summary>
+            {s.boards && (
+              <p>
+                {s.boards.verified} public company boards verified ·{" "}
+                {s.boards.failed} unavailable · {s.boards.unvisited} not visited
+                in this refresh ({s.boards.total} discovered). Company coverage
+                rotates each hour. Use “Active public boards” to include older
+                or undated active listings.
+              </p>
+            )}
             {s.status !== "error" && s.status !== "not_configured" && (
               <p>
                 {s.excluded.role} outside your roles · {s.excluded.remote}{" "}

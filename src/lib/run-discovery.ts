@@ -1,4 +1,8 @@
-import { JOB_WINDOW_MS, recentPosting } from "./job-freshness";
+import {
+  JOB_WINDOW_MS,
+  recentPosting,
+  activeBoardPosting,
+} from "./job-freshness";
 import { db } from "./db";
 import { discover } from "./discovery";
 import { match, relevant, fullyRemote } from "./matching";
@@ -39,6 +43,7 @@ export async function runDiscovery(): Promise<
             filter: { id: job.id },
             update: {
               $set: { ...job, lastSeenAt: result.checkedAt },
+              $unset: { closedAt: "" },
               $setOnInsert: { firstSeenAt: result.checkedAt },
             },
             upsert: true,
@@ -74,7 +79,23 @@ export async function runDiscovery(): Promise<
     await database.collection("jobs").deleteMany({
       $or: [
         {
-          postedAt: { $lt: new Date(Date.now() - JOB_WINDOW_MS).toISOString() },
+          $and: [
+            {
+              postedAt: {
+                $lt: new Date(Date.now() - JOB_WINDOW_MS).toISOString(),
+              },
+            },
+            {
+              $or: [
+                { lastVerifiedAt: { $exists: false } },
+                {
+                  lastVerifiedAt: {
+                    $lt: new Date(Date.now() - 24 * 3600000).toISOString(),
+                  },
+                },
+              ],
+            },
+          ],
         },
         { expiresAt: { $lt: new Date().toISOString() } },
       ],
@@ -91,7 +112,7 @@ export async function runDiscovery(): Promise<
       .updateOne({ key: "latest" }, { $set: summary }, { upsert: true });
     const cached = await database
       .collection("jobs")
-      .find({})
+      .find({closedAt:{$exists:false}})
       .sort({ postedAt: -1 })
       .limit(500)
       .toArray();
@@ -100,7 +121,9 @@ export async function runDiscovery(): Promise<
       jobs: cached
         .filter(
           (j) =>
-            recentPosting(j.postedAt) &&
+            (recentPosting(j.postedAt, Date.now(), 30) ||
+              (activeBoardPosting(j as unknown as Job) || (j.source?.startsWith("Verified lead") && Date.now()-Date.parse(j.lastVerifiedAt || "")<86400000))) &&
+            (!j.expiresAt || Date.parse(j.expiresAt) >= Date.now()) &&
             relevant(j.title, j.description) &&
             fullyRemote(j.title, j.location, j.description),
         )

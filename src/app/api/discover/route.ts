@@ -30,13 +30,30 @@ export async function GET() {
     const jobs = await database
       .collection("jobs")
       .find({
-        postedAt: {
-          $gte: new Date(Date.now() - JOB_WINDOW_MS).toISOString(),
-          $lte: new Date().toISOString(),
-        },
-        $or: [
-          { expiresAt: { $exists: false } },
-          { expiresAt: { $gte: new Date().toISOString() } },
+        closedAt: { $exists: false },
+        $and: [
+          {
+            $or: [
+              {
+                postedAt: {
+                  $gte: new Date(Date.now() - JOB_WINDOW_MS).toISOString(),
+                  $lte: new Date().toISOString(),
+                },
+              },
+              {
+                lastVerifiedAt: {
+                  $gte: new Date(Date.now() - 24 * 3600000).toISOString(),
+                },
+                source: { $regex: "^(Greenhouse|Lever|Ashby|SmartRecruiters|Verified lead)" },
+              },
+            ],
+          },
+          {
+            $or: [
+              { expiresAt: { $exists: false } },
+              { expiresAt: { $gte: new Date().toISOString() } },
+            ],
+          },
         ],
       })
       .sort({ postedAt: -1 })

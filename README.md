@@ -146,3 +146,5 @@ Read [module setup and limitations](docs/modules-setup.md) for provider configur
 ## Expanded job platforms
 
 Job Finder includes 33 platform entries and 22 automatic search connectors: 11 public API/feed sources, seven optional credential-based providers, and four configurable public employer-board networks. Direct-browsing sites and unconfigured sources are labeled and excluded from the completed-search count. See [platform setup and provider references](docs/job-platforms.md). Gemini requests now retry transient server failures once within the original deadline and show HTTP-specific error guidance.
+
+Public employer boards now support an automatic, cited company registry and optional custom board tokens. See [public job board configuration and verification](docs/public-job-boards.md).

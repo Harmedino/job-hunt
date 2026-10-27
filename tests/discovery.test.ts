@@ -97,7 +97,7 @@ function fixtureFetch(): typeof fetch {
     assert.equal(params.get("country"), "NG");
     assert.equal(params.get("timezone"), "1");
     assert.equal(params.get("sort"), "recent");
-    assert.equal(params.get("seniority"), "Entry-level,Mid-level");
+    assert.equal(params.has("seniority"), false);
     if (params.get("q") !== "frontend" || params.get("page") !== "1")
       return Response.json({ jobs: [] });
     const base = {
@@ -147,10 +147,10 @@ test("real adapter shapes preserve sources, applicant restrictions, publication 
   globalThis.fetch = fixtureFetch();
   const result = await discover();
   assert.equal(result.successfulSources.length, 5);
-  assert.equal(result.jobs.length, 6);
+  assert.equal(result.jobs.length, 8);
   assert.equal(
     result.jobs.filter((j) => j.eligibility === "eligible").length,
-    4,
+    6,
   );
   assert.equal(
     result.jobs.find((j) => j.company === "Timezone Unknown Fixture")
@@ -163,7 +163,7 @@ test("real adapter shapes preserve sources, applicant restrictions, publication 
   );
   const remotive = result.sources.find((s) => s.source === "Remotive")!;
   assert.deepEqual(remotive.excluded, {
-    role: 1,
+    role: 0,
     remote: 1,
     invalid: 0,
     age: 0,
@@ -172,7 +172,7 @@ test("real adapter shapes preserve sources, applicant restrictions, publication 
   });
   const himalayas = result.sources.find((s) => s.source === "Himalayas")!;
   assert.equal(himalayas.excluded.location, 3);
-  assert.equal(himalayas.excluded.role, 2);
+  assert.equal(himalayas.excluded.role, 1);
   assert.equal(himalayas.excluded.age, 1);
   assert.equal(himalayas.status, "partial");
 });
@@ -189,7 +189,7 @@ test("an unavailable source is distinct from a successful search with no matches
   );
   assert.equal(
     result.sources.filter((s) => s.status === "error").length,
-    jobPlatforms.filter((p) => p.access === "public").length,
+    jobPlatforms.filter((p) => p.access === "public" || p.access === "employer-boards").length,
   );
   assert.doesNotMatch(JSON.stringify(result), /private upstream/);
 });
@@ -198,7 +198,7 @@ test("MongoDB failure does not discard real live search results", async () => {
   globalThis.fetch = fixtureFetch();
   const result = await runDiscovery();
   assert.equal(result.persisted, false);
-  assert.equal(result.jobs.length, 6);
+  assert.equal(result.jobs.length, 8);
   assert.match(result.storageWarning!, /could not be saved/);
 });
 
@@ -250,11 +250,11 @@ test("search follows short pages, adds role variants, bounds concurrency and kee
   );
 });
 
-test("only real publication dates within 72 hours qualify; re-seeing a job does not make it new", async () => {
+test("only real publication dates within 30 days qualify; re-seeing a job does not make it new", async () => {
   globalThis.fetch = async (input) =>
     String(input).includes("remotive.com")
       ? Response.json({
-          jobs: [2, 71, 73, 120, -2].map((hours) => ({
+          jobs: [2, 71, 73, 120, 721, -2].map((hours) => ({
             title: "React Developer",
             company_name: `Age ${hours} Fixture`,
             candidate_required_location: "Worldwide",
@@ -269,10 +269,10 @@ test("only real publication dates within 72 hours qualify; re-seeing a job does 
   const result = await discover();
   assert.deepEqual(
     result.jobs.map((job) => job.company),
-    ["Age 2 Fixture", "Age 71 Fixture"],
+    ["Age 2 Fixture", "Age 71 Fixture", "Age 73 Fixture", "Age 120 Fixture"],
   );
   assert.equal(
     result.sources.find((source) => source.source === "Remotive")?.excluded.age,
-    3,
+    2,
   );
 });
