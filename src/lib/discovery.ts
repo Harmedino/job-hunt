@@ -1,3 +1,5 @@
+import {securityInternshipQueries} from "./career-policy";
+import {groupVacancies} from "./vacancy-groups";
 import { JOB_WINDOW_MS } from "./job-freshness";
 import { jobIdentity } from "./job-identity";
 import { classifyLocation, inferExperience, inferJobType } from "./job-intelligence";
@@ -153,11 +155,9 @@ const adapters: JobAdapter[] = [
         "Next.js",
         "JavaScript",
         "TypeScript",
-        "cybersecurity",
-        "SOC analyst",
-        "security operations",
-        "security internship",
+        ...securityInternshipQueries,
       ];
+      const security=queries.filter(q=>securityInternshipQueries.includes(q));const development=queries.filter(q=>!securityInternshipQueries.includes(q));queries.splice(0,queries.length,...Array.from({length:Math.max(security.length,development.length)},(_,i)=>[development[i],security[i]]).flat().filter((q):q is string=>!!q));
       const signal = AbortSignal.timeout(30000);
       const pages: Record<string, unknown>[][] = [];
       let successful = 0;
@@ -357,7 +357,6 @@ export async function discover() {
       const key = jobIdentity(j);
       if (seen.has(key)) {
         report.excluded.duplicate++;
-        continue;
       }
       seen.add(key);
       report.accepted++;
@@ -390,7 +389,7 @@ export async function discover() {
   return {
     successfulSources,
     sources: reports,
-    jobs: jobs.sort((a, b) => b.postedAt.localeCompare(a.postedAt)),
+    jobs: groupVacancies(jobs).sort((a, b) => b.postedAt.localeCompare(a.postedAt)),
     failures,
     checkedAt: new Date().toISOString(),
   };

@@ -123,7 +123,7 @@ test("matching explains component scores and separates preferred requirements wi
     profile,
   );
   assert.equal(j.scoreBreakdown?.location, 5);
-  assert.equal(j.matchReasons?.length, 5);
+  for(const component of ["role relevance","skills:","experience:","location confidence","posting freshness","Career preference:","Salary preference:"])assert.ok(j.matchReasons?.some(reason=>reason.includes(component)),component);
   assert.doesNotMatch(j.matchReasons!.join(" "), /probability|guaranteed/i);
 });
 

@@ -4,6 +4,24 @@ export type Job = {
   company: string;
   location: string;
   salary: string;
+  salaryDetails?:{min?:number;max?:number;currency:string;period:'month'|'year'|'week'|'hour';hoursPerWeek?:number};
+  salaryAssessment?:import('./job-salary').SalaryAssessment;
+  salaryPolicy?:'allowed'|'review'|'excluded';
+  salaryPolicyReason?:string;
+  careerPath?:import('./career-preferences').CareerPath;
+  careerAllowed?:boolean;
+  careerReason?:string;
+  developmentTrack?:'frontend'|'backend'|'fullstack'|'software';
+  isInternship?:boolean;
+  compensation?:'paid'|'unpaid'|'unknown';
+  minimumYears?:number;
+  linkEvidence?:string;
+  rankingFactors?:import('./career-preferences').RankingWeights;
+  sources?:import('./vacancy-groups').JobSource[];
+  aliasIds?:string[];
+  canonicalKey?:string;
+  isCurrentDiscovery?:boolean;
+  possibleDuplicateIds?:string[];
   description: string;
   url: string;
   postedAt: string;
@@ -46,6 +64,8 @@ export type Profile = {
   roles: string;
   preferences: string;
   cvText: string;
+  career?:import('./career-preferences').CareerPreferences;
+  jobSearchDefaults?:Partial<Record<'development'|'cybersecurity',import('./job-filter-state').JobFilters>>;
 };
 export const emptyProfile: Profile = {
   name: "",
@@ -81,6 +101,8 @@ export type Application = {
   createdAt: string;
   updatedAt: string;
   submittedAt?: string;
+  saved?:boolean;
+  unsavedAt?:string;
   applicationDate?:string;
   followUpDate?:string;
   notes?:string;

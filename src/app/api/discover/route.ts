@@ -1,3 +1,4 @@
+import {groupVacancies} from "@/lib/vacancy-groups";
 import { JOB_WINDOW_MS, DISCOVERY_REFRESH_MS } from "@/lib/job-freshness";
 import { runDiscovery } from "@/lib/run-discovery";
 import { db, errorResponse } from "@/lib/db";
@@ -71,13 +72,13 @@ export async function GET() {
           (latest.successfulSources?.length
             ? DISCOVERY_REFRESH_MS
             : 15 * 60000),
-      jobs: jobs
+      jobs: groupVacancies(jobs
         .filter(
           (j) =>
             relevant(j.title, j.description) &&
             fullyRemote(j.title, j.location, j.description),
         )
-        .map((j) => match(j as unknown as import("@/lib/types").Job, profile)),
+        .map((j) => match(j as unknown as import("@/lib/types").Job, profile))),
       persisted: true,
     });
   } catch (error) {

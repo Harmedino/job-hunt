@@ -218,7 +218,7 @@ test("search follows short pages, adds role variants, bounds concurrency and kee
     peak = Math.max(peak, active);
     await new Promise((resolve) => setTimeout(resolve, 2));
     active--;
-    if (q !== "frontend" && q !== "security operations")
+    if (q !== "frontend" && q !== "security operations intern")
       return Response.json({ jobs: [] });
     if (page === 3) return new Response("rate limited", { status: 429 });
     return Response.json({
@@ -228,7 +228,7 @@ test("search follows short pages, adds role variants, bounds concurrency and kee
           title:
             q === "frontend"
               ? "Frontend Developer"
-              : "Security Operations Analyst",
+              : "Security Operations Intern",
           companyName: `Page ${page} ${q} Fixture`,
           description: "Fully remote React or security operations work.",
           locationRestrictions: [],
@@ -241,8 +241,8 @@ test("search follows short pages, adds role variants, bounds concurrency and kee
     });
   };
   const result = await discover();
-  assert.equal(queries.size, 17);
-  for(const role of ["backend","full stack","Node.js","Laravel","PHP"])assert.ok(queries.has(role));
+  assert.equal(queries.size, 22);
+  for(const role of ["backend","full stack","Node.js","Laravel","PHP","SOC analyst intern","information security intern","blue team intern","network security intern","IT security intern"])assert.ok(queries.has(role));
   assert.ok(peak <= 3);
   assert.equal(result.jobs.filter((j) => j.source === "Himalayas").length, 4);
   assert.equal(

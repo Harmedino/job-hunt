@@ -1,0 +1,19 @@
+import type {Job,Profile} from './types';
+import {assessCareer,profileForCareer} from './career-policy';
+import {careerPreferences,type RankingWeights} from './career-preferences';
+import {assessSalary} from './job-salary';
+export function evaluateJobPreferences(job:Job,profile:Profile,minimumNgn=0,now=Date.now()):Job {
+ const career=assessCareer(job,profile),prefs=careerPreferences(profile),juniorFrontend=career.careerPath==='development'&&career.developmentTrack==='frontend'&&['Junior','Entry-level','Internship'].includes(career.assessedLevel||'');
+ const salary=assessSalary(job,profile,Math.max(minimumNgn,juniorFrontend?prefs.frontendMinimumNgn:0),now);
+ let salaryPolicy:'allowed'|'review'|'excluded'='allowed',salaryPolicyReason='';
+ if(juniorFrontend||minimumNgn>0){if(salary.status==='below'){salaryPolicy='excluded';salaryPolicyReason='Confirmed advertised pay is below your minimum.';}else if(salary.status!=='meets'){salaryPolicy='review';salaryPolicyReason='Salary needs verification before this job can meet your minimum.';}}
+ if(career.careerPath==='development'&&career.developmentTrack==='backend'&&career.isInternship&&career.compensation!=='paid'){salaryPolicy=career.compensation==='unpaid'?'excluded':'review';salaryPolicyReason=career.compensation==='unpaid'?'Unpaid backend internships are excluded.':'Backend internships need explicit paid-reward evidence.';}
+ let linkConfidence=0,linkReason='Application URL or employer needs verification.';
+ try{const url=new URL(job.url);if(url.protocol==='https:'&&!url.username&&!url.password&&job.company?.trim()){linkConfidence=/^(?:job-boards|boards)\.greenhouse\.io$|^jobs\.(?:eu\.)?lever\.co$|^jobs\.ashbyhq\.com$|^(?:jobs|careers)\.smartrecruiters\.com$/.test(url.hostname)?1:0.6;linkReason=linkConfidence===1?'Original public ATS posting; confirm the employer and vacancy.':'Publisher/application link exists; verify employer identity and payment terms.';}}catch{}
+ const weights=prefs.rankingWeights,breakdown=job.scoreBreakdown;
+ const components:RankingWeights={role:career.careerAllowed?1:0,skills:breakdown?breakdown.skills/35:(job.matchedSkills?.length?Math.min(1,job.matchedSkills.length/5):0),experience:career.assessedLevel==='Mid-level'?1:career.assessedLevel==='Junior'||career.assessedLevel==='Internship'?0.9:0.4,salary:salary.ngnMin===undefined||!salary.conversionCurrent?(career.compensation==='paid'?0.4:0):Math.min(1,salary.ngnMin/Math.max(prefs.frontendMinimumNgn,minimumNgn,1)),location:job.eligibility==='eligible'?1:job.eligibility==='review'?0.3:0,freshness:breakdown?breakdown.freshness/10:job.postedAt&&now-Date.parse(job.postedAt)<=86400000?1:job.postedAt?0.5:0,credibility:linkConfidence};
+ const total=Object.values(weights).reduce((a,b)=>a+b,0),weighted=Math.round(Object.entries(weights).reduce((sum,[key,weight])=>sum+components[key as keyof RankingWeights]*weight,0)/total*100);
+ const evidence=profileForCareer(profile,career.careerPath),hasEvidence=[evidence.skills,evidence.experience,evidence.projects].some(value=>value?.trim());
+ const score= !hasEvidence||!career.careerAllowed||salaryPolicy==='excluded'||job.eligibility==='restricted'?0:Math.min(job.stackFit==='incompatible'?20:100,salaryPolicy==='review'?59:100,breakdown?weighted:job.score||0);
+ return {...job,...career,experienceLevel:career.assessedLevel,seniorityMismatch:!career.careerAllowed&&/level|senior|advanced|experience|responsibilit/i.test(career.careerReason),salaryAssessment:salary,salaryPolicy,salaryPolicyReason,linkEvidence:linkReason,rankingFactors:components,score,matchReasons:[...(job.matchReasons||[]).filter(reason=>!reason.startsWith('Career preference:')&&!reason.startsWith('Salary preference:')&&!reason.startsWith('Application evidence:')),`Career preference: ${career.careerReason}`,`Salary preference: ${salaryPolicyReason||salary.reason}`,`Application evidence: ${linkReason}`]};
+}

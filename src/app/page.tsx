@@ -1,10 +1,17 @@
 "use client";
 import Link from "next/link";
 import SavedJobSearches from "@/components/saved-job-searches";
+import CareerPreferencesFields from "@/components/career-preferences";
+import JobSalary from "@/components/job-salary";
+import {careerPreferences} from "@/lib/career-preferences";
+import {assessCareer,profileForCareer} from "@/lib/career-policy";
+import {evaluateJobPreferences} from "@/lib/job-ranking";
+import {minimumInNgn} from "@/lib/job-salary";
+import {groupVacancies,matchingApplication,sameVacancy,applicationIsHandled,applicationWasApplied} from "@/lib/vacancy-groups";
 import {plainText} from "@/lib/job-text";
 import {applicationStatusLabel} from "@/lib/application-updates";
-import {matchesRole,sortJobResults,matchesKeywords,validateJobFilters,type JobFilters} from "@/lib/job-filter-state";
-import { jobTypes, experienceLevels, eligibilityLabels, jobAvailable, assessStackFit, inferExperience } from "@/lib/job-intelligence";
+import {defaultJobFilters,matchesQuick,matchesRole,sortJobResults,matchesKeywords,validateJobFilters,type JobFilters} from "@/lib/job-filter-state";
+import { jobTypes, experienceLevels, eligibilityLabels, jobAvailable, assessStackFit } from "@/lib/job-intelligence";
 import BountyWorkspace from "@/components/modules/bounty-workspace";
 import YoutubeWorkspace from "@/components/modules/youtube-workspace";
 import WorkspaceOverview from "@/components/modules/workspace-overview";
@@ -104,6 +111,14 @@ export default function Home() {
   const [busy, setBusy] = useState("");
   const [message, setMessage] = useState("");
   const [query, setQuery] = useState("");
+  const [career,setCareer]=useState<'development'|'cybersecurity'>('development');
+  const [showHandled,setShowHandled]=useState(false);
+  const [minimumSalary,setMinimumSalary]=useState(0);
+  const [salaryCurrency,setSalaryCurrency]=useState('NGN');
+  const [quick,setQuick]=useState('all');
+  const [pendingSaved,setPendingSaved]=useState<Job[]>([]);
+  const restoredFromBrowser=useRef(false);
+  const pathFilters=useRef<Partial<Record<'development'|'cybersecurity',JobFilters>>>({});
   const [category, setCategory] = useState("All opportunities");
   const [fresh, setFresh] = useState("3");
   const [jobPage, setJobPage] = useState(1);
@@ -114,10 +129,10 @@ export default function Home() {
   const [opportunityView, setOpportunityView] = useState("all");
   const [sort,setSort]=useState("best");
   const [filtersReady,setFiltersReady]=useState(false);
-  const filters=useMemo(()=>({query,category,jobType,level,fresh,review,includeOtherStacks,opportunityView,sort}),[query,category,jobType,level,fresh,review,includeOtherStacks,opportunityView,sort]);
-  const applyFilters=useCallback((input:JobFilters)=>{const f=validateJobFilters(input);setQuery(f.query);setCategory(f.category);setJobType(f.jobType);setLevel(f.level);setFresh(f.fresh);setReview(f.review);setIncludeOtherStacks(f.includeOtherStacks);setOpportunityView(f.opportunityView);setSort(f.sort);setJobPage(1);},[]);
-  useEffect(()=>{const timer=setTimeout(()=>{try{const value=localStorage.getItem("launchpad-job-filters");if(value)applyFilters(validateJobFilters(JSON.parse(value)));}catch{}setFiltersReady(true);},0);return()=>clearTimeout(timer);},[applyFilters]);
-  useEffect(()=>{if(!filtersReady)return;const timer=setTimeout(()=>{try{localStorage.setItem("launchpad-job-filters",JSON.stringify(filters));}catch{}},250);return()=>clearTimeout(timer);},[filters,filtersReady]);
+  const filters=useMemo(()=>({query,career,category,jobType,level,fresh,review,includeOtherStacks,showHandled,opportunityView,sort,minimumSalary,salaryCurrency,quick}),[query,career,category,jobType,level,fresh,review,includeOtherStacks,showHandled,opportunityView,sort,minimumSalary,salaryCurrency,quick]);
+  const applyFilters=useCallback((input:JobFilters)=>{const f=validateJobFilters(input);setQuery(f.query);setCareer(f.career);setShowHandled(f.showHandled);setMinimumSalary(f.minimumSalary);setSalaryCurrency(f.salaryCurrency);setQuick(f.quick);setCategory(f.category);setJobType(f.jobType);setLevel(f.level);setFresh(f.fresh);setReview(f.review);setIncludeOtherStacks(f.includeOtherStacks);setOpportunityView(f.opportunityView);setSort(f.sort);setJobPage(1);},[]);
+  useEffect(()=>{const timer=setTimeout(()=>{try{const value=localStorage.getItem("launchpad-job-filters");const paths=localStorage.getItem("launchpad-career-filters");if(paths){const parsed=JSON.parse(paths);for(const path of ["development","cybersecurity"] as const)if(parsed[path])pathFilters.current[path]=validateJobFilters(parsed[path]);}if(value){restoredFromBrowser.current=true;applyFilters(validateJobFilters(JSON.parse(value)));}}catch{}setFiltersReady(true);},0);return()=>clearTimeout(timer);},[applyFilters]);
+  useEffect(()=>{if(!filtersReady)return;const timer=setTimeout(()=>{try{pathFilters.current[filters.career]=filters;localStorage.setItem("launchpad-job-filters",JSON.stringify(filters));localStorage.setItem("launchpad-career-filters",JSON.stringify(pathFilters.current));}catch{}},250);return()=>clearTimeout(timer);},[filters,filtersReady]);
   const [selected, setSelected] = useState<Job>();
   const [notices, setNotices] = useState<{ id: string; title: string }[]>([]);
   const [showNotices, setShowNotices] = useState(false);
@@ -151,7 +166,7 @@ export default function Home() {
         })];
         if (h.database) {
           loads.push(
-            api<Profile>("profile").then((p) => { if (active) setProfile({ ...emptyProfile, ...p }); }),
+            api<Profile>("profile").then((p) => { if (active){setProfile({ ...emptyProfile, ...p });if(!restoredFromBrowser.current&&p.jobSearchDefaults?.development)applyFilters(p.jobSearchDefaults.development);} }),
             api<Application[]>("applications").then((a) => { if (active) setApplications(a); }),
             api<{ id: string; title: string }[]>("notifications").then((n) => { if (active) setNotices(n); }),
           );
@@ -166,7 +181,7 @@ export default function Home() {
     return () => {
       active = false;
     };
-  }, [receiveDiscovery]);
+  }, [receiveDiscovery,applyFilters]);
   useEffect(()=>{const reload=()=>{setFresh('active');setReview(true);setJobPage(1);void api<DiscoveryResponse>('discover').then(receiveDiscovery).catch(e=>setMessage(e.message));};window.addEventListener('lead-promoted',reload);return ()=>window.removeEventListener('lead-promoted',reload);},[receiveDiscovery]);
   useEffect(()=>{const timer=setInterval(()=>setNow(Date.now()),60000);return()=>clearInterval(timer);},[]);
   async function task(name: string, work: () => Promise<void>) {
@@ -196,12 +211,11 @@ export default function Home() {
     });
   }
   async function save(job: Job) {
-    await task(job.id, async () => {
-      await api("applications", "POST", { jobId: job.id });
-      await refreshApplications();
-      setMessage("Job saved to your applications.");
-    });
+    setPendingSaved(current=>[...current,job]);
+    try{await task(job.id, async () => {await api("applications", "POST", { jobId: job.id });await refreshApplications();setMessage("Job saved to Saved Jobs and Applications. It is no longer a new opportunity.");});}finally{setPendingSaved(current=>current.filter(item=>item.id!==job.id));}
   }
+  async function unsave(app:Application){await task(app.id,async()=>{await api('applications','PATCH',{id:app.id,saved:false});await refreshApplications();setMessage('Job unsaved. Its application history is preserved; it returns to new results if still active and suitable.');});}
+  function switchCareer(path:'development'|'cybersecurity'){pathFilters.current[career]=filters;applyFilters(pathFilters.current[path]||profile.jobSearchDefaults?.[path]||{...defaultJobFilters,career:path,fresh:path==='cybersecurity'?'available':'3'});}
   function openBuilder(job: Job, application?: Application) {
     setBuilderJob({ ...job, applicationId: application?.id, draftId: application?.cvDraftId });
     setSelected(undefined); setViewApp(undefined); setTab("CV Builder");
@@ -210,33 +224,35 @@ export default function Home() {
     ...applications.map((a) => ({ ...a.job, applicationId: a.id, draftId: a.cvDraftId })),
     ...jobs.filter((j) => !applications.some((a) => a.job.id === j.id)),
   ], [applications, jobs]);
-  const profileJobs=useMemo(()=>jobs.map(raw=>{const job={...raw,title:plainText(raw.title),company:plainText(raw.company),description:plainText(raw.description),source:plainText(raw.source)};const stack=assessStackFit(job.title,job.description,profile),profileLevel=inferExperience(profile.experience+' '+profile.roles),seniorMismatch=(job.experienceLevel||inferExperience(job.title))==='Senior'&&profileLevel&&profileLevel!=='Senior';return {...job,...stack,seniorityMismatch:!!seniorMismatch,score:Math.min(job.score,stack.stackFit==='incompatible'?20:100,seniorMismatch?59:100)};}),[jobs,profile]);
-  const activeJobs=profileJobs.filter(j=>jobAvailable(j,now));
-  const filtered = useMemo(
-    () =>
-      sortJobResults(profileJobs.filter(
-        (j) =>
-          matchesKeywords(j,query) &&
-          jobAvailable(j,now) && j.eligibility !== "restricted" &&
-          (includeOtherStacks || opportunityView === 'saved' || j.stackFit !== 'incompatible') &&
-          (review || j.eligibility === "eligible") &&
-          (jobType === 'all' || j.jobType === jobType) &&
-          (level === 'all' || j.experienceLevel === level) &&
-          (opportunityView === 'all' || (opportunityView === 'strong' && j.score >= 65) || (opportunityView === 'new' && recentPosting(j.postedAt,now,1)) || (opportunityView === 'eligible' && j.eligibility === 'eligible') || (opportunityView === 'review' && j.eligibility === 'review') || (opportunityView === 'saved' && applications.some(a=>a.job.id===j.id))) &&
-          matchesRole(j,category) &&
-          (fresh === "active" ? activeBoardPosting(j, now) : fresh === "available" ? (recentPosting(j.postedAt,now,30) || activeBoardPosting(j,now)) : recentPosting(j.postedAt, now, Number(fresh))),
-      ),sort),
-    [profileJobs, query, category, review, fresh, now, jobType, level, opportunityView, applications, includeOtherStacks, sort],
-  );
+  const minimumNgn=minimumInNgn(minimumSalary,salaryCurrency,profile,now);
+  const profileJobs=useMemo(()=>groupVacancies([...jobs,...applications.map(app=>app.job)]).map(raw=>{const job={...raw,title:plainText(raw.title),company:plainText(raw.company),description:plainText(raw.description),source:plainText(raw.source)},assessment=assessCareer(job,profile),stack=assessStackFit(job.title,job.description,profileForCareer(profile,assessment.careerPath));return evaluateJobPreferences({...job,...stack,isCurrentDiscovery:jobs.some(current=>sameVacancy(current,job))},profile,minimumNgn||0,now);}),[jobs,applications,profile,minimumNgn,now]);
+  const handled=(job:Job)=>matchingApplication(job,applications)||pendingSaved.some(saved=>sameVacancy(job,saved));
+  const activeJobs=profileJobs.filter(j=>j.isCurrentDiscovery&&jobAvailable(j,now));
+  const careerCandidates=activeJobs.filter(j=>j.careerAllowed&&j.careerPath===career&&j.stackFit!=='incompatible'&&j.eligibility!=='restricted'&&j.salaryPolicy!=='excluded');
+  const newCandidates=careerCandidates.filter(j=>!handled(j));
+  const filtered = sortJobResults(profileJobs.filter(j=>{
+    const app=matchingApplication(j,applications),history=opportunityView==='saved'||opportunityView==='applied',salaryReviewView=['needs_review','salary_unknown','salary_review'].includes(opportunityView)||quick==='salary_unknown';
+    if(j.careerPath!==career)return false;
+    if(!history&&(!j.isCurrentDiscovery||!jobAvailable(j,now)||j.eligibility==='restricted'||!j.careerAllowed||j.salaryPolicy==='excluded'||!showHandled&&handled(j)))return false;
+    if(!history&&(!includeOtherStacks&&j.stackFit==='incompatible'||!review&&j.eligibility!=='eligible'||!salaryReviewView&&j.salaryPolicy==='review'))return false;
+    if(!matchesKeywords(j,query)||!matchesRole(j,category)||!matchesQuick(j,quick)||jobType!=='all'&&j.jobType!==jobType||level!=='all'&&j.experienceLevel!==level)return false;
+    if(opportunityView==='saved'&&(!app||applicationWasApplied(app)))return false;
+    if(opportunityView==='applied'&&(!app||!applicationWasApplied(app)))return false;
+    if(opportunityView==='strong'&&j.score<65||opportunityView==='new'&&!recentPosting(j.postedAt,now,1)||opportunityView==='eligible'&&j.eligibility!=='eligible'||opportunityView==='review'&&j.eligibility!=='review')return false;
+    if(opportunityView==='needs_review'&&j.eligibility!=='review'&&j.salaryPolicy!=='review'&&!j.possibleDuplicateIds?.length)return false;
+    if(opportunityView==='salary_unknown'&&j.salaryAssessment?.status!=='unknown'||opportunityView==='salary_review'&&j.salaryAssessment?.status!=='needs_review')return false;
+    if(!history&&(minimumNgn===undefined||!(fresh==='active'?activeBoardPosting(j,now):fresh==='available'?recentPosting(j.postedAt,now,30)||activeBoardPosting(j,now):recentPosting(j.postedAt,now,Number(fresh)))))return false;
+    return true;
+  }),sort);
   const activeOlderCount = jobs.filter(j => activeBoardPosting(j, now) && !recentPosting(j.postedAt, now)).length;
   const totalJobPages = Math.max(1, Math.ceil(filtered.length / 24));
   const currentJobPage = Math.min(jobPage, totalJobPages);
   const visibleJobs = filtered.slice((currentJobPage - 1) * 24, currentJobPage * 24);
-  const currentOpportunities=profileJobs.filter(j=>j.stackFit !== 'incompatible' && jobAvailable(j,now) && j.eligibility !== 'restricted' && (recentPosting(j.postedAt,now,30)||activeBoardPosting(j,now)));
+  const currentOpportunities=newCandidates.filter(j=>j.salaryPolicy==='allowed'&&(recentPosting(j.postedAt,now,30)||activeBoardPosting(j,now)));
   const freshCount=currentOpportunities.filter(j=>recentPosting(j.postedAt,now,7)).length;
   const strongCount=currentOpportunities.filter(j=>j.score>=65).length;
   function showStatJobs(kind:'strong'|'fresh') {
-    setQuery('');setCategory('All opportunities');setJobType('all');setLevel('all');setReview(true);setIncludeOtherStacks(false);setJobPage(1);
+    setQuery('');setCategory('All opportunities');setJobType('all');setLevel('all');setReview(true);setIncludeOtherStacks(false);setShowHandled(false);setMinimumSalary(0);setQuick('all');setJobPage(1);
     setOpportunityView(kind==='strong'?'strong':'all');setFresh(kind==='strong'?'available':'7');
     requestAnimationFrame(()=>{const results=document.getElementById('job-results');results?.scrollIntoView({behavior:'smooth',block:'start'});results?.focus({preventScroll:true});});
   }
@@ -402,11 +418,9 @@ export default function Home() {
             <>
               <section className="stats-grid">
                 <Stat
-                  label="Location-supported jobs"
-                  value={
-                    activeJobs.filter((j) => j.eligibility === "eligible").length
-                  }
-                  hint="Worldwide employers · location checked"
+                  label="New unsaved opportunities"
+                  value={currentOpportunities.length}
+                  hint="This career · active and not yet handled"
                   icon={<BriefcaseBusiness size={19} />}
                 />
                 <Stat
@@ -430,13 +444,13 @@ export default function Home() {
                   icon={<Sparkles size={19} />}
                 />
                 <Stat
-                  label="Applications in motion"
+                  label="Saved jobs"
                   value={
                     applications.filter(
-                      (a) => !["Saved", "Rejected", "Offer"].includes(a.status),
+                      (a) => applicationIsHandled(a)&&!applicationWasApplied(a),
                     ).length
                   }
-                  hint="Your next step is waiting"
+                  hint="Saved separately · not submitted"
                   icon={<ArrowUpRight size={19} />}
                 />
               </section>
@@ -475,6 +489,9 @@ export default function Home() {
               </div>
               <p className="result-summary">{jobs.length} loaded · {activeJobs.length} active · {activeJobs.filter(j=>j.eligibility==='eligible').length} location-supported · {activeJobs.filter(j=>j.eligibility==='review').length} need location review · {filtered.length} match your filters</p>
               <details className="count-definitions"><summary>What these counts mean</summary><p>Loaded means retained discovery results. Active excludes known closed or expired vacancies. Location-supported and location-review counts cover active listings. Location-supported means explicit Nigeria, worldwide or Africa coverage. A job may be active without matching your stack or filters; unknown eligibility stays available for review. Strong matches are profile scores of at least 65/100, not hiring probabilities. Fresh means posted within seven days.</p></details>
+              <div className="career-tabs" role="group" aria-label="Career views">{(['development','cybersecurity'] as const).map(path=><button className={career===path?'primary':'secondary'} aria-pressed={career===path} key={path} onClick={()=>switchCareer(path)}>{path==='development'?'Development Jobs':'Cybersecurity Internships'} <b>{activeJobs.filter(j=>j.careerAllowed&&j.careerPath===path&&j.salaryPolicy==='allowed'&&j.eligibility!=='restricted'&&j.stackFit!=='incompatible'&&!handled(j)).length}</b></button>)}</div>
+              <p className="career-policy-note">{career==='development'?`Development up to ${careerPreferences(profile).developmentMax}; junior/intern frontend minimum ₦${careerPreferences(profile).frontendMinimumNgn.toLocaleString('en-NG')} monthly. Paid Node.js backend internships are welcome.`:`Cybersecurity: ${careerPreferences(profile).securityMax==='Internship'?'genuine internships and structured beginner placements only':careerPreferences(profile).securityMax+' maximum'}. Development employment is not treated as professional security experience.`} <button className="text-button" onClick={()=>setTab('My Profile')}>Edit career preferences</button></p>
+              <div className="opportunity-tabs" role="group" aria-label="Opportunity lists">{[['all','All New Opportunities'],['strong','Strong Matches'],['saved','Saved Jobs'],['applied','Applied Jobs'],['needs_review','Needs Review'],['salary_unknown','Salary Unknown']].map(([value,label])=><button className={opportunityView===value?'primary':'secondary'} aria-pressed={opportunityView===value} key={value} onClick={()=>{setOpportunityView(value);setJobPage(1);}}>{label}</button>)}</div>
               <div className="filter-bar">
                 <div className="search-input">
                   <Search size={17} />
@@ -497,11 +514,11 @@ export default function Home() {
                   <option value="active">Active public boards</option>
                 </select>
                 <label>Role type<select aria-label="Role type" value={category} onChange={e=>{setCategory(e.target.value);setJobPage(1);}}>{['All opportunities','Development','Frontend','Backend','Full-stack','Software engineering','Cybersecurity'].map(role=><option key={role}>{role}</option>)}</select></label>
-                <label>Sort<select aria-label="Sort jobs" value={sort} onChange={e=>{setSort(e.target.value);setJobPage(1);}}><option value="best">Best Match</option><option value="newest">Newest</option><option value="company">Company</option><option value="experience">Experience Level</option></select></label>
-                <label>Job type<select aria-label="Job type" value={jobType} onChange={e=>{setJobType(e.target.value);setJobPage(1);}}><option value="all">All job types</option>{jobTypes.map(t=><option key={t}>{t}</option>)}</select></label>
+                <label>Sort<select aria-label="Sort jobs" value={sort} onChange={e=>{setSort(e.target.value);setJobPage(1);}}><option value="best">Best Match</option><option value="newest">Newest</option><option value="salary_high">Highest Salary</option><option value="salary_low">Lowest Salary</option><option value="skills">Most Relevant Skills</option><option value="eligible">Confirmed Nigeria/Worldwide Eligibility</option><option value="company">Company</option><option value="experience">Experience Level</option></select></label>
+                <label>Minimum monthly salary<input type="number" aria-label="Minimum monthly salary" min={0} max={1e10} value={minimumSalary} onChange={e=>{setMinimumSalary(Number(e.target.value));setJobPage(1);}}/></label><label>Salary currency<select aria-label="Salary currency" value={salaryCurrency} onChange={e=>setSalaryCurrency(e.target.value)}>{[...new Set(["NGN","USD","EUR","GBP",...careerPreferences(profile).exchangeRates.map(r=>r.currency)])].map(c=><option key={c}>{c}</option>)}</select></label><label>Job type<select aria-label="Job type" value={jobType} onChange={e=>{setJobType(e.target.value);setJobPage(1);}}><option value="all">All job types</option>{jobTypes.map(t=><option key={t}>{t}</option>)}</select></label>
                 <label>Experience level<select aria-label="Experience level" value={level} onChange={e=>{setLevel(e.target.value);setJobPage(1);}}><option value="all">All levels</option>{experienceLevels.map(t=><option key={t}>{t}</option>)}</select></label>
-                <label>View<select aria-label="Opportunity view" value={opportunityView} onChange={e=>{setOpportunityView(e.target.value);setJobPage(1);}}><option value="all">All relevant jobs</option><option value="strong">Strong matches</option><option value="new">Newly posted</option><option value="eligible">Nigeria / Africa / worldwide eligible</option><option value="review">Eligibility needs checking</option><option value="saved">Saved jobs</option></select></label>
-                <label className="review-toggle"><input type="checkbox" checked={includeOtherStacks} onChange={e=>{setIncludeOtherStacks(e.target.checked);setJobPage(1);}}/>Include jobs outside my stack</label>
+                <label>View<select aria-label="Opportunity view" value={opportunityView} onChange={e=>{setOpportunityView(e.target.value);setJobPage(1);}}><option value="all">All relevant jobs</option><option value="strong">Strong matches</option><option value="new">Newly posted</option><option value="eligible">Nigeria / Africa / worldwide eligible</option><option value="review">Eligibility needs checking</option><option value="saved">Saved jobs</option><option value="applied">Applied jobs</option><option value="needs_review">Needs review</option><option value="salary_unknown">Salary Unknown</option><option value="salary_review">Salary Needs Review</option></select></label>
+                <label className="review-toggle"><input type="checkbox" checked={showHandled} onChange={e=>setShowHandled(e.target.checked)}/>Show saved/applied jobs</label><label className="review-toggle"><input type="checkbox" checked={includeOtherStacks} onChange={e=>{setIncludeOtherStacks(e.target.checked);setJobPage(1);}}/>Include jobs outside my stack</label>
                 <label className="review-toggle">
                   <input
                     type="checkbox"
@@ -511,10 +528,13 @@ export default function Home() {
                   Include location review{reviewCount ? ` (${reviewCount})` : ""}
                 </label>
               </div>
+              {minimumNgn===undefined&&<p className="notice">This minimum needs a current, explicitly configured {salaryCurrency} → NGN rate in My Profile. No conversion was assumed.</p>}
+              <div className="quick-filters" role="group" aria-label="Quick job filters">{[['all','Reset quick filter'],['junior_frontend','Junior Frontend ≥ ₦300k'],['mid_frontend','Intermediate Frontend'],['backend','Backend Junior / Mid'],['node_intern','Paid Node.js Internships'],['fullstack','Full-Stack Development'],['security_intern','Cybersecurity Internships'],['salary_unknown','Salary Unknown']].map(([value,label])=><button className="secondary" aria-pressed={quick===value} key={value} onClick={()=>{if(value==='security_intern')switchCareer('cybersecurity');else if(!['all','salary_unknown'].includes(value))switchCareer('development');setQuick(value);setCategory('All opportunities');setLevel('all');setJobType('all');setQuery('');setOpportunityView(value==='salary_unknown'?'salary_unknown':'all');setFresh('available');setJobPage(1);}}>{label}</button>)}</div>
+              <p className="result-summary">{currentOpportunities.length} new unsaved · {applications.filter(a=>applicationIsHandled(a)&&!applicationWasApplied(a)).length} saved · {applications.filter(a=>applicationWasApplied(a)).length} applied · {applications.filter(a=>a.submittedAt||a.status==='Submitted').length} confirmed submitted · {newCandidates.filter(j=>j.salaryAssessment?.status==='meets').length} meet salary requirements · {newCandidates.filter(j=>j.salaryPolicy==='review').length} need salary verification · {newCandidates.filter(j=>j.eligibility==='review').length} need location verification</p>
               <SavedJobSearches filters={filters} connected={!!health?.database} onRun={async f=>{applyFilters(f);await findJobs();}} />
               <div className="module-actions"><button className="secondary" onClick={()=>{document.getElementById("manual-intake-panel")?.setAttribute("open","");window.dispatchEvent(new CustomEvent("open-social-inbox",{detail:{platform:"Manual job"}}));document.getElementById("manual-intake-panel")?.scrollIntoView({behavior:"smooth"});}}>Add job for review</button><button className="secondary" onClick={()=>setTab('Applications')}>Application history</button><button className="secondary" onClick={()=>{document.getElementById('manual-intake-panel')?.setAttribute('open','');document.getElementById('social-inbox')?.scrollIntoView();window.dispatchEvent(new Event('open-social-inbox'));}}>Social opportunities awaiting verification</button></div>
               <div className="category-tabs">
-                {["All opportunities", "Development", "Cybersecurity"].map(
+                {["All opportunities", "Frontend", "Backend", "Full-stack"].map(
                   (c) => (
                     <button
                       key={c}
@@ -556,7 +576,7 @@ export default function Home() {
                         </span>
                         <div className="company-name">
                           {job.company}
-                          <small>{job.source}</small>
+                          <small>{[...new Set(job.sources?.map(s=>s.source)||[job.source])].join(' · ')}</small>
                         </div>
                       </div>
                       <button
@@ -593,9 +613,9 @@ export default function Home() {
                       <p className="job-excerpt">
                         {job.description.slice(0, 165)}…
                       </p>
-                      <div className="salary">
-                        {job.salary || "Salary not disclosed"}
-                      </div>
+                      <JobSalary job={job}/>
+                      {job.possibleDuplicateIds?.length?<p className="location-warning">Possible duplicate advertisement — compare the original vacancies before acting.</p>:null}
+                      {job.sources&&job.sources.length>1&&<details><summary>{job.sources.length} source advertisements grouped</summary>{job.sources.map(source=><p key={source.id+source.source}><a href={source.url} target="_blank" rel="noopener noreferrer">{source.source} · {source.location} ↗</a></p>)}</details>}
                       <div className="job-card-bottom">
                         <span
                           className={job.score >= 65 ? "match strong" : "match"}
@@ -612,7 +632,8 @@ export default function Home() {
                       </div>
                       <details className="card-match"><summary>Why this match?</summary><p>Profile similarity, not a hiring probability.</p>{job.matchReasons?.map(reason=><p key={reason}>{reason}</p>) || <p>Save your qualifications in My Profile to compare this vacancy.</p>}</details>
                       <div className="job-card-actions">
-                      <button className="secondary" aria-label={`Save ${job.title}`} disabled={!!busy||!health?.database} onClick={()=>save(job)}><Bookmark size={15}/>{applications.some(a=>a.job.id===job.id)?'Saved':'Save Job'}</button>
+                      <button className="secondary" aria-label={`Save ${job.title}`} disabled={!!busy||!health?.database} onClick={()=>save(job)}><Bookmark size={15}/>{matchingApplication(job,applications)?'Saved':'Save Job'}</button>
+                      {matchingApplication(job,applications)&&!applicationWasApplied(matchingApplication(job,applications)!)&&<button className="secondary" disabled={!!busy} onClick={()=>unsave(matchingApplication(job,applications)!)}>Unsave</button>}
                       <button
                         className="secondary"
                         onClick={() => setSelected(job)}
@@ -763,6 +784,7 @@ export default function Home() {
                     />
                   </label>
                 ))}
+                <CareerPreferencesFields profile={profile} onChange={setProfile} filters={filters}/>
                 <button
                   className="primary"
                   disabled={!!busy || !health?.database}
@@ -910,7 +932,8 @@ export default function Home() {
                           ))}
                         </select>
                       </div>
-                      <div className="application-actions">
+                      <p>{app.saved===false&&!applicationWasApplied(app)?'Unsaved · work history retained':applicationWasApplied(app)?'Applied job · preserved history':'Saved opportunity · not submitted'}</p>
+                      <div className="application-actions">{!applicationWasApplied(app)&&<button className="secondary" disabled={!!busy} onClick={()=>app.saved===false?save(app.job):unsave(app)}>{app.saved===false?'Save again':'Unsave job'}</button>}
                         <a
                           className="secondary"
                           href={app.job.url}
@@ -1031,7 +1054,7 @@ export default function Home() {
               <ShieldCheck size={17} />
               {selected.eligibilityReason}
             </div>
-            <p><b>{selected.salary || "Salary not disclosed"}</b></p>
+            <JobSalary job={selected}/><p>{selected.careerReason}</p>{selected.sources&&selected.sources.length>1&&<details><summary>All source advertisements</summary>{selected.sources.map(source=><p key={source.id+source.source}><a href={source.url} target="_blank" rel="noopener noreferrer">{source.source} · {source.location} ↗</a></p>)}</details>}
               <details><summary>Why this job matches</summary><p>Match scores compare profile evidence with the posting; they are not hiring probabilities.</p>{selected.matchReasons?.map(reason=><p key={reason}>{reason}</p>)}</details>
             <h3>Requirements & role description</h3>
             <p className="description">{selected.description}</p>

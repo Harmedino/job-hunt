@@ -1,3 +1,4 @@
+import {groupVacancies,vacancyGroupKey} from "./vacancy-groups";
 import {
   JOB_WINDOW_MS,
   recentPosting,
@@ -26,12 +27,12 @@ export async function runDiscovery(): Promise<
     for (const source of result.sources
       .filter((s) => s.status === "ok")
       .map((s) => s.source))
-      await database.collection("jobs").deleteMany({
+      await database.collection("jobs").updateMany({
         source,
         id: {
-          $nin: result.jobs.filter((j) => j.source === source).map((j) => j.id),
+          $nin: result.jobs.filter((j) => j.source === source).flatMap((j) => j.aliasIds||[j.id]),
         },
-      });
+      },{$set:{closedAt:result.checkedAt}});
     const profile =
       (await database.collection("profile").findOne({ key: "owner" }))
         ?.profile || emptyProfile;
@@ -76,7 +77,7 @@ export async function runDiscovery(): Promise<
           { ordered: false },
         );
     }
-    await database.collection("jobs").deleteMany({
+    await database.collection("jobs").updateMany({
       $or: [
         {
           $and: [
@@ -99,7 +100,12 @@ export async function runDiscovery(): Promise<
         },
         { expiresAt: { $lt: new Date().toISOString() } },
       ],
-    });
+    },{$set:{closedAt:result.checkedAt}});
+    // Additive grouping metadata preserves original jobs and application snapshots.
+    const retained=await database.collection('jobs').find({},{projection:{_id:0}}).limit(5000).toArray();
+    const groups=groupVacancies(retained as unknown as Job[]);
+    await database.collection('vacancy_groups').createIndex({key:1},{unique:true});
+    if(groups.length){await database.collection('vacancy_groups').bulkWrite(groups.map(group=>({updateOne:{filter:{key:vacancyGroupKey(group)},update:{$set:{updatedAt:result.checkedAt},$setOnInsert:{primaryId:group.id,createdAt:result.checkedAt},$addToSet:{aliases:{$each:group.aliasIds||[group.id]}}},upsert:true}})),{ordered:false});await database.collection('jobs').bulkWrite(groups.map(group=>({updateMany:{filter:{id:{$in:group.aliasIds||[group.id]}},update:{$set:{canonicalKey:vacancyGroupKey(group),sources:group.sources,aliasIds:group.aliasIds}}}})),{ordered:false});}
     const summary = {
       revision: DISCOVERY_REVISION,
       checkedAt: result.checkedAt,
@@ -118,7 +124,7 @@ export async function runDiscovery(): Promise<
       .toArray();
     return {
       ...result,
-      jobs: cached
+      jobs: groupVacancies(cached
         .filter(
           (j) =>
             (recentPosting(j.postedAt, Date.now(), 30) ||
@@ -127,7 +133,7 @@ export async function runDiscovery(): Promise<
             relevant(j.title, j.description) &&
             fullyRemote(j.title, j.location, j.description),
         )
-        .map((j) => match(j as unknown as Job, profile)),
+        .map((j) => match(j as unknown as Job, profile))),
       persisted: true,
     };
   } catch (error) {

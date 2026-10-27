@@ -1,3 +1,4 @@
+import {careerPath} from "./career-policy";
 import { classifyLocation, explainMatch } from "./job-intelligence";
 import type { Job, Profile } from "./types";
 export {plainText} from "./job-text";
@@ -6,7 +7,7 @@ export function eligibility(location:string,description:string) {
  return result.eligibility === 'restricted' ? null : result;
 }
 export function relevant(title:string,description='') {
- return /front[ -]?end|back[ -]?end|full[ -]?stack|software (?:engineer|developer)|web developer|react|angular|next\.?js|node\.?js|express|laravel|php|javascript|typescript|cyber.?security|soc (?:analyst|intern)|security (?:analyst|operations|intern)/i.test(title+' '+(/^(?:software|web|ui) (?:engineer|developer)$/i.test(title)?description:'')) &&
+ return (careerPath(title,description)==='cybersecurity' || /front[ -]?end|back[ -]?end|full[ -]?stack|software (?:engineer|developer)|web developer|react|angular|next\.?js|node\.?js|express|laravel|php|javascript|typescript|cyber.?security|soc (?:analyst|intern)|security (?:analyst|operations|intern)/i.test(title+' '+(/^(?:software|web|ui) (?:engineer|developer)$/i.test(title)?description:''))) &&
  !/\b(?:sales|account executive|future position|talent (?:pool|community)|chief|ceo|cto|founder|director)\b|react native|\bmobile\b|coding tasks|\(internal\)/i.test(title);
 }
 export function match(job:Job,profile:Profile):Job { return explainMatch(job,profile); }

@@ -1,3 +1,5 @@
+import {sameVacancy,applicationWasApplied} from "@/lib/vacancy-groups";
+import type {Application,Job} from "@/lib/types";
 import { randomUUID } from "node:crypto";
 import { db, errorResponse } from "@/lib/db";
 import {applicationUpdate} from "@/lib/application-updates";
@@ -22,7 +24,7 @@ export async function POST(request: Request) {
     if (typeof jobId !== "string")
       return Response.json({ error: "Invalid job ID" }, { status: 400 });
     const database = await db();
-    const job = await database.collection("jobs").findOne({ id: jobId });
+    const job = await database.collection("jobs").findOne({ id: jobId }) || (await database.collection("applications").findOne({"job.id":jobId}))?.job;
     if (!job)
       return Response.json(
         { error: "Refresh discovery before saving this job." },
@@ -31,15 +33,14 @@ export async function POST(request: Request) {
     await database
       .collection("applications")
       .createIndex({ "job.id": 1 }, { unique: true });
-    const existing = await database
-      .collection("applications")
-      .findOne({ "job.id": jobId });
-    if (existing) return Response.json(existing);
+    const existing = (await database.collection('applications').find({}).toArray()).find(app=>sameVacancy(job as unknown as Job,app.job));
+    if(existing){await database.collection('applications').updateOne({id:existing.id},{$set:{saved:true,updatedAt:new Date().toISOString()},$unset:{unsavedAt:''}});return Response.json({...existing,saved:true});}
     const now = new Date().toISOString();
     const application = {
       id: randomUUID(),
       job,
       status: "Saved",
+      saved:true,
       createdAt: now,
       updatedAt: now,
       followUp: "",
@@ -53,13 +54,15 @@ export async function POST(request: Request) {
 export async function PATCH(request: Request) {
   try {
     let parsed;try{parsed=applicationUpdate(await request.json());}catch(e){return Response.json({error:(e as Error).message},{status:400});}
-    const {id,fields}=parsed;const status=fields.status;
+    const {id,fields,saved}=parsed;const status=fields.status;
     const update={...fields,updatedAt:new Date().toISOString()};
     const database=await db();
     const application=await database.collection('applications').findOne({id});
     if(!application)return Response.json({error:'Application not found'},{status:404});
+    if(saved===false&&applicationWasApplied(application as unknown as Application))return Response.json({error:'Applied jobs stay in application history and cannot be returned to new opportunities.'},{status:409});
     const changes:Record<string,unknown>={...update};
-    const query:Record<string,unknown>={id};
+    if(saved!==undefined){changes.saved=saved;if(!saved)changes.unsavedAt=new Date().toISOString();}
+    const query:Record<string,unknown>={id};if(saved===false){query.submittedAt={$exists:false};query.status={$nin:['Submitted','Interview','Rejected','Offer']};}
     if(status==='Submitted' && !application.submittedAt){
       query.submittedAt={$exists:false};
       changes.submittedAt=new Date().toISOString();

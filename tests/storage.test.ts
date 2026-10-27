@@ -142,13 +142,14 @@ test(
       (await saveApplication(request({ jobId: { $ne: null } }))).status,
       400,
     );
-    // Source removes its posting: stale discovery record disappears, application history remains.
+    // Source removes its posting: retain the closed record and submitted history, hide it from current discovery.
     globalThis.fetch = async (input) =>
       Response.json(
         String(input).includes("remotive") ? { jobs: [] } : { data: [] },
       );
     await discoverJobs();
-    assert.equal(await (await db()).collection("jobs").countDocuments(), 0);
+    assert.equal(await (await db()).collection("jobs").countDocuments({closedAt:{$exists:false}}), 0);
+    assert.equal(await (await db()).collection("jobs").countDocuments({closedAt:{$exists:true}}), 1);
     assert.equal(
       await (await db()).collection("applications").countDocuments(),
       1,
@@ -288,7 +289,7 @@ test(
     const leads = await (await listLeads()).json();
     assert.equal(leads.length, 1);
     assert.equal(leads[0].status, "Needs verification");
-    assert.equal(await (await db()).collection("jobs").countDocuments(), 0);
+    assert.equal(await (await db()).collection("jobs").countDocuments(), 1);
     assert.equal(
       (await addLead(request({ ...body, url: "https://example.com/fake" })))
         .status,
@@ -343,7 +344,7 @@ test(
         ).length,
         0,
       );
-      assert.equal(await (await db()).collection("jobs").countDocuments(), 0);
+      assert.equal(await (await db()).collection("jobs").countDocuments(), 1);
     } finally {
       globalThis.fetch = previousFetch;
     }
@@ -419,7 +420,7 @@ test(
 );
 
 test(
-  "discovery cache removes postings older than 30 days while preserving application history",
+  "discovery cache closes old postings without deleting job or application history",
   { skip: !enabled, timeout: 30000 },
   async () => {
     const database = await db();
@@ -455,8 +456,8 @@ test(
     const searched = await (await discoverJobs()).json();
     assert.ok(!searched.jobs.some((job: { id: string }) => job.id === old.id));
     assert.equal(
-      await database.collection("jobs").countDocuments({ id: old.id }),
-      0,
+      await database.collection("jobs").countDocuments({ id: old.id,closedAt:{$exists:true} }),
+      1,
     );
     assert.equal(
       await database

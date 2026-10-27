@@ -12,5 +12,6 @@ export function applicationUpdate(body:unknown){
  if(typeof status==='string')fields.status=status;
  for(const [key,max] of [['followUp',2000],['notes',8000],['interviewInfo',4000]] as const){if(value[key]!==undefined){if(typeof value[key]!=='string'||value[key].length>max)throw new Error(`Invalid ${key}.`);fields[key]=value[key];}}
  for(const key of ['applicationDate','followUpDate'] as const){if(value[key]!==undefined){if(!validCalendarDate(value[key]))throw new Error('Use a valid date in YYYY-MM-DD format.');fields[key]=value[key] as string;}}
- return {id:value.id,fields};
+ if(value.saved!==undefined&&typeof value.saved!=='boolean')throw new Error('Invalid saved-job preference.');
+ return {id:value.id,fields,saved:value.saved as boolean|undefined};
 }

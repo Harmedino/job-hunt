@@ -1,3 +1,6 @@
+import {careerPreferences} from "./career-preferences";
+import {assessCareer,profileForCareer} from "./career-policy";
+import {evaluateJobPreferences} from "./job-ranking";
 import {plainText} from "./job-text";
 import type { Job, Profile } from "./types";
 export const jobTypes = [
@@ -47,6 +50,7 @@ export const knownSkills = [
   "Cybersecurity",
   "HTML",
   "CSS",
+  "Tailwind CSS", "Networking", "Wireshark", "Nmap", "Information Security", "Network Security", "Blue Team", "Incident Response",
 ] as const;
 const skillPatterns = new Map<string, RegExp>();
 export function skillMention(text: string, skill: string) {
@@ -103,7 +107,8 @@ export function classifyLocation(
       if(offset!==1)return restricted('The posting requires applicants to be based in a timezone other than Nigeria (UTC+1).');
     }
   }
-  if(/\bremote\s*[-–—]\s*(?:united states|united kingdom|canada|australia|india|europe|\bus\b|\buk\b)\b/i.test(text))return restricted('The posting explicitly labels the remote work location outside Nigeria.');
+  if(/\bremote\s*[-–—]\s*(?:united states|united kingdom|canada|australia|india|europe|latin america|latam|americas|apac|asia|singapore|hong kong|\bus\b|\buk\b)\b/i.test(text))return restricted('The posting explicitly labels the remote work location outside Nigeria.');
+  if(/\b(?:must (?:reside|live|be (?:based|located)) in|(?:candidates?|applicants?) (?:from|based in|located in)|only (?:hiring|available) in|restricted to)\s+(?:the )?(?:latin america|latam|americas|apac|asia|north america)\b|\b(?:latam|latin america|americas|apac|asia)[ -]only\b/i.test(text))return restricted('The advertised applicant region excludes Nigeria.');
   const normalized = (countries || []).map((c) => c.toLowerCase().trim());
   if (timezones?.length && !timezones.includes(1))
     return restricted("The advertised timezone list excludes Nigeria (UTC+1).");
@@ -200,6 +205,9 @@ export function explainMatch(job: Job, profile: Profile): Job {
       };
   }
 
+  const originalProfile=profile;
+  const career=assessCareer(job,profile);
+  profile=profileForCareer(profile,career.careerPath);
   const skills = profile.skills
     .split(/[,\n]/)
     .map((s) => s.trim())
@@ -208,7 +216,7 @@ export function explainMatch(job: Job, profile: Profile): Job {
   const matchedSkills = profileSkills.filter((s) =>
     skillMention(`${job.title} ${job.description}`, s),
   );
-  const level = job.experienceLevel || inferExperience(job.title);
+  const level = career.assessedLevel;
   const type = job.jobType || inferJobType(`${job.title} ${job.description}`);
   const requested = knownSkills.filter((s) => skillMention(job.description, s));
   const required = extractRequirements(job.description, profile);
@@ -234,16 +242,8 @@ export function explainMatch(job: Job, profile: Profile): Job {
     : skills.length
       ? Math.min(20, matchedSkills.length * 5)
       : 0;
-  const profileLevel = inferExperience(
-    profile.experience + " " + profile.roles,
-  );
-  const experience =
-    level &&
-    new RegExp(level.replace("-", "[ -]?"), "i").test(
-      profile.experience + " " + profile.roles,
-    )
-      ? 15
-      : 0;
+  const profileLevel = career.careerPath==='cybersecurity'?careerPreferences(originalProfile).securityMax:careerPreferences(originalProfile).developmentMax;
+  const experience=career.careerAllowed?(level?15:5):0;
   const location =
     job.eligibility === "eligible" ? 15 : job.eligibility === "review" ? 5 : 0;
   const age = Date.now() - Date.parse(job.postedAt);
@@ -265,7 +265,7 @@ export function explainMatch(job: Job, profile: Profile): Job {
   const matchReasons = [
     `${role}/25 role relevance`,
     `${skillScore}/35 skills: ${matchedSkills.join(", ") || "no profile skill matches established"}`,
-    `${experience}/15 experience: ${level || "level not supplied"}${experience ? " matches your stated level" : " needs review"}`,
+    `${experience}/15 experience: ${level || "level not supplied"}${experience ? " fits your selected career level; verify required experience duration" : " needs review"}`,
     `${location}/15 location confidence: ${job.eligibilityReason}`,
     `${freshness}/10 posting freshness${!Number.isFinite(age) ? " (date unavailable)" : ""}`,
   ];
@@ -275,7 +275,7 @@ export function explainMatch(job: Job, profile: Profile): Job {
     );
   const stack=assessStackFit(job.title,job.description,profile);
   if(stack.stackFit==='incompatible')matchReasons.push(stack.stackReason+' Profile match score is capped because the primary stack differs.');
-  return {
+  return evaluateJobPreferences({
     ...job,
     ...stack,
     jobType: type,
@@ -296,7 +296,7 @@ export function explainMatch(job: Job, profile: Profile): Job {
     scoreBreakdown,
     matchReasons,
     requirements: required,
-  };
+  },originalProfile);
 }
 export type RequirementCheck = {
   text: string;

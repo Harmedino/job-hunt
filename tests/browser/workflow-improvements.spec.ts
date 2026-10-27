@@ -13,7 +13,7 @@ const jobs = Array.from({ length: 3 }, (_, i) => ({
   description:
     "Required: React and Node.js. Preferred: Docker. TypeScript APIs.",
   url: `https://example.org/jobs/${i}`,
-  salary: "",
+  salary: "NGN 400000 monthly",
   source: "Public board test fixture",
   postedAt: new Date(Date.now() - (i === 0 ? 10 : 1) * 86400000).toISOString(),
   discoveredAt: now,
@@ -75,7 +75,7 @@ test("unknown locations remain visible, and date/type/experience/view filters wo
   await page.getByLabel("Experience level").selectOption("Senior");
   await expect(
     page.getByRole("button", { name: "Senior PHP Developer", exact: true }),
-  ).toBeVisible();
+  ).not.toBeVisible();
   await expect(
     page.getByRole("button", {
       name: "Backend Node.js Developer",

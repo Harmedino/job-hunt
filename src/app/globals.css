@@ -1980,3 +1980,21 @@ footer > span {
 .job-card .job-card-bottom { border-color:var(--border); }
 .job-card .salary { font-size:14px;color:var(--muted); }
 .job-card .location-warning { font-size:13px;line-height:1.6; }
+.career-tabs,.opportunity-tabs,.quick-filters { display:flex;flex-wrap:wrap;gap:8px;margin:16px 0; }
+.career-tabs button { flex:1 1 220px;justify-content:center;font-size:15px; }
+.career-tabs b { margin-left:8px;padding:2px 8px;border-radius:6px;background:#102519; }
+.career-policy-note { line-height:1.8;color:var(--muted); }
+.quick-filters button { padding:9px 12px;font-size:13px; }
+.quick-filters button[aria-pressed=true] { outline:1px solid var(--green); }
+.career-preferences { padding-top:20px;border-top:1px solid var(--border); }
+.career-preferences details { margin:16px 0;padding:14px;border:1px solid var(--border);border-radius:8px; }
+.career-preferences summary { cursor:pointer;line-height:1.7;font-weight:600; }
+.career-preferences p,.job-salary-details p { line-height:1.7;color:var(--muted); }
+.exchange-rate-row { display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;padding:16px 0;border-bottom:1px solid var(--border); }
+.job-salary-details { padding:12px 0;font-size:13px; }
+.job-salary-details b { font-size:14px; }
+.job-salary-details summary { cursor:pointer; }
+.job-salary-details .salary-meets { color:#b0dfb9; }
+.job-salary-details .salary-review { color:#e1ce92; }
+.filter-bar input[type=number] { border:1px solid var(--border);border-radius:7px;padding:10px;width:170px;max-width:100%; }
+@media(max-width:600px){.exchange-rate-row{grid-template-columns:1fr;}.opportunity-tabs button{flex:1 1 145px;justify-content:center;}}
