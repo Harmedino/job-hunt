@@ -14,8 +14,8 @@ Job cards show the source, location eligibility, type, level, salary, posting ag
 
 1. Choose a discovered job, saved application or manual description. Existing descriptions are collapsed by default.
 2. Review required/preferred skills, profile mentions, missing evidence and exact relevant experience/projects. Mentions do not prove proficiency, years or credentials.
-3. Select AI writing or Basic Layout explicitly; edit sections beside the live preview. Empty sections collapse. Use the arrows to reorder sections; the same order is retained in saved versions, autosaves, PDF, Word and readability exports. Compare with the master, check selectable PDF text, or open the actual saved PDF layout. Revert clears unfinished edits with a newer revision so delayed autosaves cannot restore them.
-4. Save a version and application package, download either document, open the original page and track status. A manually pasted target needs its original HTTPS application link before package saving. It stays labeled as a manual, unverified job and is not inserted into discovery as a confirmed vacancy.
+3. Select AI writing or Basic Layout explicitly; edit entries and bullets beside the actual saved-PDF preview. Cover letters are optional and generated separately. Empty sections collapse. Use the arrows to reorder sections; the same order is retained in saved versions, autosaves, PDF, Word and readability exports. Compare with the master, check selectable PDF text, or open the actual saved PDF layout. Revert clears unfinished edits with a newer revision so delayed autosaves cannot restore them.
+4. Save a version and application package, download either document, open the original page and track status. A manually added or pasted target can be saved without a URL; missing links remain unknown. It stays labeled as a manual, unverified job and is not inserted into discovery as a confirmed vacancy.
 
 ## Applications
 
@@ -24,3 +24,5 @@ Track Saved → Preparing → Ready to Apply → Submitted → Interview / Rejec
 Submission requires explicit confirmation in the interface and its API request. The original submitted CV and letter are snapshotted. Generating another version or moving the status backward does not replace that package.
 
 No new environment variables, paid search keys or services are required. MongoDB adds `job_filter_searches` and private TTL-limited `resume_generation_recovery` records alongside existing data. Production still needs its existing database, password and optional server-side AI credentials.
+
+See [the CV and application upgrade guide](cv-and-application-upgrade.md) for structured records, import approval, career tracks, NYSC, keyword presets, original submission files and validation evidence.

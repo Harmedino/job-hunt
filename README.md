@@ -64,7 +64,7 @@ One connection to **Google Gemini or OpenAI** supports CV-to-profile extraction,
 
 `AI_PROVIDER` accepts `auto`, `gemini` or `openai`. Automatic selection preserves an existing OpenAI connection first, otherwise uses Gemini. An explicit provider requires its own key; failures never silently send your CV to another provider. Gemini uses `gemini-flash-latest`, the model alias in Google's current SDK quickstart; set `GEMINI_MODEL` to an available JSON-capable text model to pin it. OpenAI defaults to `gpt-4o-mini`, overridable with `OPENAI_MODEL`. A key with usable API access/quota is required for live writing. Server-side keys are sent only to fixed provider endpoints, never included in URLs or UI responses. Gemini blocked/truncated responses are rejected. Provider requests and connection checks are not cached.
 
-OpenAI requests use `store: false`; Gemini requests follow Google’s data-use terms. Provider retention policies still apply. Without a key, recognised CV sections still populate the profile and preparation uses an explicit factual template. AI rewrites are grounded in cited profile evidence and checked separately; credentials and qualifications must not be invented. Automatic submission is not enabled.
+OpenAI requests use `store: false`; Gemini requests follow Google’s data-use terms. Provider retention policies still apply. Without a key, recognised CV sections are proposed for profile review and preparation uses an explicit factual template. AI rewrites are grounded in cited profile evidence and checked separately; credentials and qualifications must not be invented. Automatic submission is not enabled.
 
 ## Social job posts
 
@@ -148,3 +148,5 @@ Read the [paid contribution workflow and verification report](docs/bounty-paid-w
 Job Finder includes 33 platform entries and 22 automatic search connectors: 11 public API/feed sources, seven optional credential-based providers, and four configurable public employer-board networks. Direct-browsing sites and unconfigured sources are labeled and excluded from the completed-search count. See [platform setup and provider references](docs/job-platforms.md). Gemini requests now retry transient server failures once within the original deadline and show HTTP-specific error guidance.
 
 Public employer boards now support an automatic, cited company registry and optional custom board tokens. See [public job board configuration and verification](docs/public-job-boards.md).
+
+The [CV and application upgrade guide](docs/cv-and-application-upgrade.md) covers manual jobs, structured career records, keyword editing, independent letters, PDF previews, immutable submitted files and 2027 tracking.
