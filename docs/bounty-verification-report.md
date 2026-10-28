@@ -1,5 +1,7 @@
 # Bounty discovery and verified-only results
 
+**Historical report — 20 October 2026.** The default and workflow described here were superseded on 28 October 2026 by the [paid contribution workflow](bounty-paid-workflow-report.md). Current discovery includes paid/potentially paid tasks by default while retaining strict funding verification.
+
 Validated 20 October 2026. The workspace defaults to **Verified Funded**, following the user's explicit preference over the attachment's broader default. Other classifications require an explicit filter change; resetting filters restores verified-only mode.
 
 ## Root causes

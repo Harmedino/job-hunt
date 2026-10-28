@@ -1,5 +1,7 @@
 # Implementation report
 
+Historical initial-module report. For the current Coding Bounties workflow, source research and validation, read the [28 October 2026 paid contribution report](bounty-paid-workflow-report.md).
+
 Implemented in the existing application on `feat/bounty-youtube-workspaces`. Both modules have separate sidebar tabs; existing tabs remain unchanged. No dependency or framework was added.
 
 ## Features
