@@ -1,3 +1,6 @@
+import {statusHistory} from "@/lib/application-history";
+import {applicationWasApplied} from "@/lib/vacancy-groups";
+import type {Application} from "@/lib/types";
 import { db, errorResponse } from "@/lib/db";
 import { AiError, rankEvidence, aiConfigured } from "@/lib/ai";
 import { facts } from "@/lib/matching";
@@ -19,7 +22,7 @@ export async function POST(request: Request) {
     if (!application)
       return Response.json({ error: "Application not found" }, { status: 404 });
     if (
-      application.submittedAt || ["Submitted", "Interview", "Rejected", "Offer"].includes(
+      applicationWasApplied(application as unknown as Application) || application.status==='Archived' || application.submittedAt || ["Submitted", "Interview", "Rejected", "Offer"].includes(
         application.status,
       )
     )
@@ -72,6 +75,7 @@ export async function POST(request: Request) {
       {
         $set: {
           status: "Ready for review",
+          statusHistory:statusHistory(application as unknown as Application,"Ready for review",new Date().toISOString()),
           cvFacts: chosen,
           coverLetter,
           profileSnapshot: profile,

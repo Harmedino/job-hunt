@@ -1,79 +1,75 @@
-import {sameVacancy,applicationWasApplied} from "@/lib/vacancy-groups";
-import type {Application,Job} from "@/lib/types";
-import { randomUUID } from "node:crypto";
+import type { Job } from "@/lib/types";
 import { db, errorResponse } from "@/lib/db";
-import {applicationUpdate} from "@/lib/application-updates";
+import {
+  applicationHeaders,
+  applicationError,
+  ApplicationInputError,
+  applicationIndexes,
+  ensureJobApplication,
+  updateApplication,
+  createManualApplication,
+} from "@/lib/application-store";
 export async function GET() {
   try {
     return Response.json(
       await (
-        await db()
+        await applicationIndexes()
       )
-        .collection("applications")
-        .find({})
+        .find({}, { projection: { _id: 0 } })
         .sort({ updatedAt: -1 })
         .toArray(),
+      { headers: applicationHeaders },
     );
   } catch (e) {
-    return errorResponse(e);
+    return applicationError(e) || errorResponse(e);
   }
 }
 export async function POST(request: Request) {
   try {
-    const { jobId } = await request.json();
-    if (typeof jobId !== "string")
-      return Response.json({ error: "Invalid job ID" }, { status: 400 });
-    const database = await db();
-    const job = await database.collection("jobs").findOne({ id: jobId }) || (await database.collection("applications").findOne({"job.id":jobId}))?.job;
-    if (!job)
-      return Response.json(
-        { error: "Refresh discovery before saving this job." },
-        { status: 400 },
+    const body = await request.json();
+    if (!body || typeof body !== "object" || Array.isArray(body))
+      throw new ApplicationInputError("Invalid application.");
+    if (body.manual === true)
+      return Response.json(await createManualApplication(body), {
+        headers: applicationHeaders,
+      });
+    if (typeof body.jobId !== "string" || body.jobId.length > 200)
+      throw new ApplicationInputError("Invalid job ID.");
+    if (
+      body.markApplied === true &&
+      (!body.applicationDate || body.submissionConfirmed !== true)
+    )
+      throw new ApplicationInputError(
+        "Confirm submission and enter the date you actually applied.",
       );
-    await database
-      .collection("applications")
-      .createIndex({ "job.id": 1 }, { unique: true });
-    const existing = (await database.collection('applications').find({}).toArray()).find(app=>sameVacancy(job as unknown as Job,app.job));
-    if(existing){await database.collection('applications').updateOne({id:existing.id},{$set:{saved:true,updatedAt:new Date().toISOString()},$unset:{unsavedAt:''}});return Response.json({...existing,saved:true});}
-    const now = new Date().toISOString();
-    const application = {
-      id: randomUUID(),
-      job,
-      status: "Saved",
-      saved:true,
-      createdAt: now,
-      updatedAt: now,
-      followUp: "",
-    };
-    await database.collection("applications").insertOne(application);
-    return Response.json(application);
+    const database = await db(),
+      job =
+        (await database.collection("jobs").findOne({ id: body.jobId })) ||
+        (
+          await database
+            .collection("applications")
+            .findOne({ "job.id": body.jobId })
+        )?.job;
+    if (!job)
+      throw new ApplicationInputError(
+        "Refresh discovery before saving this job, or record an outside application manually.",
+      );
+    const app = await ensureJobApplication(job as unknown as Job);
+    return Response.json(
+      body.markApplied
+        ? await updateApplication({ ...body, id: app.id, status: "Submitted" })
+        : app,
+      { headers: applicationHeaders },
+    );
   } catch (e) {
-    return errorResponse(e);
+    return applicationError(e) || errorResponse(e);
   }
 }
 export async function PATCH(request: Request) {
   try {
-    let parsed;try{parsed=applicationUpdate(await request.json());}catch(e){return Response.json({error:(e as Error).message},{status:400});}
-    const {id,fields,saved}=parsed;const status=fields.status;
-    const update={...fields,updatedAt:new Date().toISOString()};
-    const database=await db();
-    const application=await database.collection('applications').findOne({id});
-    if(!application)return Response.json({error:'Application not found'},{status:404});
-    if(saved===false&&applicationWasApplied(application as unknown as Application))return Response.json({error:'Applied jobs stay in application history and cannot be returned to new opportunities.'},{status:409});
-    const changes:Record<string,unknown>={...update};
-    if(saved!==undefined){changes.saved=saved;if(!saved)changes.unsavedAt=new Date().toISOString();}
-    const query:Record<string,unknown>={id};if(saved===false){query.submittedAt={$exists:false};query.status={$nin:['Submitted','Interview','Rejected','Offer']};}
-    if(status==='Submitted' && !application.submittedAt){
-      query.submittedAt={$exists:false};
-      changes.submittedAt=new Date().toISOString();
-      const cv=application.cvDraftId?await database.collection('resumes').findOne({id:application.cvDraftId},{projection:{_id:0}}):null;
-      changes.documentSnapshot={cv,coverLetter:application.coverLetter,profileSnapshot:application.profileSnapshot,cvFacts:application.cvFacts,capturedAt:changes.submittedAt};
-    }
-    const result=await database.collection('applications').updateOne(query,{$set:changes});
-    if (!result.matchedCount)
-      return Response.json({ error: "Application not found" }, { status: 404 });
-    return Response.json({ ok: true });
+    await updateApplication(await request.json());
+    return Response.json({ ok: true }, { headers: applicationHeaders });
   } catch (e) {
-    return errorResponse(e);
+    return applicationError(e) || errorResponse(e);
   }
 }

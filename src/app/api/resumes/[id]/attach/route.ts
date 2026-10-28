@@ -1,3 +1,6 @@
+import {statusHistory} from "@/lib/application-history";
+import {applicationWasApplied} from "@/lib/vacancy-groups";
+import type {Application} from "@/lib/types";
 import { db } from "@/lib/db";
 import { jobAvailable } from "@/lib/job-intelligence";
 import { loadResume, privateHeaders, resumeError } from "@/lib/resume-store";
@@ -23,7 +26,7 @@ export async function POST(
     const application = await database
       .collection("applications")
       .findOne(query);
-    if (!application)
+    if (!application || applicationWasApplied(application as unknown as Application))
       throw new ResumeInputError(
         "This application has progressed or no longer exists. Its submitted CV is preserved.",
         409,
@@ -40,6 +43,7 @@ export async function POST(
         preparationMethod: "CV builder saved version",
         coverLetter,
         status: "Ready for review",
+        statusHistory:statusHistory(application as unknown as Application,"Ready for review",new Date().toISOString()),
         updatedAt: new Date().toISOString(),
       },
     });

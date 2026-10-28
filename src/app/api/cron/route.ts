@@ -1,3 +1,4 @@
+import {syncApplicationReminders} from "@/lib/application-store";
 import { runModuleSchedule } from "@/lib/modules/workspace";
 import { runDiscovery } from "@/lib/run-discovery";
 import { errorResponse } from "@/lib/db";
@@ -9,13 +10,15 @@ export async function GET(request: Request) {
   )
     return Response.json({ error: "Unauthorized" }, { status: 401 });
   try {
-    const [jobs, modules] = await Promise.allSettled([
+    const [jobs, modules,reminders] = await Promise.allSettled([
       runDiscovery(),
       runModuleSchedule(),
+      syncApplicationReminders(),
     ]);
     if (jobs.status === "rejected") return errorResponse(jobs.reason);
     return Response.json({
       ...jobs.value,
+      applicationReminders:reminders.status==='fulfilled'?reminders.value:{error:'Application reminders unavailable.'},
       modules: modules.status === "fulfilled"
         ? modules.value
         : { error: "Module schedule failed. Check the source diagnostics." },

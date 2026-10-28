@@ -64,6 +64,7 @@ export type Profile = {
   roles: string;
   preferences: string;
   cvText: string;
+  availability?:import('./application-history').JobHuntAvailability;
   career?:import('./career-preferences').CareerPreferences;
   jobSearchDefaults?:Partial<Record<'development'|'cybersecurity',import('./job-filter-state').JobFilters>>;
 };
@@ -93,6 +94,7 @@ export const statuses = [
   "Interview",
   "Rejected",
   "Offer",
+  "Archived",
 ] as const;
 export type Application = {
   id: string;
@@ -101,6 +103,14 @@ export type Application = {
   createdAt: string;
   updatedAt: string;
   submittedAt?: string;
+  origin?: 'manual'|'discovered';
+  hasApplied?:boolean;
+  vacancyKey?:string;
+  statusHistory?:{status:string;at:string}[];
+  interviewDate?:string;
+  employerResponse?:string;
+  nextAction?:string;
+  documentSnapshot?:{cv?:import('./resume-types').ResumeDraft|null;coverLetter?:string;coverLetterUsed?:'yes'|'no'|'unknown';cvLabel?:string;profileSnapshot?:Profile;cvFacts?:string[];capturedAt:string};
   saved?:boolean;
   unsavedAt?:string;
   applicationDate?:string;

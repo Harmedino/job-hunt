@@ -13,6 +13,6 @@ export function groupVacancies(jobs:Job[]):Job[]{const groups:Job[]=[];for(const
  for(let i=0;i<groups.length;i++)for(let j=i+1;j<groups.length;j++){const a=groups[i],b=groups[j];if(employerIdentity(a.company)===employerIdentity(b.company)&&normalized(a.title)===normalized(b.title)&&!conflicting(a,b)&&!(a.requisitionId&&b.requisitionId&&a.requisitionId!==b.requisitionId)){a.possibleDuplicateIds=[...new Set([...a.possibleDuplicateIds||[],b.id])];b.possibleDuplicateIds=[...new Set([...b.possibleDuplicateIds||[],a.id])];}}
  return groups;
 }
-export function applicationWasApplied(app:Application){return !!app.submittedAt||['Submitted','Interview','Rejected','Offer'].includes(app.status);}
+export function applicationWasApplied(app:Application){return !!app.submittedAt||app.hasApplied===true||['Submitted','Interview','Rejected','Offer'].includes(app.status)||!!app.statusHistory?.some(item=>['Submitted','Interview','Rejected','Offer'].includes(item.status));}
 export function applicationIsHandled(app:Application){return app.saved!==false||applicationWasApplied(app);}
 export function matchingApplication(job:Job,applications:Application[]){return applications.find(app=>applicationIsHandled(app)&&sameVacancy(job,app.job));}

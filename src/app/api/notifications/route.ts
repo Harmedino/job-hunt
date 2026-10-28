@@ -1,6 +1,8 @@
+import {syncApplicationReminders} from "@/lib/application-store";
 import { db, errorResponse } from "@/lib/db";
 export async function GET() {
   try {
+    await syncApplicationReminders();
     return Response.json(
       await (
         await db()
