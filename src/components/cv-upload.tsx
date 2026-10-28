@@ -4,7 +4,16 @@ import { Check, Upload } from "lucide-react";
 import Link from "next/link";
 import { CV_ACCEPT, cvFileProblem } from "@/lib/cv-limits";
 import type { ProfilePatch } from "@/lib/profile-import-fields";
-export type CvImportResult = { text: string; fields?: ProfilePatch; persisted: boolean; warning?: string; aiWarning?: string; method?: string };
+export type CvImportResult = {
+  text: string;
+  fields?: ProfilePatch;
+  persisted: boolean;
+  warning?: string;
+  aiWarning?: string;
+  method?: string;
+  previewOnly?: boolean;
+  extractionWarning?: string;
+};
 export default function CvUpload({
   disabled,
   cvText,
@@ -37,9 +46,16 @@ export default function CvUpload({
     try {
       const form = new FormData();
       if (file) form.set("file", file);
-      const response = await fetch(file ? "/api/cv" : "/api/profile/import", file ? { method: "POST", body: form } : {
-        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text: cvText }),
-      });
+      const response = await fetch(
+        file ? "/api/cv" : "/api/profile/import",
+        file
+          ? { method: "POST", body: form }
+          : {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ text: cvText }),
+            },
+      );
       if (response.status === 401) {
         setNeedsLogin(true);
         throw new Error(
@@ -64,9 +80,11 @@ export default function CvUpload({
       setKind(persisted && !result.aiWarning ? "success" : "warning");
       setFeedback(
         (persisted
-          ? "CV imported and saved. Empty profile fields filled where found; review your details before tailoring."
+          ? "CV read. Review every proposed update before saving your master profile."
           : result.warning ||
-              "CV imported into this form, but not saved. Connect storage and save your profile before leaving this page.") + (result.aiWarning ? ` ${result.aiWarning}` : ""),
+            "CV read. Review the proposed changes; your master profile has not changed.") +
+          (result.extractionWarning ? ` ${result.extractionWarning}` : "") +
+          (result.aiWarning ? ` ${result.aiWarning}` : ""),
       );
       onImport(result);
     } catch (error) {
@@ -89,8 +107,9 @@ export default function CvUpload({
       </h3>
       <p id="cv-upload-help">
         Choose a text-based PDF, Word DOCX, or TXT file, up to 4 MB. You can
-        fill empty profile fields from your CV. Existing entries are kept;
-        review imported details before preparing an application.
+        compare extracted information with your existing profile. Approve,
+        reject or edit proposed updates before saving; existing records are
+        retained.
       </p>
       <div className="upload-box">
         <Upload size={25} />
@@ -118,7 +137,12 @@ export default function CvUpload({
           }}
         />
       </div>
-      <button className="secondary" type="button" disabled={busy || disabled || !cvText.trim()} onClick={() => void upload()}>
+      <button
+        className="secondary"
+        type="button"
+        disabled={busy || disabled || !cvText.trim()}
+        onClick={() => void upload()}
+      >
         {busy ? "Reading your CV…" : "Fill profile from saved CV"}
       </button>
       {fileName && (

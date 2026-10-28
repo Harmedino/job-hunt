@@ -13,6 +13,9 @@ for (const tracePath of [
   resolve(".next/server/app/api/resumes/[id]/readability/route.js.nft.json"),
   resolve(".next/server/app/api/resumes/[id]/export/route.js.nft.json"),
   resolve(".next/server/app/api/documents/[id]/route.js.nft.json"),
+  resolve(".next/server/app/api/resumes/[id]/preview/route.js.nft.json"),
+  resolve(".next/server/app/api/applications/[id]/documents/route.js.nft.json"),
+  resolve(".next/server/app/api/applications/route.js.nft.json"),
 ]) {
   const trace = JSON.parse(await readFile(tracePath, "utf8"));
   const tracedFiles = new Set(
@@ -36,6 +39,11 @@ const server = await startProduction({
 try {
   for (const path of [
     "/api/resumes",
+    "/api/manual-jobs",
+    "/api/keyword-presets",
+    "/api/profile/history",
+    "/api/resumes/test/preview?meta=1",
+    "/api/applications/test/files/test-file",
     "/api/resumes/test/pdf",
     "/api/resumes/test/export?document=letter&format=docx",
   ])
@@ -98,6 +106,25 @@ try {
   });
   assert.equal(generated.status, 200);
   const first = await generated.json();
+  assert.equal(first.coverLetter, "");
+  const previewMeta = await fetch(
+    server.url + `/api/resumes/${first.id}/preview?meta=1`,
+    { headers: { Cookie: cookie } },
+  );
+  assert.equal(previewMeta.status, 200);
+  assert.ok((await previewMeta.json()).pageCount >= 1);
+  const renderedPage = await fetch(
+    server.url + `/api/resumes/${first.id}/preview?page=1`,
+    { headers: { Cookie: cookie } },
+  );
+  assert.equal(renderedPage.status, 200);
+  assert.equal(renderedPage.headers.get("Content-Type"), "image/png");
+  assert.equal(
+    Buffer.from(await renderedPage.arrayBuffer())
+      .subarray(1, 4)
+      .toString(),
+    "PNG",
+  );
   const saved = await fetch(server.url + "/api/resumes", {
     method: "POST",
     headers,
@@ -124,12 +151,17 @@ try {
   assert.ok(
     (await PDFDocument.load(await pdf.arrayBuffer())).getPageCount() >= 1,
   );
-  const readable = await fetch(server.url + `/api/resumes/${version.id}/readability`, { headers: { Cookie: cookie } });
-  assert.equal(readable.status,200);
-  const readableResult=await readable.json();
-  assert.equal(readableResult.selectableText,true);
-  assert.match(readableResult.extractedText,/Production CV Test/);
-  assert.match(readableResult.notice,/not an ATS score/);
+  const readable = await fetch(
+    server.url + `/api/resumes/${version.id}/readability`,
+    { headers: { Cookie: cookie } },
+  );
+  assert.equal(readable.status, 200);
+  const readableResult = await readable.json();
+  assert.equal(readableResult.selectableText, true);
+  assert.equal(readableResult.wordSelectableText, true);
+  assert.equal(readableResult.readingOrder, true);
+  assert.match(readableResult.extractedText, /Production CV Test/);
+  assert.match(readableResult.notice, /not an ATS score/);
   assert.equal(version.template, "modern");
   assert.match(version.coverLetter, /edited production-test/);
   for (const document of ["cv", "letter"]) {

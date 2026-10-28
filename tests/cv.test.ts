@@ -64,3 +64,46 @@ test("CV extraction remains available without storage and never reports a false 
   assert.match(result.warning, /not saved/);
   assert.match(result.text, /React/);
 });
+
+test("UTF-16 text remains readable and DOCX validation rejects embedded code, external templates and expansion bombs", async () => {
+  const { default: JSZip } = await import("jszip");
+  const text = "Fictional CV Candidate\nReact and TypeScript";
+  assert.equal(
+    await extractCv(
+      new File(
+        [
+          Buffer.concat([
+            Buffer.from([0xff, 0xfe]),
+            Buffer.from(text, "utf16le"),
+          ]),
+        ],
+        "utf16.txt",
+      ),
+    ),
+    text,
+  );
+  for (const fixture of ["macro", "external", "expanded"]) {
+    const zip = new JSZip();
+    zip.file("[Content_Types].xml", "<Types/>");
+    zip.file(
+      "word/document.xml",
+      "<w:document><w:body>Fictional CV</w:body></w:document>",
+    );
+    if (fixture === "macro") zip.file("word/vbaProject.bin", "executable");
+    if (fixture === "external")
+      zip.file(
+        "word/_rels/document.xml.rels",
+        '<Relationships><Relationship Type="http://example.org/attachedTemplate" Target="https://example.org/template" TargetMode="External"/></Relationships>',
+      );
+    if (fixture === "expanded")
+      zip.file("word/oversized.xml", "x".repeat(11 * 1024 * 1024));
+    const bytes = await zip.generateAsync({
+      type: "nodebuffer",
+      compression: "DEFLATE",
+    });
+    await assert.rejects(
+      () => extractCv(new File([new Uint8Array(bytes)], fixture + ".docx")),
+      /invalid or protected/,
+    );
+  }
+});

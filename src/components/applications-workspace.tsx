@@ -19,6 +19,8 @@ import {
   applicationStatusLabel,
   calendarToday,
 } from "@/lib/application-updates";
+import ApplicationOriginalFiles from "./application-original-files";
+import ApplicationCustomFields from "./application-custom-fields";
 import ApplicationEntry from "./application-entry";
 async function api(path: string, method: string, body: unknown) {
   const r = await fetch("/api/" + path, {
@@ -42,6 +44,7 @@ export default function ApplicationsWorkspace({
   setViewApp,
   setTab,
   onOpenApplication,
+  onAddJob,
 }: {
   applications: Application[];
   pending: string;
@@ -54,6 +57,7 @@ export default function ApplicationsWorkspace({
   setViewApp: (app: Application) => void;
   setTab: (tab: string) => void;
   onOpenApplication: (job: Job) => void;
+  onAddJob: () => void;
 }) {
   const [stage, setStage] = useState(""),
     [query, setQuery] = useState(""),
@@ -97,16 +101,31 @@ export default function ApplicationsWorkspace({
     <section aria-label="Applications workspace">
       <div className="module-actions">
         <button
+          className="secondary"
+          disabled={!connected || !!busy}
+          onClick={onAddJob}
+        >
+          Add Job Manually
+        </button>
+        <button
           className="primary"
           disabled={!connected || !!busy}
           onClick={() => setManual(true)}
         >
           Add Application Manually
         </button>
-        <a className="secondary" href="/api/applications/export?format=csv">
+        <a
+          className="secondary"
+          download
+          href="/api/applications/export?format=csv"
+        >
           Export CSV
         </a>
-        <a className="secondary" href="/api/applications/export?format=json">
+        <a
+          className="secondary"
+          download
+          href="/api/applications/export?format=json"
+        >
           Export JSON
         </a>
       </div>
@@ -590,6 +609,17 @@ export default function ApplicationsWorkspace({
                   </a>
                 </>
               )}
+            {applicationWasApplied(selected) && (
+              <ApplicationOriginalFiles
+                application={selected}
+                onSaved={refreshApplications}
+              />
+            )}
+            <ApplicationCustomFields
+              key={selected.id}
+              application={selected}
+              onSaved={refreshApplications}
+            />
             <h3>Notes and next actions</h3>
             <p>{selected.notes || "No personal notes recorded."}</p>
             <p>{selected.nextAction || "No next action recorded."}</p>

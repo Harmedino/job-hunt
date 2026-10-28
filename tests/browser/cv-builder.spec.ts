@@ -84,7 +84,7 @@ async function open(
 }
 test("CV builder creates an editable draft, saves a separate version and downloads a PDF", async ({
   page,
-}) => {
+}, testInfo) => {
   let generated = false,
     saved = false;
   const pdf = await PDFDocument.create();
@@ -138,16 +138,25 @@ test("CV builder creates an editable draft, saves a separate version and downloa
   await builder
     .getByLabel("Professional summary", { exact: true })
     .fill("React and TypeScript skills for accessible interfaces.");
+  if (testInfo.project.name === "mobile")
+    await builder.getByRole("button", { name: "Preview", exact: true }).click();
+  await builder
+    .getByText("Editable HTML preview (approximate)", { exact: true })
+    .click();
   await expect(
     builder.getByRole("region", { name: "CV preview" }),
   ).toContainText("React and TypeScript skills for accessible interfaces.");
+  if (testInfo.project.name === "mobile")
+    await builder.getByRole("button", { name: "Editor", exact: true }).click();
   await builder.getByRole("button", { name: "Save new version" }).click();
-  await expect(builder.getByRole("status")).toContainText(
+  await expect(builder.locator(".cv-feedback[role=status]")).toContainText(
     "New CV version saved",
   );
   const downloadEvent = page.waitForEvent("download");
   await builder.getByRole("button", { name: "Download CV PDF" }).click();
-  expect((await downloadEvent).suggestedFilename()).toBe("tailored-cv.pdf");
+  expect((await downloadEvent).suggestedFilename()).toBe(
+    "CV_Builder_Test_Builder_Fixture_Frontend_Developer_CV.pdf",
+  );
   expect(generated && saved).toBe(true);
   expect(
     await page.evaluate(
@@ -197,7 +206,7 @@ test("applications open the correct job in CV builder and link an explicit saved
   await builder
     .getByRole("button", { name: "Use this CV for application" })
     .click();
-  await expect(builder.getByRole("status")).toContainText(
+  await expect(builder.locator(".cv-feedback[role=status]")).toContainText(
     "linked to the application",
   );
   expect(attached).toBe(true);
@@ -222,9 +231,18 @@ test("AI drafting shows evidence gaps and keeps provider errors actionable", asy
           json: {
             ...first,
             method: "AI-written CV · job analysis and factual checks completed",
-            aiGeneration: { provider: "Google Gemini", model: "fixture-model", verifiedAt: new Date().toISOString() },
+            aiGeneration: {
+              provider: "Google Gemini",
+              model: "fixture-model",
+              verifiedAt: new Date().toISOString(),
+            },
             analysis: {
-              priorities: [{ requirement: "Kubernetes is a desirable skill.", evidence: [] }],
+              priorities: [
+                {
+                  requirement: "Kubernetes is a desirable skill.",
+                  evidence: [],
+                },
+              ],
               selectedEvidence: [],
             },
             requirementsToReview: ["Kubernetes is a desirable skill."],
@@ -246,14 +264,24 @@ test("AI drafting shows evidence gaps and keeps provider errors actionable", asy
     builder.getByRole("heading", { name: "Requirements to check" }),
   ).toBeVisible();
   await expect(
-    builder.locator(".builder-gaps").getByText("Kubernetes is a desirable skill.", { exact: true }),
+    builder
+      .locator(".builder-gaps")
+      .getByText("Kubernetes is a desirable skill.", { exact: true }),
   ).toBeVisible();
   await expect(builder.getByLabel("Skills", { exact: true })).not.toHaveValue(
     /Kubernetes/,
   );
-  await expect(builder.locator(".builder-ai-proof")).toContainText("Written with Google Gemini");
-  await builder.getByText("How this CV addresses the job", { exact: true }).click();
-  await expect(builder.getByText("No supporting qualification established.", { exact: false })).toBeVisible();
+  await expect(builder.locator(".builder-ai-proof")).toContainText(
+    "Written with Google Gemini",
+  );
+  await builder
+    .getByText("How this CV addresses the job", { exact: true })
+    .click();
+  await expect(
+    builder.getByText("No supporting qualification established.", {
+      exact: false,
+    }),
+  ).toBeVisible();
 });
 
 test("cover letter and style edits persist before PDF and Word downloads", async ({
@@ -313,19 +341,30 @@ test("cover letter and style edits persist before PDF and Word downloads", async
       "Dear Hiring Team,\n\nMy edited letter about accessible React work.\n\nKind regards,\nCV Builder Test",
     );
   await builder.getByLabel("Document style").selectOption("modern");
+  if (testInfo.project.name === "mobile")
+    await builder.getByRole("button", { name: "Preview", exact: true }).click();
+  await builder
+    .getByText("Editable HTML preview (approximate)", { exact: true })
+    .click();
   await expect(
     builder.getByRole("region", { name: "Cover letter preview" }),
   ).toContainText("My edited letter");
+  if (testInfo.project.name === "mobile")
+    await builder.getByRole("button", { name: "Editor", exact: true }).click();
   let download = page.waitForEvent("download");
   await builder
     .getByRole("button", { name: "Download editable Word (.docx)" })
     .click();
-  expect((await download).suggestedFilename()).toBe("cover-letter.docx");
+  expect((await download).suggestedFilename()).toBe(
+    "CV_Builder_Test_Builder_Fixture_Frontend_Developer_Cover_Letter.docx",
+  );
   download = page.waitForEvent("download");
   await builder
     .getByRole("button", { name: "Download cover letter PDF" })
     .click();
-  expect((await download).suggestedFilename()).toBe("cover-letter.pdf");
+  expect((await download).suggestedFilename()).toBe(
+    "CV_Builder_Test_Builder_Fixture_Frontend_Developer_Cover_Letter.pdf",
+  );
   await builder.getByRole("button", { name: "CV", exact: true }).click();
   await expect(
     builder.getByLabel("Professional summary", { exact: true }),
@@ -334,7 +373,9 @@ test("cover letter and style edits persist before PDF and Word downloads", async
   await builder
     .getByRole("button", { name: "Download editable Word (.docx)" })
     .click();
-  expect((await download).suggestedFilename()).toBe("tailored-cv.docx");
+  expect((await download).suggestedFilename()).toBe(
+    "CV_Builder_Test_Builder_Fixture_Frontend_Developer_CV.docx",
+  );
   expect(saves).toBe(1);
   expect(exported).toEqual(["letter:docx", "letter:pdf", "cv:docx"]);
   expect(
@@ -388,13 +429,18 @@ test("old CV opens as a clean copy with project entries and named sections, then
   await open(page);
   await page.getByRole("button", { name: "CV Builder", exact: true }).click();
   const builder = page.getByRole("region", { name: "CV builder", exact: true });
-  await builder.locator(".builder-history").getByRole("button").click();
+  await builder.locator(".builder-history").getByRole("button").first().click();
   await expect(builder.getByRole("note")).toContainText(
     "removed the old catch-all section",
   );
   await expect(
     builder.getByLabel("Additional qualifications", { exact: true }),
   ).toHaveCount(0);
+  if (testInfo.project.name === "mobile")
+    await builder.getByRole("button", { name: "Preview", exact: true }).click();
+  await builder
+    .getByText("Editable HTML preview (approximate)", { exact: true })
+    .click();
   const preview = builder.getByRole("region", {
     name: "CV preview",
     exact: true,
@@ -431,6 +477,8 @@ test("old CV opens as a clean copy with project entries and named sections, then
   await expect(
     preview.getByRole("heading", { name: "Certifications", exact: true }),
   ).toHaveCount(0);
+  if (testInfo.project.name === "mobile")
+    await builder.getByRole("button", { name: "Editor", exact: true }).click();
   await builder.getByRole("button", { name: "Save new version" }).click();
   await expect(builder.getByRole("note")).toHaveCount(0);
   expect(saved).toBe(true);
@@ -475,34 +523,217 @@ test("AI is the default and a missing key cannot silently create a basic CV", as
   ).toBeEnabled();
 });
 
-test('unfinished edits autosave separately, recover explicitly, and expose master comparison and readability checks',async({page})=>{
- let copy: {content:typeof first.content;coverLetter:string;template:string;updatedAt:string}|undefined;
- await page.route('**/api/resumes/working**',r=>{if(r.request().method()==='POST'){const b=r.request().postDataJSON();copy={content:b.content,coverLetter:b.coverLetter,template:b.template,updatedAt:new Date().toISOString()};return r.fulfill({json:{ok:true}});}return r.fulfill({json:{copy}});});
- await page.route('**/api/resumes',r=>r.fulfill({json:r.request().method()==='GET'?{drafts:[first]}:first}));
- await page.route('**/api/resumes/cv-version-1',r=>r.fulfill({json:first}));
- await page.route('**/api/resumes/cv-version-1/readability',r=>r.fulfill({json:{selectableText:true,wordCount:120,warnings:[],notice:'Readability checks, not an ATS score.',extractedText:'CV Builder Test React TypeScript'}}));
- await open(page);await page.getByRole('button',{name:'CV Builder',exact:true}).click();const builder=page.getByRole('region',{name:'CV builder',exact:true});
- await builder.getByRole('button',{name:/Frontend Developer.*Builder Fixture/}).first().click();
- await builder.getByLabel('Professional summary',{exact:true}).fill('Unfinished genuine profile edit');
- await expect(builder.getByText('Unfinished edits autosaved.',{exact:false})).toBeVisible();expect(copy?.content.summary).toBe('Unfinished genuine profile edit');
- await page.reload();await page.getByRole('button',{name:'CV Builder',exact:true}).click();await builder.getByRole('button',{name:/Frontend Developer.*Builder Fixture/}).first().click();
- await builder.getByRole('button',{name:'Restore unfinished edits'}).click();await expect(builder.getByLabel('Professional summary',{exact:true})).toHaveValue('Unfinished genuine profile edit');
- await builder.getByText('Compare with master CV',{exact:true}).click();await expect(builder.getByText('Master profile',{exact:true}).first()).toBeVisible();
- await builder.getByText('Required and preferred skills',{exact:true}).click();await expect(builder).toContainText('Profile mentions: React, TypeScript');
+test("unfinished edits autosave separately, recover explicitly, and expose master comparison and readability checks", async ({
+  page,
+}) => {
+  let copy:
+    | {
+        content: typeof first.content;
+        coverLetter: string;
+        template: string;
+        updatedAt: string;
+      }
+    | undefined;
+  await page.route("**/api/resumes/working**", (r) => {
+    if (r.request().method() === "POST") {
+      const b = r.request().postDataJSON();
+      copy = {
+        content: b.content,
+        coverLetter: b.coverLetter,
+        template: b.template,
+        updatedAt: new Date().toISOString(),
+      };
+      return r.fulfill({ json: { ok: true } });
+    }
+    return r.fulfill({ json: { copy } });
+  });
+  await page.route("**/api/resumes", (r) =>
+    r.fulfill({
+      json: r.request().method() === "GET" ? { drafts: [first] } : first,
+    }),
+  );
+  await page.route("**/api/resumes/cv-version-1", (r) =>
+    r.fulfill({ json: first }),
+  );
+  await page.route("**/api/resumes/cv-version-1/readability", (r) =>
+    r.fulfill({
+      json: {
+        selectableText: true,
+        wordCount: 120,
+        warnings: [],
+        notice: "Readability checks, not an ATS score.",
+        extractedText: "CV Builder Test React TypeScript",
+      },
+    }),
+  );
+  await open(page);
+  await page.getByRole("button", { name: "CV Builder", exact: true }).click();
+  const builder = page.getByRole("region", { name: "CV builder", exact: true });
+  await builder
+    .getByRole("button", { name: /Frontend Developer.*Builder Fixture/ })
+    .first()
+    .click();
+  await builder
+    .getByLabel("Professional summary", { exact: true })
+    .fill("Unfinished genuine profile edit");
+  await expect(
+    builder.getByText("Unfinished edits autosaved.", { exact: false }),
+  ).toBeVisible();
+  expect(copy?.content.summary).toBe("Unfinished genuine profile edit");
+  await page.reload();
+  await page.getByRole("button", { name: "CV Builder", exact: true }).click();
+  await builder
+    .getByRole("button", { name: /Frontend Developer.*Builder Fixture/ })
+    .first()
+    .click();
+  await builder
+    .getByRole("button", { name: "Restore unfinished edits" })
+    .click();
+  await expect(
+    builder.getByLabel("Professional summary", { exact: true }),
+  ).toHaveValue("Unfinished genuine profile edit");
+  await builder.getByText("Compare with master CV", { exact: true }).click();
+  await expect(
+    builder.getByText("Master profile", { exact: true }).first(),
+  ).toBeVisible();
+  await builder
+    .getByText("Required and preferred skills", { exact: true })
+    .click();
+  await expect(builder).toContainText("Profile mentions: React, TypeScript");
 });
 
-test('four CV stages keep failed inputs, resume explicitly, reorder sections, revert and save an application package',async({page},testInfo)=>{
- let attempts=0,retried=false,cleared=false,packaged=false;
- const value={...first,target:{...first.target,url:job.url}};
- await page.route('**/api/resumes',r=>{if(r.request().method()==='GET')return r.fulfill({json:{drafts:[]}});const body=r.request().postDataJSON();if(body.action==='generate'){attempts++;if(attempts===1)return r.fulfill({status:503,json:{error:'Google Gemini is temporarily overloaded (HTTP 503).'}});retried=body.retry===true;return r.fulfill({json:value});}return r.fulfill({json:{...value,id:'cv-ordered-2',content:body.content,coverLetter:body.coverLetter,template:body.template,sectionOrder:body.sectionOrder,manualEdits:true}});});
- await page.route('**/api/resumes/working**',r=>{if(r.request().method()==='DELETE')cleared=true;return r.fulfill({json:r.request().method()==='GET'?{copy:null}:{ok:true}});});
- await page.route('**/api/resumes/*/package',r=>{packaged=true;return r.fulfill({json:{ok:true,applicationId:'package-fixture'}});});
- await open(page,[],true);await page.getByRole('button',{name:'CV Builder',exact:true}).click();const builder=page.getByRole('region',{name:'CV builder',exact:true});await expect(builder.getByRole('navigation',{name:'CV preparation stages'}).getByRole('button')).toHaveCount(4);
- await builder.getByLabel('Job to tailor for').selectOption(job.id);await expect(builder.getByLabel('Job description',{exact:true})).not.toBeVisible();await expect(builder.getByRole('region',{name:'Job requirements analysis'})).toContainText('React');
- await builder.getByRole('button',{name:'Build tailored CV',exact:true}).click();await expect(builder.getByRole('alert')).toContainText('503');await expect(builder.getByLabel('Target role')).toHaveValue(job.title);await expect(builder.getByLabel('Job description',{exact:true})).toHaveValue(description);await expect(builder.getByLabel('Professional summary',{exact:true})).toHaveCount(0);
- await builder.getByRole('button',{name:'Retry Generation',exact:true}).click();await expect(builder.getByLabel('Professional summary',{exact:true})).toHaveValue(first.content.summary);expect(retried).toBe(true);
- await builder.getByRole('button',{name:'Move Projects up',exact:true}).click();const headings=await builder.getByRole('region',{name:'CV preview',exact:true}).locator('section h3').allTextContents();expect(headings.indexOf('Projects')).toBeLessThan(headings.indexOf('Experience'));
- await builder.getByRole('button',{name:'Save new version',exact:true}).click();await expect(builder.getByRole('status')).toContainText('New CV version saved');await builder.getByLabel('Professional summary',{exact:true}).fill('Temporary unwanted wording');await builder.getByRole('button',{name:'Revert unsaved edits',exact:true}).click();await expect(builder.getByLabel('Professional summary',{exact:true})).toHaveValue(first.content.summary);expect(cleared).toBe(true);
- await builder.getByRole('button',{name:'Save application package',exact:true}).click();await expect(builder.getByRole('status')).toContainText('Application package saved');expect(packaged).toBe(true);await page.screenshot({path:`/tmp/launchpad-cv-${testInfo.project.name}.png`,fullPage:true});await builder.getByRole('button',{name:'Track application status',exact:true}).click();await expect(page.getByRole('heading',{name:'Every application. One place.'})).toBeVisible();
- expect(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth)).toBe(true);
+test("four CV stages keep failed inputs, resume explicitly, reorder sections, revert and save an application package", async ({
+  page,
+}, testInfo) => {
+  let attempts = 0,
+    retried = false,
+    cleared = false,
+    packaged = false;
+  const value = { ...first, target: { ...first.target, url: job.url } };
+  await page.route("**/api/resumes", (r) => {
+    if (r.request().method() === "GET")
+      return r.fulfill({ json: { drafts: [] } });
+    const body = r.request().postDataJSON();
+    if (body.action === "generate") {
+      attempts++;
+      if (attempts === 1)
+        return r.fulfill({
+          status: 503,
+          json: {
+            error: "Google Gemini is temporarily overloaded (HTTP 503).",
+          },
+        });
+      retried = body.retry === true;
+      return r.fulfill({ json: value });
+    }
+    return r.fulfill({
+      json: {
+        ...value,
+        id: "cv-ordered-2",
+        content: body.content,
+        coverLetter: body.coverLetter,
+        template: body.template,
+        sectionOrder: body.sectionOrder,
+        manualEdits: true,
+      },
+    });
+  });
+  await page.route("**/api/resumes/working**", (r) => {
+    if (r.request().method() === "DELETE") cleared = true;
+    return r.fulfill({
+      json: r.request().method() === "GET" ? { copy: null } : { ok: true },
+    });
+  });
+  await page.route("**/api/resumes/*/package", (r) => {
+    packaged = true;
+    return r.fulfill({ json: { ok: true, applicationId: "package-fixture" } });
+  });
+  await open(page, [], true);
+  await page.getByRole("button", { name: "CV Builder", exact: true }).click();
+  const builder = page.getByRole("region", { name: "CV builder", exact: true });
+  await expect(
+    builder
+      .getByRole("navigation", { name: "CV preparation stages" })
+      .getByRole("button"),
+  ).toHaveCount(4);
+  await builder.getByLabel("Job to tailor for").selectOption(job.id);
+  await expect(
+    builder.getByLabel("Job description", { exact: true }),
+  ).not.toBeVisible();
+  await expect(
+    builder.getByRole("region", { name: "Job requirements analysis" }),
+  ).toContainText("React");
+  await builder
+    .getByRole("button", { name: "Build tailored CV", exact: true })
+    .click();
+  await expect(builder.getByRole("alert")).toContainText("503");
+  await expect(builder.getByLabel("Target role")).toHaveValue(job.title);
+  await expect(
+    builder.getByLabel("Job description", { exact: true }),
+  ).toHaveValue(description);
+  await expect(
+    builder.getByLabel("Professional summary", { exact: true }),
+  ).toHaveCount(0);
+  await builder
+    .getByRole("button", { name: "Retry Generation", exact: true })
+    .click();
+  await expect(
+    builder.getByLabel("Professional summary", { exact: true }),
+  ).toHaveValue(first.content.summary);
+  expect(retried).toBe(true);
+  await builder
+    .getByRole("button", { name: "Move Projects up", exact: true })
+    .click();
+  if (testInfo.project.name === "mobile")
+    await builder.getByRole("button", { name: "Preview", exact: true }).click();
+  await builder
+    .getByText("Editable HTML preview (approximate)", { exact: true })
+    .click();
+  const headings = await builder
+    .getByRole("region", { name: "CV preview", exact: true })
+    .locator("section h3")
+    .allTextContents();
+  expect(headings.indexOf("Projects")).toBeLessThan(
+    headings.indexOf("Experience"),
+  );
+  if (testInfo.project.name === "mobile")
+    await builder.getByRole("button", { name: "Editor", exact: true }).click();
+  await builder
+    .getByRole("button", { name: "Save new version", exact: true })
+    .click();
+  await expect(builder.locator(".cv-feedback[role=status]")).toContainText(
+    "New CV version saved",
+  );
+  await builder
+    .getByLabel("Professional summary", { exact: true })
+    .fill("Temporary unwanted wording");
+  await builder
+    .getByRole("button", { name: "Revert unsaved edits", exact: true })
+    .click();
+  await expect(
+    builder.getByLabel("Professional summary", { exact: true }),
+  ).toHaveValue(first.content.summary);
+  expect(cleared).toBe(true);
+  await builder
+    .getByRole("button", { name: "Save application package", exact: true })
+    .click();
+  await expect(builder.locator(".cv-feedback[role=status]")).toContainText(
+    "Application package saved",
+  );
+  expect(packaged).toBe(true);
+  await page.screenshot({
+    path: `/tmp/launchpad-cv-${testInfo.project.name}.png`,
+    fullPage: true,
+  });
+  await builder
+    .getByRole("button", { name: "Track application status", exact: true })
+    .click();
+  await expect(
+    page.getByRole("heading", { name: "Every application. One place." }),
+  ).toBeVisible();
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= window.innerWidth,
+    ),
+  ).toBe(true);
 });

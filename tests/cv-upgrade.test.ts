@@ -349,6 +349,28 @@ test(
       assert.match(second.coverLetter, /Dear Hiring Team/);
       assert.equal(second.previousId, first.id);
       assert.equal(stages, 2);
+      const sectionResponse = await writing(
+        req({ section: "experience", useAi: false }),
+        params(second.id),
+      );
+      assert.equal(sectionResponse.status, 200);
+      const sectionVersion = await sectionResponse.json();
+      assert.equal(sectionVersion.coverLetter, second.coverLetter);
+      assert.equal(sectionVersion.content.skills, second.content.skills);
+      assert.equal(sectionVersion.content.experience, first.content.experience);
+      assert.equal(
+        (
+          await create(
+            req({
+              action: "save",
+              draftId: second.id,
+              content: second.content,
+              statementReviews: { bad: "unrecognized" },
+            }),
+          )
+        ).status,
+        400,
+      );
       const packaged = await packageCv(req({}), params(second.id));
       assert.equal(packaged.status, 200);
       const appId = (await packaged.json()).applicationId;
@@ -376,17 +398,14 @@ test(
         params(appId),
       );
       const frozenBytes = Buffer.from(await frozen.arrayBuffer());
-      await database
-        .collection("resumes")
-        .updateOne(
-          { id: second.id },
-          {
-            $set: {
-              "content.summary":
-                "Later content must not replace submitted files",
-            },
+      await database.collection("resumes").updateOne(
+        { id: second.id },
+        {
+          $set: {
+            "content.summary": "Later content must not replace submitted files",
           },
-        );
+        },
+      );
       assert.deepEqual(
         Buffer.from(
           await (

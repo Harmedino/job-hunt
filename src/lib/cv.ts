@@ -27,7 +27,13 @@ export async function extractCv(file: File) {
         throw new CvInputError(
           "This DOCX is invalid or protected. Open it in Word and save an unprotected DOCX, PDF, or TXT copy.",
         );
-      validateDocxContainer(bytes);
+      try {
+        validateDocxContainer(bytes);
+      } catch {
+        throw new CvInputError(
+          "This DOCX is invalid or protected, contains unsupported embedded content, or exceeds safe expanded limits. Save a plain DOCX, PDF or TXT copy.",
+        );
+      }
       const { extractRawText } = await import("mammoth");
       text = (await extractRawText({ buffer: bytes })).value;
     } else {
