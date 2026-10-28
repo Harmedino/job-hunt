@@ -230,7 +230,7 @@ export function formatCareerRecord(
     .filter(Boolean)
     .join(" – ");
   return [
-    heading,
+    heading ? "## " + heading : "",
     [record.employmentType, dates, record.location].filter(Boolean).join(" · "),
     record.description,
     record.technologies ? `Technologies: ${record.technologies}` : "",

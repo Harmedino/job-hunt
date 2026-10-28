@@ -57,6 +57,12 @@ function technologies(line: string) {
 }
 function entryMeta(line: string) {
   return (
+    /(?:^|\s[·|]\s)(?:19|20)\d{2}(?:[-/]\d{2})?(?:[-/]\d{2})?\s*[–—-]\s*(?:Present|(?:19|20)\d{2})\b/i.test(
+      line,
+    ) ||
+    /^(?:Full[- ]time|Part[- ]time|Contract|Permanent|Internship|Freelance|Temporary)(?:\s*[·|]|$)/i.test(
+      line,
+    ) ||
     /^(?:(?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)\s+)?(?:19|20)\d{2}(?:[-/]\d{2})?(?:[-/]\d{2})?(?:\b|\s)/i.test(
       line,
     ) ||

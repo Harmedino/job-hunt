@@ -145,3 +145,30 @@ test("PDF and Word contain clean sections, project heading styles and real edita
   assert.match(xml, /<w:numPr>/);
   assert.match(xml, /52626A/);
 });
+
+test("structured employer headings remain intact with employment types, locations and unknown dates", async () => {
+  const { emptyCareerRecord, formatCareerRecord } = await import(
+    "../src/lib/career-records"
+  );
+  for (const dates of [
+    { start: "2023-04", end: "2025-08" },
+    { start: "", end: "" },
+  ]) {
+    const record = {
+      ...emptyCareerRecord("fixture-employment"),
+      confirmed: true,
+      organization: "Fictional Studio",
+      title: "Frontend Developer",
+      employmentType: "Full-time",
+      location: "Remote",
+      responsibilities: "Built genuine React forms.",
+      ...dates,
+    };
+    const entries = resumeEntries(formatCareerRecord(record, "employment"));
+    assert.equal(entries.length, 1);
+    assert.equal(entries[0].title, "Fictional Studio — Frontend Developer");
+    assert.equal(entries[0].parts[0].kind, "meta");
+    assert.match(entries[0].parts[0].text, /Full-time.*Remote/);
+    assert.equal(entries[0].parts[1].kind, "bullet");
+  }
+});

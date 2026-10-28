@@ -140,12 +140,99 @@ export function manualJobDescription(job: Job) {
 }
 export function suggestManualJob(text: string) {
   const parsed = extractLead(text);
+  const aliases: Record<string, string> = {
+    salary: "salary",
+    compensation: "salary",
+    "salary currency": "salaryCurrency",
+    currency: "salaryCurrency",
+    "application deadline": "deadline",
+    deadline: "deadline",
+    "closing date": "deadline",
+    "required skills": "requiredSkills",
+    "mandatory skills": "requiredSkills",
+    required: "requiredSkills",
+    requirements: "requiredSkills",
+    "preferred skills": "preferredSkills",
+    preferred: "preferredSkills",
+    "nice to have": "preferredSkills",
+    technologies: "technologies",
+    "tech stack": "technologies",
+    responsibilities: "responsibilities",
+    duties: "responsibilities",
+    "additional employer requirements": "additionalRequirements",
+    "additional requirements": "additionalRequirements",
+    "work arrangement": "workArrangement",
+    "work mode": "workArrangement",
+    "employment type": "jobType",
+    "job type": "jobType",
+    "experience level": "experienceLevel",
+    seniority: "experienceLevel",
+    position: "title",
+    role: "title",
+    "job title": "title",
+    title: "title",
+    company: "company",
+    employer: "company",
+    location: "location",
+    "application url": "url",
+    apply: "url",
+    "personal notes": "personalNotes",
+  };
+  const sections: Record<string, string[]> = {};
+  let active = "";
+  for (const raw of text.split("\n")) {
+    const line = raw.trim(),
+      match = line.match(/^([a-z][a-z /-]{1,60}):\s*(.*)$/i);
+    const key =
+      match &&
+      aliases[
+        match[1].toLowerCase().replace(/[-/]/g, " ").replace(/\s+/g, " ").trim()
+      ];
+    if (key) {
+      active = key;
+      sections[key] = match[2] ? [match[2]] : [];
+    } else if (!line) active = "";
+    else if (active && /^\s*[-•*]\s+/.test(raw))
+      sections[active].push(line.replace(/^[-•*]\s+/, ""));
+    else active = "";
+  }
+  const field = (key: string) => (sections[key] || []).join("\n");
+  const canonical = (key: string, choices: readonly string[]) =>
+    choices.find(
+      (value) =>
+        value.toLowerCase().replace(/[ -]/g, "") ===
+        field(key).toLowerCase().replace(/[ -]/g, ""),
+    ) || "";
+  const salary = field("salary"),
+    statedCurrency =
+      field("salaryCurrency") ||
+      salary.match(/\b(?:NGN|USD|EUR|GBP|CAD|AUD|KES|GHS|ZAR)\b/i)?.[0] ||
+      "";
+  const deadline = field("deadline");
   return {
     title: parsed.title || "",
     company: parsed.company || "",
     url: parsed.applicationUrl || "",
     location: parsed.location || "",
     description: text,
+    workArrangement: canonical("workArrangement", [
+      "Remote",
+      "Hybrid",
+      "Onsite",
+    ]),
+    jobType: canonical("jobType", jobTypes),
+    experienceLevel: canonical("experienceLevel", experienceLevels),
+    salary,
+    salaryCurrency: /^[A-Z]{3}$/i.test(statedCurrency)
+      ? statedCurrency.toUpperCase()
+      : "",
+    deadline: deadline && validCalendarDate(deadline) ? deadline : "",
+    requiredSkills: field("requiredSkills"),
+    preferredSkills: field("preferredSkills"),
+    technologies: field("technologies") || parsed.skills.join(", "),
+    responsibilities: field("responsibilities"),
+    additionalRequirements: field("additionalRequirements"),
+    personalNotes: field("personalNotes"),
     keywords: suggestJobKeywords(text),
   };
 }

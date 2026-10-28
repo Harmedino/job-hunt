@@ -16,6 +16,8 @@ export function readabilityReview(
   const warnings: string[] = [],
     normalized = (s: string) =>
       s
+        .replace(/^#{1,4}\s+/gm, "")
+        .replace(/^\*\*(.*?)\*\*$/gm, "$1")
         .replace(/^[ \t]*[•▪◦*–-]\s+/gm, "")
         .replace(/\s+/g, " ")
         .trim()

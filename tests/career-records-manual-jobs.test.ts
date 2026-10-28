@@ -303,3 +303,25 @@ test(
     }
   },
 );
+
+test("manual-job suggestions preserve explicit salary, deadline and requirement sections without inventing missing values", () => {
+  const text =
+    "Position: Node.js Developer\nCompany: Fictional Studio\nEmployment type: Full-time\nExperience level: Junior\nWork arrangement: Remote\nSalary: NGN 400,000 monthly\nApplication deadline: 2027-01-15\nRequired skills:\n- Node.js\n- Express\nPreferred skills: MongoDB\nResponsibilities:\n- Build documented REST APIs\nAdditional requirements: NYSC information requested";
+  const values = suggestManualJob(text);
+  assert.equal(values.salary, "NGN 400,000 monthly");
+  assert.equal(values.salaryCurrency, "NGN");
+  assert.equal(values.deadline, "2027-01-15");
+  assert.equal(values.workArrangement, "Remote");
+  assert.equal(values.jobType, "Full-time");
+  assert.equal(values.experienceLevel, "Junior");
+  assert.equal(values.requiredSkills, "Node.js\nExpress");
+  assert.equal(values.preferredSkills, "MongoDB");
+  assert.equal(values.responsibilities, "Build documented REST APIs");
+  assert.equal(values.additionalRequirements, "NYSC information requested");
+  assert.equal(values.url, "");
+  const unknown = suggestManualJob(
+    "Position: Developer\nSalary: $400 monthly\nDeadline: next week",
+  );
+  assert.equal(unknown.salaryCurrency, "");
+  assert.equal(unknown.deadline, "");
+});
