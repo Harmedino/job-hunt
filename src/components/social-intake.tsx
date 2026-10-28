@@ -13,7 +13,7 @@ async function leadsRequest(method = "GET", body?: unknown) {
   if (!r.ok) throw new Error(data.error || "Could not load social posts.");
   return data;
 }
-export default function SocialIntake({ connected }: { connected: boolean }) {
+export default function SocialIntake({ connected, openRequest }: { connected: boolean; openRequest?: { id: number; platform?: string } }) {
   const [platform, setPlatform] = useState("Social URL");
   const [reviewId, setReviewId] = useState("");
   const [searchName, setSearchName] = useState("");
@@ -27,6 +27,15 @@ export default function SocialIntake({ connected }: { connected: boolean }) {
   const [text, setText] = useState("");
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
+  useEffect(() => {
+    if (!openRequest) return;
+    // Retain early dashboard clicks through child hydration instead of losing a one-shot window event.
+    const timer = setTimeout(() => {
+      if (openRequest.platform === "Manual job") setPlatform("Manual job");
+      setOpen(true);
+    }, 0);
+    return () => clearTimeout(timer);
+  }, [openRequest]);
   useEffect(() => {
     const reveal=()=>{document.getElementById("manual-intake-panel")?.setAttribute("open","");};
     const show = (event:Event) => {reveal();const source=(event as CustomEvent).detail?.platform;if(source==='Manual job')setPlatform(source);setOpen(true);};

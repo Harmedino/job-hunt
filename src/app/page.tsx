@@ -93,6 +93,7 @@ const ago = (value: string, now: number) => {
 export default function Home() {
   const [now, setNow] = useState(() => Date.now());
   const [tab, setTab] = useState("Job Finder");
+  const [intakeRequest, setIntakeRequest] = useState<{ id: number; platform?: string }>();
   useEffect(() => {
     const update = () => {
       if (window.location.hash === "#youtube") setTab("YouTube Research");
@@ -532,7 +533,7 @@ export default function Home() {
               <div className="quick-filters" role="group" aria-label="Quick job filters">{[['all','Reset quick filter'],['junior_frontend','Junior Frontend ≥ ₦300k'],['mid_frontend','Intermediate Frontend'],['backend','Backend Junior / Mid'],['node_intern','Paid Node.js Internships'],['fullstack','Full-Stack Development'],['security_intern','Cybersecurity Internships'],['salary_unknown','Salary Unknown']].map(([value,label])=><button className="secondary" aria-pressed={quick===value} key={value} onClick={()=>{if(value==='security_intern')switchCareer('cybersecurity');else if(!['all','salary_unknown'].includes(value))switchCareer('development');setQuick(value);setCategory('All opportunities');setLevel('all');setJobType('all');setQuery('');setOpportunityView(value==='salary_unknown'?'salary_unknown':'all');setFresh('available');setJobPage(1);}}>{label}</button>)}</div>
               <p className="result-summary">{currentOpportunities.length} new unsaved · {applications.filter(a=>applicationIsHandled(a)&&!applicationWasApplied(a)).length} saved · {applications.filter(a=>applicationWasApplied(a)).length} applied · {applications.filter(a=>a.submittedAt||a.status==='Submitted').length} confirmed submitted · {newCandidates.filter(j=>j.salaryAssessment?.status==='meets').length} meet salary requirements · {newCandidates.filter(j=>j.salaryPolicy==='review').length} need salary verification · {newCandidates.filter(j=>j.eligibility==='review').length} need location verification</p>
               <SavedJobSearches filters={filters} connected={!!health?.database} onRun={async f=>{applyFilters(f);await findJobs();}} />
-              <div className="module-actions"><button className="secondary" onClick={()=>{document.getElementById("manual-intake-panel")?.setAttribute("open","");window.dispatchEvent(new CustomEvent("open-social-inbox",{detail:{platform:"Manual job"}}));document.getElementById("manual-intake-panel")?.scrollIntoView({behavior:"smooth"});}}>Add job for review</button><button className="secondary" onClick={()=>setTab('Applications')}>Application history</button><button className="secondary" onClick={()=>{document.getElementById('manual-intake-panel')?.setAttribute('open','');document.getElementById('social-inbox')?.scrollIntoView();window.dispatchEvent(new Event('open-social-inbox'));}}>Social opportunities awaiting verification</button></div>
+              <div className="module-actions"><button className="secondary" onClick={()=>{document.getElementById("manual-intake-panel")?.setAttribute("open","");setIntakeRequest(previous=>({id:(previous?.id||0)+1,platform:"Manual job"}));document.getElementById("manual-intake-panel")?.scrollIntoView({behavior:"smooth"});}}>Add job for review</button><button className="secondary" onClick={()=>setTab('Applications')}>Application history</button><button className="secondary" onClick={()=>{document.getElementById('manual-intake-panel')?.setAttribute('open','');document.getElementById('social-inbox')?.scrollIntoView();setIntakeRequest(previous=>({id:(previous?.id||0)+1}));}}>Social opportunities awaiting verification</button></div>
               <div className="category-tabs">
                 {["All opportunities", "Frontend", "Backend", "Full-stack"].map(
                   (c) => (
@@ -684,7 +685,7 @@ export default function Home() {
                 <span>One step closer to your next chapter.</span>
               </footer>
               <details className="panel advanced-job-sources"><summary>Job sources and connection diagnostics</summary><JobPlatformDirectory/><SourceDirectory/><DiscoveryReport sources={sourceReports} storageWarning={storageWarning}/><WorkspaceOverview jobs={jobs.length} navigate={setTab}/></details>
-              <details className="panel" id="manual-intake-panel"><summary>Paste a job, social post or alert for review</summary><SocialIntake connected={!!health?.database}/></details>
+              <details className="panel" id="manual-intake-panel"><summary>Paste a job, social post or alert for review</summary><SocialIntake connected={!!health?.database} openRequest={intakeRequest}/></details>
             </>
           )}
           <div hidden={tab !== "CV Builder"}>
