@@ -3,7 +3,11 @@ import {
   brunoProfile,
   type WorkspaceSnapshot,
 } from "../../src/lib/modules/types";
-async function fixtures(page: Page, bounties: WorkspaceSnapshot["bounties"] = []) {
+async function fixtures(
+  page: Page,
+  bounties: WorkspaceSnapshot["bounties"] = [],
+  ai = false,
+) {
   const state: WorkspaceSnapshot = {
     bounties,
     tracked: [],
@@ -28,7 +32,7 @@ async function fixtures(page: Page, bounties: WorkspaceSnapshot["bounties"] = []
       highMatch: 65,
     },
     storageAvailable: true,
-    configured: { github: false, youtube: false, oauth: false, ai: false },
+    configured: { github: false, youtube: false, oauth: false, ai },
   };
   // The Next.js development toolbar overlaps the first mobile nav item.
   // Hide developer tooling only in this browser fixture; production has no portal.
@@ -85,11 +89,23 @@ async function fixtures(page: Page, bounties: WorkspaceSnapshot["bounties"] = []
     );
     if (path === "state") return route.fulfill({ json: state });
     if (path === "bounties/analyze") {
-      const bounty = state.bounties.find((b) => b.id === route.request().postDataJSON().id)!;
+      const bounty = state.bounties.find(
+        (b) => b.id === route.request().postDataJSON().id,
+      )!;
       bounty.analysis = {
-        score: 20, confidence: "Metadata only", matchedSkills: [], criteria: [],
-        paymentRisk: "Check funding evidence", eligibility: "Unverified", generatedAt: new Date().toISOString(),
-        aiWarning: "Google Gemini could not be reached. Basic task analysis is available below. The AI task plan was not generated; retry AI analysis later.",
+        score: 20,
+        confidence: "Metadata only",
+        matchedSkills: [],
+        criteria: [],
+        paymentRisk: "Check funding evidence",
+        eligibility: "Unverified",
+        generatedAt: new Date().toISOString(),
+        ...(route.request().postDataJSON().ai
+          ? {
+              aiWarning:
+                "Google Gemini could not be reached. Basic task analysis is available below. The AI task plan was not generated; retry AI analysis later.",
+            }
+          : {}),
       };
       return route.fulfill({ json: bounty });
     }
@@ -190,39 +206,109 @@ test("separate module tabs preserve job finder and profile navigation and show h
     ),
   ).toBe(true);
 });
-test("funding evidence is visible while unverified tasks are hidden by default", async ({ page }) => {
+test("funded and advertised tasks stay distinct and strict funded mode remains available", async ({
+  page,
+}) => {
   const bounty: WorkspaceSnapshot["bounties"][number] = {
-    id: "proof-test", title: "Task with checked funding evidence", description: "Test fixture",
-    source: "GitHub", manual: false, url: "https://github.com/example/project/issues/1",
-    repository: "example/project", organization: "example", language: "TypeScript",
-    skills: [], status: "open", sponsor: "example", assignees: [], difficulty: "easy",
+    id: "proof-test",
+    title: "Task with checked funding evidence",
+    description: "Test fixture",
+    source: "GitHub",
+    manual: false,
+    url: "https://github.com/example/project/issues/1",
+    repository: "example/project",
+    organization: "example",
+    language: "TypeScript",
+    skills: [],
+    status: "open",
+    sponsor: "example",
+    assignees: [],
+    difficulty: "easy",
     reward: {
-      amount: "100", currency: "USD", verification: "user-verified",
-      evidenceUrl: "https://github.com/example/project/issues/1#issuecomment-123",
+      amount: "100",
+      currency: "USD",
+      verification: "user-verified",
+      evidenceUrl:
+        "https://github.com/example/project/issues/1#issuecomment-123",
       fundingType: "escrow",
-      authoritativeConfirmation: { authority: "Test escrow provider", taskUrl: "https://github.com/example/project/issues/1", validUntil: new Date(Date.now() + 86400000).toISOString() },
-      conditions: "Accepted submission", eligibility: "Check payout provider",
+      authoritativeConfirmation: {
+        authority: "Test escrow provider",
+        taskUrl: "https://github.com/example/project/issues/1",
+        validUntil: new Date(Date.now() + 86400000).toISOString(),
+      },
+      conditions: "Accepted submission",
+      eligibility: "Check payout provider",
       verifiedAt: new Date().toISOString(),
     },
   };
-  await fixtures(page, [bounty, { ...bounty, id: "unverified-test", title: "Unverified task", reward: undefined, bountySignal: true }]);
+  await fixtures(
+    page,
+    [
+      bounty,
+      {
+        ...bounty,
+        id: "unverified-test",
+        title: "Unverified task",
+        reward: undefined,
+        bountySignal: true,
+        url: "https://github.com/example/project/issues/2",
+      },
+    ],
+    true,
+  );
   await page.goto("/");
-  await page.getByRole("button", { name: "Coding Bounties", exact: true }).click();
-  await expect(page.getByRole("link", { name: "View verification evidence", exact: false })).toHaveAttribute("href", bounty.reward!.evidenceUrl);
-  await expect(page.getByRole("heading", { name: "Unverified task", exact: true })).toHaveCount(0);
+  await page
+    .getByRole("button", { name: "Coding Bounties", exact: true })
+    .click();
+  await expect(
+    page.getByRole("link", {
+      name: "View verification evidence",
+      exact: false,
+    }),
+  ).toHaveAttribute("href", bounty.reward!.evidenceUrl);
+  await expect(
+    page.getByRole("heading", { name: "Unverified task", exact: true }),
+  ).toBeVisible();
+  await page
+    .getByRole("combobox", { name: "Funding verification", exact: true })
+    .selectOption("Verified Funded");
+  await expect(
+    page.getByRole("heading", { name: "Unverified task", exact: true }),
+  ).toHaveCount(0);
   await page.getByRole("button", { name: "View task", exact: true }).click();
   await page.getByRole("button", { name: "Analyze Task", exact: true }).click();
   const dialog = page.getByRole("dialog", { name: "Bounty details" });
+  await dialog
+    .getByRole("button", {
+      name: "Generate AI implementation plan",
+      exact: true,
+    })
+    .click();
   await expect(dialog).toContainText("Basic task analysis is available below");
   await expect(dialog).toContainText("Explainable score: 20/100");
   await dialog.getByRole("button", { name: /close/i }).click();
-  await page.getByRole("combobox", { name: "Funding verification", exact: true }).selectOption("All paid or potentially paid");
-  await expect(page.getByRole("heading", { name: "Unverified task", exact: true })).toBeVisible();
-  await page.getByRole("button", { name: "Apply filters", exact: true }).click();
-  await expect(page.getByRole("heading", { name: "Unverified task", exact: true })).toBeVisible();
-  await page.getByRole("button", { name: "Reset filters", exact: true }).click();
-  await expect(page.getByRole("combobox", { name: "Funding verification", exact: true })).toHaveValue("Verified Funded");
-  await expect(page.getByRole("heading", { name: "Unverified task", exact: true })).toHaveCount(0);
+  await page
+    .getByRole("combobox", { name: "Funding verification", exact: true })
+    .selectOption("All paid or potentially paid");
+  await expect(
+    page.getByRole("heading", { name: "Unverified task", exact: true }),
+  ).toBeVisible();
+  await page.getByText("More filters and sorting", { exact: true }).click();
+  await page
+    .getByRole("button", { name: "Apply filters", exact: true })
+    .click();
+  await expect(
+    page.getByRole("heading", { name: "Unverified task", exact: true }),
+  ).toBeVisible();
+  await page
+    .getByRole("button", { name: "Reset filters", exact: true })
+    .click();
+  await expect(
+    page.getByRole("combobox", { name: "Funding verification", exact: true }),
+  ).toHaveValue("All paid or potentially paid");
+  await expect(
+    page.getByRole("heading", { name: "Unverified task", exact: true }),
+  ).toBeVisible();
 });
 test("manual bounty import never labels an unverified task as funded", async ({
   page,
@@ -233,7 +319,7 @@ test("manual bounty import never labels an unverified task as funded", async ({
     .getByRole("button", { name: "Coding Bounties", exact: true })
     .click();
   await page
-    .getByText("Import an Algora, IssueHunt or GitHub task URL", {
+    .getByText("Import an Algora, Opire, IssueHunt or GitHub task URL", {
       exact: true,
     })
     .click();
@@ -244,8 +330,15 @@ test("manual bounty import never labels an unverified task as funded", async ({
     .getByLabel("Task title (required without GitHub issue)")
     .fill("Test-only bounty fixture");
   await page.getByRole("button", { name: "Import task", exact: true }).click();
-  await expect(page.getByRole("heading", { name: "Test-only bounty fixture", exact: true })).toHaveCount(0);
-  await page.getByRole("combobox", { name: "Funding verification", exact: true }).selectOption("All paid or potentially paid");
+  await expect(
+    page.getByRole("heading", {
+      name: "Test-only bounty fixture",
+      exact: true,
+    }),
+  ).toBeVisible();
+  await page
+    .getByRole("combobox", { name: "Funding verification", exact: true })
+    .selectOption("All paid or potentially paid");
   await expect(
     page.getByRole("heading", {
       name: "Test-only bounty fixture",
@@ -253,7 +346,9 @@ test("manual bounty import never labels an unverified task as funded", async ({
     }),
   ).toBeVisible();
   await expect(
-    page.locator("article").getByText("Unverified Bounty", { exact: true }),
+    page
+      .locator("article")
+      .getByText("Needs Funding Verification", { exact: true }),
   ).toBeVisible();
   await page.getByRole("button", { name: "View task", exact: true }).click();
   const dialog = page.getByRole("dialog", { name: "Bounty details" });

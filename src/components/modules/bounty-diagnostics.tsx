@@ -5,7 +5,7 @@ export function BountyDiagnostics({ bounties, sources, displayed }: { bounties: 
   return <details className="module-panel">
     <summary>Discovery diagnostics</summary>
     <p>GitHub: {source ? source.success === false ? "Failed or unavailable" : source.success ? "At least one query succeeded" : "Legacy report; refresh for detailed diagnostics" : "Not queried yet"}.</p>
-    <p>Algora / IssueHunt: manual import only. No working authorized live API has been verified. They are not counted as queried providers.</p>
+    <p>Algora / Opire / IssueHunt: manual import only. No working authorized live API has been verified. They are not counted as queried providers.</p>
     <p>Last successful GitHub refresh: {source?.lastSuccessAt ? new Date(source.lastSuccessAt).toLocaleString() : "Not recorded"}.</p>
     {source?.diagnostics && <>
       <p>Latest run: {source.diagnostics.raw} raw · {source.diagnostics.duplicates} duplicates · {source.diagnostics.rejected} rejected · {source.diagnostics.saved} unique saved.</p>

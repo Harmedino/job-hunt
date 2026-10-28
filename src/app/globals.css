@@ -1998,3 +1998,14 @@ footer > span {
 .job-salary-details .salary-review { color:#e1ce92; }
 .filter-bar input[type=number] { border:1px solid var(--border);border-radius:7px;padding:10px;width:170px;max-width:100%; }
 @media(max-width:600px){.exchange-rate-row{grid-template-columns:1fr;}.opportunity-tabs button{flex:1 1 145px;justify-content:center;}}
+.module-tabs { display:flex;flex-wrap:wrap;gap:8px; }
+.module-workspace .module-tabs button { padding:11px 14px;font-size:13px; }
+.module-detail section[aria-label] { padding:20px 0;border-top:1px solid var(--border); }
+.module-detail section[aria-label] :is(p,dd) { font-size:14px;line-height:1.7; }
+.module-detail details { margin:15px 0; }
+.module-detail details summary { cursor:pointer;line-height:1.7;font-weight:600; }
+.module-detail pre { max-height:340px;overflow:auto;padding:12px;background:#151e18;border-radius:8px; }
+
+.bounty-advanced-filters { margin:18px 0; }
+.bounty-advanced-filters > summary { cursor:pointer;font-weight:600;padding:10px 0; }
+.bounty-advanced-filters .module-form { margin-top:14px; }
