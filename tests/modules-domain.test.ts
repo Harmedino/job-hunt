@@ -119,8 +119,9 @@ test("canonical IDs deduplicate GitHub imports and reward filtering never mixes 
   const c: Bounty = {
     ...b,
     id: "github:example:13",
+    url:"https://github.com/example/project/issues/13",issueUrl:"https://github.com/example/project/issues/13",
     language: "PHP",
-    reward: { ...b.reward!, amount: "9000", currency: "NGN" },
+    reward: { ...b.reward!, amount: "9000", currency: "NGN",authoritativeConfirmation:{...b.reward!.authoritativeConfirmation!,taskUrl:"https://github.com/example/project/issues/13"} },
   };
   assert.equal(deduplicateBounties([a, b]).length, 1);
   assert.deepEqual(filterBounties([a, b], {}).map((v) => v.reward?.amount), ["100.00"]);
@@ -132,7 +133,7 @@ test("canonical IDs deduplicate GitHub imports and reward filtering never mixes 
     { ...b.reward!, fundingType: undefined },
     { ...b.reward!, authoritativeConfirmation: undefined },
   ]) {
-    assert.equal(filterBounties([{ ...b, reward }], {}).length, 0);
+    assert.equal(filterBounties([{ ...b, reward }], {verification:"Verified Funded"}).length, 0);
   }
   assert.equal(filterBounties([a, b, c], { min: 50 }).length, 0);
   assert.deepEqual(
@@ -183,7 +184,7 @@ test("money uses currency precision and exact totals; actual earnings need actua
   const received = bountyEarnings(
     [],
     [],
-    [{ amount: "2.10", currency: "USD" } as Payment],
+    [{id:"received-proof",bountyId:"task-proof",amount:"2.10",currency:"USD",receivedAt:"2026-01-01",evidenceUrl:"https://example.org/receipt",notes:"",confirmation:"owner-confirmed"} as Payment],
   );
   assert.deepEqual(received.received, { USD: "2.10" });
 });

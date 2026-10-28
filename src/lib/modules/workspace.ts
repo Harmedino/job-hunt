@@ -1,8 +1,14 @@
+import { careerPreferences } from "../career-preferences";
+import { groupBountyAdvertisements } from "./bounty-opportunity";
 import { defaultBountySkills } from "./defaults";
 import { aiConfigured } from "../ai";
 import { db } from "../db";
 import { emptyProfile } from "../types";
-import { analyzeBounty, discoverBounties, verifySavedBounties } from "./bounties";
+import {
+  analyzeBounty,
+  discoverBounties,
+  verifySavedBounties,
+} from "./bounties";
 import { oauthConfigured, channelAnalytics } from "./oauth";
 import { collection, get, lease, list, ownerFilter, put, OWNER } from "./store";
 import { refreshSavedYoutube, savedYoutube, discoverVideos } from "./youtube";
@@ -121,7 +127,14 @@ export async function snapshot(): Promise<WorkspaceSnapshot> {
     const skills = await ownerSkills();
     return {
       ...base,
-      bounties: bounties.map((b) => ({ ...b, analysis: { ...b.analysis, ...analyzeBounty(b, skills) } })),
+      exchangeRates: careerPreferences(
+        (await (await db()).collection("profile").findOne({ key: "owner" }))
+          ?.profile || emptyProfile,
+      ).exchangeRates,
+      bounties: groupBountyAdvertisements(bounties).map((b) => ({
+        ...b,
+        analysis: { ...b.analysis, ...analyzeBounty(b, skills) },
+      })),
       tracked,
       payments,
       profiles: profiles.some((p) => p.id === "bruno")
@@ -156,14 +169,10 @@ export async function runModuleSchedule() {
     () => defaultSettings,
   );
   // Housekeeping runs even if all automatic discovery switches are off.
-  await (
-    await db()
-  )
+  await (await db())
     .collection("workspace_youtube_cache")
     .deleteMany(ownerFilter({ expiresAt: { $lte: new Date() } }));
-  await (
-    await db()
-  )
+  await (await db())
     .collection("workspace_ai_cache")
     .deleteMany(ownerFilter({ expiresAt: { $lte: new Date() } }));
   const tasks: Promise<unknown>[] = [];
@@ -221,9 +230,7 @@ export async function runModuleSchedule() {
         }
       })(),
     );
-    const integrations = await (
-      await db()
-    )
+    const integrations = await (await db())
       .collection("workspace_oauth")
       .find(ownerFilter())
       .sort({ lastSyncAt: 1 })
@@ -238,9 +245,7 @@ export async function runModuleSchedule() {
             new Date(Date.now() - 86400000).toISOString().slice(0, 10),
           );
           if (
-            !(await (
-              await db()
-            )
+            !(await (await db())
               .collection("workspace_oauth")
               .findOne(ownerFilter({ id: integration.id })))
           )

@@ -1,9 +1,14 @@
 export const workStatuses = [
   "Saved",
   "Evaluating",
+  "Funding Verified",
+  "Assignment Requested",
   "Applied/Claimed",
   "Working",
   "Submitted",
+  "In Review",
+  "Merged",
+  "Reward Claimed",
   "Accepted",
   "Paid",
   "Rejected",
@@ -40,7 +45,7 @@ export type Bounty = {
   id: string;
   title: string;
   description: string;
-  source: "GitHub" | "Algora" | "IssueHunt";
+  source: "GitHub" | "Algora" | "Opire" | "IssueHunt";
   manual: boolean;
   url: string;
   issueUrl?: string;
@@ -61,9 +66,40 @@ export type Bounty = {
   rewardMention?: string;
   labels?: string[];
   bountySignal?: boolean;
-  rewardAnnouncement?: { evidenceUrl: string; announcedBy: string; reward?: Money };
+  rewardAnnouncement?: {
+    evidenceUrl: string;
+    announcedBy: string;
+    reward?: Money;
+  };
   difficulty: "unknown" | "easy" | "medium" | "hard";
   analysis?: BountyAnalysis;
+  aliasIds?: string[];
+  advertisements?: {
+    source: string;
+    url: string;
+    rewardAnnouncement?: Bounty["rewardAnnouncement"];
+  }[];
+  fundingArrangements?: Reward[];
+  competingPrCount?: number;
+  linkedPullRequests?: { url: string; state: string; title: string }[];
+  maintainerResponseAt?: string;
+  repositoryEvidence?: {
+    checkedAt: string;
+    scope: string;
+    branch?: string;
+    files: { path: string; url: string; excerpt: string }[];
+    rootFiles: string[];
+    warnings: string[];
+  };
+  paymentReview?: {
+    nigeria: "unknown" | "supported" | "restricted";
+    eligibilitySourceUrl: string;
+    methods: string;
+    fees: string;
+    acceptanceCriteria: string;
+    historicalPayoutUrl: string;
+    checkedAt: string;
+  };
 };
 export type BountyAnalysis = {
   score: number;
@@ -103,6 +139,17 @@ export type TrackedBounty = {
   deadline: string;
   submissionUrl: string;
   updatedAt: string;
+  branchUrl?: string;
+  reviewStatus?: string;
+  maintainerFeedback?: string;
+  claimStatus?: string;
+  claimDate?: string;
+  approvalEvidenceUrl?: string;
+  approvedReward?: Money;
+  effortHours?: number;
+  prSourceUpdatedAt?: string;
+  prCheckedAt?: string;
+  archived?: boolean;
 };
 export type Payment = {
   id: string;
@@ -113,6 +160,9 @@ export type Payment = {
   evidenceUrl: string;
   notes: string;
   confirmation: "owner-confirmed";
+  voidedAt?: string;
+  platform?: string;
+  pullRequestUrl?: string;
 };
 export type ModuleSettings = {
   id: string;
@@ -121,6 +171,7 @@ export type ModuleSettings = {
   youtubeRefresh: boolean;
   refreshHours: number;
   highMatch: number;
+  bountyFilters?: import("./bounties-client").BountyFilters;
 };
 export type ContentProfile = {
   id: string;
@@ -246,7 +297,13 @@ export type SourceState = {
   success?: boolean;
   lastSuccessAt?: string;
   diagnostics?: {
-    queries: { query: string; page: number; returned: number; success: boolean; error?: string }[];
+    queries: {
+      query: string;
+      page: number;
+      returned: number;
+      success: boolean;
+      error?: string;
+    }[];
     raw: number;
     duplicates: number;
     saved: number;
@@ -273,6 +330,7 @@ export type AnalyticsSnapshot = {
   reports: Record<string, { data?: YoutubeReport; unavailable?: string }>;
 };
 export type WorkspaceSnapshot = {
+  exchangeRates?: import("../career-preferences").ExchangeRate[];
   bounties: Bounty[];
   tracked: TrackedBounty[];
   payments: Payment[];

@@ -1,4 +1,6 @@
-import { randomUUID } from "node:crypto";
+import { validateBountyFilters } from "./bounties-client";
+import type { TrackedBounty } from "./types";
+import { createHash, randomUUID } from "node:crypto";
 import { db } from "../db";
 import { get, list, put, remove, type Bucket, ownerFilter } from "./store";
 import {
@@ -15,6 +17,7 @@ import {
   text,
   videoId,
 } from "./validation";
+import { hasFundingEvidence } from "./bounty-verification";
 import { analyzeBounty } from "./bounties";
 import {
   brunoProfile,
@@ -97,25 +100,75 @@ export async function saveRecord(kind: string, input: unknown, skills: string) {
       });
     case "tracked": {
       const bountyId = id(o.bountyId);
-      await get<Bounty>("bounties", bountyId);
-      const old = await get<{ status: string }>("tracked", bountyId).catch(
-        (e) => {
-          if (e instanceof ModuleError && e.status === 404) return undefined;
-          throw e;
-        },
-      );
+      const sourceBounty = await get<Bounty>("bounties", bountyId);
+      const old = await get<TrackedBounty>("tracked", bountyId).catch((e) => {
+        if (e instanceof ModuleError && e.status === 404) return undefined;
+        throw e;
+      });
       const payments = (await list<Payment>("payments")).filter(
-        (p) => p.bountyId === bountyId,
+        (p) => p.bountyId === bountyId && !p.voidedAt,
       );
       const status = choice(o.status, workStatuses, "work status");
       validateTransition(old?.status || "Saved", status, payments.length > 0);
+      if (status === "Funding Verified" && !hasFundingEvidence(sourceBounty))
+        throw new ModuleError(
+          "Record current task-specific secured funding evidence before choosing Funding Verified.",
+        );
+      if (o.claimStatus === "Paid" && !payments.length)
+        throw new ModuleError(
+          "Record an actual received payment before marking a claim Paid.",
+        );
+      if (
+        o.claimStatus === "Approved unpaid" &&
+        !(o.approvalEvidenceUrl || old?.approvalEvidenceUrl)
+      )
+        throw new ModuleError(
+          "Record approval evidence for approved but unpaid rewards.",
+        );
       return put("tracked", {
+        ...old,
         id: bountyId,
         bountyId,
         status,
-        notes: text(o.notes || "", "notes", 10000),
-        deadline: date(o.deadline || ""),
-        submissionUrl: httpsUrl(o.submissionUrl || ""),
+        notes: text(o.notes ?? old?.notes ?? "", "notes", 10000),
+        deadline: date(o.deadline ?? old?.deadline ?? ""),
+        submissionUrl: httpsUrl(o.submissionUrl ?? old?.submissionUrl ?? ""),
+        branchUrl: httpsUrl(o.branchUrl ?? old?.branchUrl ?? ""),
+        reviewStatus: text(
+          o.reviewStatus ?? old?.reviewStatus ?? "",
+          "PR review status",
+          200,
+        ),
+        maintainerFeedback: text(
+          o.maintainerFeedback ?? old?.maintainerFeedback ?? "",
+          "maintainer feedback",
+          6000,
+        ),
+        claimStatus: choice(
+          o.claimStatus ?? old?.claimStatus ?? "Not claimed",
+          [
+            "Not claimed",
+            "Claim pending",
+            "Approved unpaid",
+            "Paid",
+            "Disputed",
+          ],
+          "claim status",
+        ),
+        claimDate: date(o.claimDate ?? old?.claimDate ?? ""),
+        approvalEvidenceUrl: httpsUrl(
+          o.approvalEvidenceUrl ?? old?.approvalEvidenceUrl ?? "",
+        ),
+        approvedReward:
+          o.approvedAmount || o.approvedCurrency
+            ? money(o.approvedAmount, o.approvedCurrency)
+            : old?.approvedReward,
+        effortHours:
+          o.effortHours !== undefined && o.effortHours !== ""
+            ? number(o.effortHours, 0, 2000)
+            : old?.effortHours,
+        archived:
+          o.archived === undefined ? old?.archived || false : bool(o.archived),
         updatedAt: now,
       });
     }
@@ -129,12 +182,27 @@ export async function saveRecord(kind: string, input: unknown, skills: string) {
       const receivedAt = date(o.receivedAt, true);
       if (Date.parse(receivedAt) > Date.now())
         throw new ModuleError("Received payment date cannot be in the future.");
+      const amount = money(o.amount, o.currency),
+        evidenceUrl = httpsUrl(o.evidenceUrl, true);
+      const duplicate = (await list<Payment>("payments")).find(
+        (p) =>
+          !p.voidedAt &&
+          p.bountyId === bountyId &&
+          p.amount === amount.amount &&
+          p.currency === amount.currency &&
+          p.receivedAt === receivedAt &&
+          p.evidenceUrl === evidenceUrl &&
+          p.id !== recordId,
+      );
+      if (duplicate) return duplicate;
       return put("payments", {
         id: recordId,
         bountyId,
-        ...money(o.amount, o.currency),
+        ...amount,
         receivedAt,
-        evidenceUrl: httpsUrl(o.evidenceUrl, true),
+        evidenceUrl,
+        platform: text(o.platform || "", "payment platform", 150),
+        pullRequestUrl: httpsUrl(o.pullRequestUrl || ""),
         notes: text(o.notes || "", "payment notes", 3000),
         confirmation: "owner-confirmed",
       });
@@ -144,9 +212,13 @@ export async function saveRecord(kind: string, input: unknown, skills: string) {
       if (o.confirmed !== true)
         throw new ModuleError("Confirm that you checked funding evidence.");
       if (o.fundingType !== "escrow" && o.fundingType !== "deposit")
-        throw new ModuleError("Confirm escrow or deposited funding; a promised reward is not funded.");
+        throw new ModuleError(
+          "Confirm escrow or deposited funding; a promised reward is not funded.",
+        );
       if (o.fundingConfirmed !== true)
-        throw new ModuleError("Confirm that an authoritative source identifies current funding for this exact task; a reward announcement or past payout is insufficient.");
+        throw new ModuleError(
+          "Confirm that an authoritative source identifies current funding for this exact task; a reward announcement or past payout is insufficient.",
+        );
       const reward: NonNullable<Bounty["reward"]> = {
         ...money(o.amount, o.currency),
         verification: "user-verified" as const,
@@ -170,11 +242,93 @@ export async function saveRecord(kind: string, input: unknown, skills: string) {
       const value = {
         ...bounty,
         reward,
+        fundingArrangements: [
+          ...(bounty.fundingArrangements || []),
+          ...(bounty.reward ? [bounty.reward] : []),
+          reward,
+        ].filter(
+          (r, i, all) =>
+            all.findIndex(
+              (other) =>
+                other.evidenceUrl === r.evidenceUrl &&
+                other.verifiedAt === r.verifiedAt,
+            ) === i,
+        ),
         deadline: date(o.deadline || ""),
         sponsor: text(o.sponsor || "Unknown", "sponsor", 300),
       };
       value.analysis = analyzeBounty(value, skills);
-      return put("bounties", value);
+      const saved = await put("bounties", value);
+      if (
+        (await list<TrackedBounty>("tracked")).some(
+          (t) => t.bountyId === bounty.id,
+        )
+      ) {
+        const noticeId =
+          "bounty-funding:" +
+          createHash("sha256")
+            .update(
+              JSON.stringify([
+                bounty.id,
+                reward.amount,
+                reward.currency,
+                reward.evidenceUrl,
+                reward.conditions,
+                now.slice(0, 10),
+              ]),
+            )
+            .digest("hex");
+        await (await db())
+          .collection("notifications")
+          .updateOne(
+            { id: noticeId },
+            {
+              $setOnInsert: {
+                id: noticeId,
+                title: `Current funding evidence recorded: ${bounty.title}. Payment remains conditional.`,
+                createdAt: now,
+                read: false,
+              },
+            },
+            { upsert: true },
+          );
+      }
+      return saved;
+    }
+    case "payment-review": {
+      const bounty = await get<Bounty>("bounties", id(o.bountyId));
+      const nigeria = choice(
+          o.nigeria || "unknown",
+          ["unknown", "supported", "restricted"],
+          "Nigeria payout eligibility",
+        ),
+        eligibilitySourceUrl = httpsUrl(o.eligibilitySourceUrl || "");
+      if (
+        nigeria !== "unknown" &&
+        (!eligibilitySourceUrl || o.confirmed !== true)
+      )
+        throw new ModuleError(
+          "Review and cite published country/payout evidence, or leave Nigeria eligibility unknown.",
+        );
+      return put("bounties", {
+        ...bounty,
+        paymentReview: {
+          nigeria,
+          eligibilitySourceUrl,
+          methods: text(o.methods || "", "payment methods", 2000),
+          fees: text(o.fees || "", "fees and restrictions", 3000),
+          acceptanceCriteria: text(
+            o.acceptanceCriteria || "",
+            "acceptance criteria",
+            5000,
+          ),
+          historicalPayoutUrl: httpsUrl(o.historicalPayoutUrl || ""),
+          checkedAt: now,
+        },
+        ...(o.competingPrCount !== undefined && o.competingPrCount !== ""
+          ? { competingPrCount: number(o.competingPrCount, 0, 10000) }
+          : {}),
+      });
     }
     case "ideas": {
       const profileId = id(o.profileId);
@@ -263,7 +417,11 @@ export async function saveRecord(kind: string, input: unknown, skills: string) {
         next: text(o.next, "next experiment", 5000, true),
         createdAt: now,
       });
-    case "settings":
+    case "settings": {
+      const previous = await get<{ bountyFilters?: unknown }>(
+        "settings",
+        "preferences",
+      ).catch(() => undefined);
       return put("settings", {
         id: "preferences",
         bountyQuery: text(o.bountyQuery || "", "bounty query", 150),
@@ -271,7 +429,13 @@ export async function saveRecord(kind: string, input: unknown, skills: string) {
         youtubeRefresh: bool(o.youtubeRefresh),
         refreshHours: number(o.refreshHours, 6, 168),
         highMatch: number(o.highMatch, 0, 100),
+        ...(o.bountyFilters !== undefined
+          ? { bountyFilters: validateBountyFilters(o.bountyFilters) }
+          : previous?.bountyFilters
+            ? { bountyFilters: previous.bountyFilters }
+            : {}),
       });
+    }
     default:
       throw new ModuleError("Unsupported record type.", 404);
   }
@@ -300,24 +464,38 @@ export async function deleteRecord(kind: string, recordId: string) {
   )
     throw new ModuleError("Remove this idea from the plan first.");
   if (kind === "ideas") {
-    await (
-      await db()
-    )
+    await (await db())
       .collection("workspace_prompts")
       .deleteMany(ownerFilter({ ideaId: recordId }));
-    await (
-      await db()
-    )
+    await (await db())
       .collection("workspace_metadata")
       .deleteMany(ownerFilter({ ideaId: recordId }));
   }
+  if (kind === "tracked") {
+    const tracked = await get<TrackedBounty>("tracked", recordId);
+    await put("tracked", {
+      ...tracked,
+      archived: true,
+      updatedAt: new Date().toISOString(),
+    });
+    return;
+  }
   if (kind === "payments") {
-    const p = await get<Payment>("payments", recordId);
-    const tracked = await (await import("./store")).collection("tracked");
-    await tracked.updateOne(
-      ownerFilter({ bountyId: p.bountyId, status: "Paid" }),
-      { $set: { status: "Accepted" } },
+    const payment = await get<Payment>("payments", recordId);
+    await put("payments", { ...payment, voidedAt: new Date().toISOString() });
+    const remaining = (await list<Payment>("payments")).filter(
+      (p) =>
+        p.bountyId === payment.bountyId &&
+        !p.voidedAt &&
+        p.confirmation === "owner-confirmed",
     );
+    if (!remaining.length)
+      await (
+        await (await import("./store")).collection("tracked")
+      ).updateOne(ownerFilter({ bountyId: payment.bountyId, status: "Paid" }), {
+        $set: { status: "Accepted", claimStatus: "Not claimed" },
+      });
+    return;
   }
   await remove(kind as Bucket, recordId);
 }

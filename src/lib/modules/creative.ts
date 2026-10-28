@@ -13,7 +13,12 @@ import type {
 } from "./types";
 import { get, lease, ownerFilter, OWNER, put } from "./store";
 import { ModuleError, number, object, stringList, text } from "./validation";
-import { fundingStatus, hasFundingEvidence, opportunityReward, paymentRisk } from "./bounty-verification";
+import {
+  fundingStatus,
+  hasFundingEvidence,
+  opportunityReward,
+  paymentRisk,
+} from "./bounty-verification";
 async function generated(
   instructions: string,
   data: unknown,
@@ -71,9 +76,9 @@ export function validateTaskPlan(value: unknown): TaskPlan {
   };
 }
 export async function taskPlan(bounty: Bounty, skills: string) {
-  // No repository files were fetched, so the model must label file suggestions as unverified.
+  // Only supplied, bounded public excerpts count as inspected repository evidence.
   return (await generated(
-    "Explain this coding bounty using only supplied issue metadata. Return {explanation,requirements:string[],codeAreas:string[],challenges:string[],plan:string[],tests:string[],effort,effortHoursLow:number,effortHoursHigh:number,rewardValue,submission,uncertainty}. No code contents are supplied: codeAreas must describe possible areas, never assert exact files exist. Effort must be an uncertain range, never a deadline. Give conservative numeric effortHoursLow and effortHoursHigh estimates from 0 to 2000 hours, with high >= low. Do not assert funding, payout, eligibility, responsiveness, hidden competitors or claim the task. rewardValue must say unavailable if no verified reward exists. Describe checking CONTRIBUTING, sponsor terms and explicitly authorized PR submission by the user. No external actions have been taken.",
+    "Explain this coding bounty using only supplied issue metadata and explicitly fetched repository evidence. Return {explanation,requirements:string[],codeAreas:string[],challenges:string[],plan:string[],tests:string[],effort,effortHoursLow:number,effortHoursHigh:number,rewardValue,submission,uncertainty}. Only repositoryEvidence.files are inspected file excerpts. If none are supplied, codeAreas must describe possible areas and must not assert exact files exist. Root directory names are not code inspection. State the actual inspection scope and missing information. Never claim tests were run. Effort must be an uncertain range, never a deadline. Give conservative numeric effortHoursLow and effortHoursHigh estimates from 0 to 2000 hours, with high >= low. Do not assert funding, payout, eligibility, responsiveness, hidden competitors or claim the task. rewardValue must say unavailable if no verified reward exists. Describe checking CONTRIBUTING, sponsor terms and explicitly authorized PR submission by the user. No external actions have been taken.",
     {
       bounty: {
         title: bounty.title,
@@ -83,12 +88,15 @@ export async function taskPlan(bounty: Bounty, skills: string) {
         skills: bounty.skills,
         status: bounty.status,
         reward: hasFundingEvidence(bounty) ? bounty.reward : undefined,
-        advertisedReward: hasFundingEvidence(bounty) ? undefined : opportunityReward(bounty),
+        advertisedReward: hasFundingEvidence(bounty)
+          ? undefined
+          : opportunityReward(bounty),
         fundingStatus: fundingStatus(bounty),
         paymentRisk: paymentRisk(bounty),
         assignees: bounty.assignees,
         comments: bounty.comments,
         repositoryPushedAt: bounty.repositoryPushedAt,
+        repositoryEvidence: bounty.repositoryEvidence,
       },
       skills,
     },

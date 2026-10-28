@@ -49,6 +49,10 @@ import {
   videoId,
 } from "@/lib/modules/validation";
 import { ownerSkills, snapshot } from "@/lib/modules/workspace";
+import {
+  inspectBountyRepository,
+  inspectIssueActivity,
+} from "@/lib/modules/bounty-repository";
 import { taskAnalysis } from "@/lib/modules/task-analysis";
 import {
   discoverVideos,
@@ -145,11 +149,36 @@ export async function POST(request: Request, context: Context) {
       case "bounties/analyze": {
         let bounty = await get<Bounty>("bounties", id(body.id));
         const skills = await ownerSkills();
-        if (bounty.issueUrl)
-          bounty = await persistBounty(
-            await fetchIssue(bounty.issueUrl, bounty.manual),
-            skills,
-          );
+        if (bounty.issueUrl) {
+          try {
+            bounty = await persistBounty(
+              await inspectIssueActivity(
+                await fetchIssue(bounty.issueUrl, bounty.manual),
+              ),
+              skills,
+            );
+          } catch (error) {
+            bounty = {
+              ...bounty,
+              repositoryEvidence: {
+                checkedAt: new Date().toISOString(),
+                scope: "Issue metadata only; live status check failed.",
+                files: [],
+                rootFiles: [],
+                warnings: [
+                  error instanceof Error
+                    ? error.message
+                    : "Source check failed.",
+                ],
+              },
+            };
+          }
+        }
+        if (body.inspectRepository === true)
+          bounty = {
+            ...bounty,
+            repositoryEvidence: await inspectBountyRepository(bounty),
+          };
         const analysis = await taskAnalysis(bounty, skills, body.ai === true);
         const result = { ...bounty, analysis };
         await put("bounties", result);
@@ -292,9 +321,7 @@ export async function DELETE(request: Request, context: Context) {
       const kind = new URL(request.url).searchParams.get("kind");
       if (!["video", "channel"].includes(kind || ""))
         throw new ModuleError("Invalid reference type.");
-      await (
-        await db()
-      )
+      await (await db())
         .collection("workspace_youtube_cache")
         .deleteOne(ownerFilter({ id: recordId, kind }));
     } else throw new ModuleError("Unknown workspace endpoint.", 404);

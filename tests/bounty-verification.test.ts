@@ -85,6 +85,6 @@ test("source failures retain partial results, rate limits are explicit and empty
   assert.equal(partial.items.length, 1);
   assert.equal(partial.diagnostics.queries[1].success, false);
   assert.ok(partial.retryAt);
-  assert.match(bountyEmptyReason([normalizeIssue(issue())], [], {}), /current verified funding/);
+  assert.match(bountyEmptyReason([normalizeIssue(issue())], [], {verification:"Verified Funded"}), /current verified funding/);
   assert.match(bountyEmptyReason([], [{ id: "github", name: "GitHub", mode: "Official API", message: "API quota exhausted", success: false }], {}), /quota exhausted/);
 });

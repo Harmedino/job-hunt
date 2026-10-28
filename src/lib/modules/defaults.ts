@@ -14,4 +14,4 @@ export const defaultTopics = [
   channelId: "",
 }));
 export const defaultBountySkills =
-  "React, Next.js, Angular, JavaScript, TypeScript, Node.js, Express.js, MongoDB, Firebase, HTML, CSS, Tailwind CSS, PHP, Laravel";
+  "React, Next.js, Angular, JavaScript, TypeScript, Node.js, Express.js, MongoDB, HTML, CSS, Tailwind CSS";

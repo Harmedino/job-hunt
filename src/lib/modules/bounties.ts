@@ -1,10 +1,17 @@
+import { skillMention } from "../job-intelligence";
+import { groupBountyAdvertisements } from "./bounty-opportunity";
 import { createHash } from "node:crypto";
 import type { Bounty, BountyAnalysis, TrackedBounty } from "./types";
 import { githubIssue, httpsUrl, ModuleError, object, text } from "./validation";
 import { providerJson } from "./http";
 import { get, lease, list, put, OWNER } from "./store";
 import { db } from "../db";
-import { bountyClassification, hasFundingEvidence, paymentRisk, sourceRewardAnnouncement } from "./bounty-verification";
+import {
+  bountyClassification,
+  hasFundingEvidence,
+  paymentRisk,
+  sourceRewardAnnouncement,
+} from "./bounty-verification";
 export function normalizeIssue(
   value: unknown,
   repository?: Record<string, unknown>,
@@ -45,9 +52,10 @@ export function normalizeIssue(
     "Laravel",
     "Python",
   ].filter((skill) =>
-    `${issue.title} ${body} ${labels.join(" ")} ${language}`
-      .toLowerCase()
-      .includes(skill.toLowerCase()),
+    skillMention(
+      `${issue.title} ${body} ${labels.join(" ")} ${language}`,
+      skill,
+    ),
   );
   return {
     id: `github:${link.repository.toLowerCase()}:${link.number}`,
@@ -85,12 +93,24 @@ export function normalizeIssue(
       /(?:USD|EUR|GBP|NGN|\$|€|£)\s*[\d,.]+/i,
     )?.[0],
     labels,
-    bountySignal: labels.some((l) => /bounty|reward|paid/i.test(l)) || /\bbount(?:y|ies)\b|cash reward|\/bounty\b/i.test(`${issue.title} ${body}`),
+    bountySignal:
+      labels.some((l) => /bounty|reward|paid/i.test(l)) ||
+      /\bbount(?:y|ies)\b|cash reward|\/bounty\b/i.test(
+        `${issue.title} ${body}`,
+      ),
     rewardAnnouncement: sourceRewardAnnouncement(
-      String(issue.title || ""), body,
-      ["OWNER", "MEMBER", "COLLABORATOR"].includes(String(issue.author_association)) ||
-        (typeof issue.user === "object" && !!issue.user && String(object(issue.user).login).toLowerCase() === link.repository.split("/")[0].toLowerCase()),
-      typeof issue.user === "object" && issue.user ? String(object(issue.user).login || "Unknown") : "Unknown",
+      String(issue.title || ""),
+      body,
+      ["OWNER", "MEMBER", "COLLABORATOR"].includes(
+        String(issue.author_association),
+      ) ||
+        (typeof issue.user === "object" &&
+          !!issue.user &&
+          String(object(issue.user).login).toLowerCase() ===
+            link.repository.split("/")[0].toLowerCase()),
+      typeof issue.user === "object" && issue.user
+        ? String(object(issue.user).login || "Unknown")
+        : "Unknown",
       link.url,
     ),
     difficulty: labels.some((l) => /good first issue|easy/i.test(l))
@@ -100,7 +120,7 @@ export function normalizeIssue(
         : "unknown",
   };
 }
-export async function github(path: string) {
+export async function github(path: string, timeoutMs = 6000) {
   const token = process.env.BOUNTY_GITHUB_TOKEN?.trim();
   return providerJson(
     `https://api.github.com${path}`,
@@ -112,6 +132,7 @@ export async function github(path: string) {
       },
     },
     "GitHub",
+    timeoutMs,
   );
 }
 export async function fetchIssue(url: string, manual = false) {
@@ -136,8 +157,12 @@ export function analyzeBounty(bounty: Bounty, skills: string): BountyAnalysis {
     .filter(Boolean);
   const evidence =
     `${bounty.title} ${bounty.description} ${bounty.language} ${bounty.skills.join(" ")}`.toLowerCase();
-  const matchedSkills = configured.filter((s) =>
-    evidence.includes(s.toLowerCase()),
+  const matchedSkills = configured.filter(
+    (s) =>
+      skillMention(evidence, s) ||
+      (s.toLowerCase() === "express.js" && skillMention(evidence, "Express")) ||
+      (s.toLowerCase() === "tailwind css" &&
+        skillMention(evidence, "Tailwind")),
   );
   const criteria = [
     {
@@ -206,7 +231,7 @@ export function analyzeBounty(bounty: Bounty, skills: string): BountyAnalysis {
   };
 }
 export function deduplicateBounties(values: Bounty[]) {
-  return [...new Map(values.map((b) => [b.id, b])).values()];
+  return groupBountyAdvertisements(values);
 }
 export async function persistBounty(bounty: Bounty, skills: string) {
   const existing = await get<Bounty>("bounties", bounty.id).catch((e) => {
@@ -222,8 +247,18 @@ export async function persistBounty(bounty: Bounty, skills: string) {
       ? { manual: true, source: existing.source, url: existing.url }
       : {}),
   };
+  value.advertisements = groupBountyAdvertisements([
+    ...(existing ? [existing] : []),
+    bounty,
+  ])[0]?.advertisements;
   value.analysis = analyzeBounty(value, skills);
-  if (existing?.updatedAt === value.updatedAt && existing?.description === value.description && existing?.status === value.status && JSON.stringify(existing?.reward) === JSON.stringify(value.reward) && existing?.analysis?.ai) {
+  if (
+    existing?.updatedAt === value.updatedAt &&
+    existing?.description === value.description &&
+    existing?.status === value.status &&
+    JSON.stringify(existing?.reward) === JSON.stringify(value.reward) &&
+    existing?.analysis?.ai
+  ) {
     value.analysis.ai = existing.analysis.ai;
   }
   await put("bounties", value);
@@ -239,15 +274,39 @@ export async function persistBounty(bounty: Bounty, skills: string) {
     (saved &&
       existing &&
       (existing.status !== value.status ||
-        existing.updatedAt !== value.updatedAt))
+        existing.updatedAt !== value.updatedAt ||
+        JSON.stringify(existing.rewardAnnouncement) !==
+          JSON.stringify(value.rewardAnnouncement) ||
+        existing.maintainerResponseAt !== value.maintainerResponseAt ||
+        JSON.stringify(existing.linkedPullRequests) !==
+          JSON.stringify(value.linkedPullRequests)))
   ) {
-    const noticeId = `bounty:${createHash("sha256").update(`${value.id}:${value.updatedAt}:${value.status}`).digest("hex")}`;
+    const changedMergedPr = value.linkedPullRequests?.find(
+      (pr) =>
+        pr.state === "merged" &&
+        pr.url !== saved?.submissionUrl &&
+        !existing?.linkedPullRequests?.some(
+          (old) => old.url === pr.url && old.state === "merged",
+        ),
+    );
+    const noticeId = `bounty:${createHash("sha256")
+      .update(
+        JSON.stringify([
+          value.id,
+          value.updatedAt,
+          value.status,
+          value.rewardAnnouncement,
+          value.maintainerResponseAt,
+          value.linkedPullRequests,
+        ]),
+      )
+      .digest("hex")}`;
     await database.collection("notifications").updateOne(
       { id: noticeId },
       {
         $setOnInsert: {
           id: noticeId,
-          title: `${saved ? "Saved task updated" : "New bounty candidate"}: ${value.title}${hasFundingEvidence(value) ? "" : " (payment unverified)"}`,
+          title: `${changedMergedPr ? "Another linked PR merged — review task availability" : saved ? "Saved task updated" : "New bounty candidate"}: ${value.title}${hasFundingEvidence(value) ? "" : " (payment unverified)"}`,
           createdAt: new Date().toISOString(),
           read: false,
         },
@@ -260,15 +319,42 @@ export async function persistBounty(bounty: Bounty, skills: string) {
 export function bountyQueries(query: string) {
   const clean = query.replace(/\b(?:is|state|type):\S+/gi, "").trim();
   const qualifiers = clean.match(/(?:repo|org|user|language):[^\s]+/gi) || [];
-  const terms = clean.replace(/(?:repo|org|user|language):[^\s]+/gi, "").split(/[\s,;]+/).filter(Boolean).slice(0, 6);
-  return ["label:bounty", "bounty", '"reward"', '"paid"', '"cash reward"', '"/bounty"'].map((signal, i) =>
+  const suppliedTerms = clean
+    .replace(/(?:repo|org|user|language):[^\s]+/gi, "")
+    .split(/[\s,;]+/)
+    .filter(Boolean)
+    .slice(0, 6);
+  const terms = suppliedTerms.length
+    ? suppliedTerms
+    : qualifiers.length
+      ? []
+      : ["React", "TypeScript", "Node.js", "Angular", "JavaScript", "Express"];
+  return [
+    "label:bounty",
+    "bounty",
+    '"reward"',
+    '"paid"',
+    '"cash reward"',
+    '"/bounty"',
+  ].map((signal, i) =>
     `is:public is:issue is:open ${signal} ${qualifiers.join(" ")} ${terms.length ? terms[i % terms.length] : ""}`.trim(),
   );
 }
-export async function collectBountyCandidates(query: string, request = github, maxRequests = process.env.BOUNTY_GITHUB_TOKEN ? 12 : 8) {
-  const diagnostics: NonNullable<import("./types").SourceState["diagnostics"]> = {
-    queries: [], raw: 0, duplicates: 0, saved: 0, rejected: 0, classifications: {}, bounded: false,
-  };
+export async function collectBountyCandidates(
+  query: string,
+  request = github,
+  maxRequests = process.env.BOUNTY_GITHUB_TOKEN ? 12 : 8,
+) {
+  const diagnostics: NonNullable<import("./types").SourceState["diagnostics"]> =
+    {
+      queries: [],
+      raw: 0,
+      duplicates: 0,
+      saved: 0,
+      rejected: 0,
+      classifications: {},
+      bounded: false,
+    };
   const unique = new Map<string, unknown>();
   const failures: string[] = [];
   const queries = bountyQueries(query);
@@ -278,59 +364,150 @@ export async function collectBountyCandidates(query: string, request = github, m
   outer: for (let page = 1; page <= 2; page++) {
     for (const q of queries) {
       if (exhausted.has(q)) continue;
-      if (diagnostics.queries.length >= maxRequests || Date.now() - start > 22000) {
-        diagnostics.bounded = true; break outer;
+      if (
+        diagnostics.queries.length >= maxRequests ||
+        Date.now() - start > 22000
+      ) {
+        diagnostics.bounded = true;
+        break outer;
       }
       try {
-        const result = object(await request(`/search/issues?${new URLSearchParams({ q, sort: "updated", order: "desc", per_page: "30", page: String(page) })}`));
-        if (!Array.isArray(result.items)) throw new ModuleError("GitHub returned an invalid search response.", 502);
-        diagnostics.queries.push({ query: q, page, returned: result.items.length, success: true });
+        const result = object(
+          await request(
+            `/search/issues?${new URLSearchParams({ q, sort: "updated", order: "desc", per_page: "30", page: String(page) })}`,
+          ),
+        );
+        if (!Array.isArray(result.items))
+          throw new ModuleError(
+            "GitHub returned an invalid search response.",
+            502,
+          );
+        diagnostics.queries.push({
+          query: q,
+          page,
+          returned: result.items.length,
+          success: true,
+        });
         diagnostics.raw += result.items.length;
         if (result.items.length < 30) exhausted.add(q);
-        if (result.incomplete_results) { diagnostics.bounded = true; failures.push("GitHub returned partial search results."); }
+        if (result.incomplete_results) {
+          diagnostics.bounded = true;
+          failures.push("GitHub returned partial search results.");
+        }
         for (const item of result.items) {
           try {
             const b = normalizeIssue(item);
             if (unique.has(b.id)) diagnostics.duplicates++;
             else unique.set(b.id, item);
-          } catch { diagnostics.rejected++; }
+          } catch {
+            diagnostics.rejected++;
+          }
         }
       } catch (error) {
-        const message = error instanceof ModuleError ? error.message : "GitHub search unavailable.";
-        diagnostics.queries.push({ query: q, page, returned: 0, success: false, error: message });
+        const message =
+          error instanceof ModuleError
+            ? error.message
+            : "GitHub search unavailable.";
+        diagnostics.queries.push({
+          query: q,
+          page,
+          returned: 0,
+          success: false,
+          error: message,
+        });
         failures.push(message);
-        if (error instanceof ModuleError && error.status === 429) { retryAt = error.retryAt; diagnostics.bounded = true; break outer; }
+        if (error instanceof ModuleError && error.status === 429) {
+          retryAt = error.retryAt;
+          diagnostics.bounded = true;
+          break outer;
+        }
       }
     }
   }
-  return { items: [...unique.values()], diagnostics, failures: [...new Set(failures)], retryAt };
+  return {
+    items: [...unique.values()],
+    diagnostics,
+    failures: [...new Set(failures)],
+    retryAt,
+  };
 }
 export async function discoverBounties(query: string, skills: string) {
   if (!(await lease("bounty-discovery", 120)))
-    throw new ModuleError("Discovery was recently requested. Wait two minutes before refreshing.", 429);
-  const previous = await get<import("./types").SourceState>("sources", "github").catch(() => undefined);
-  const { items, diagnostics, failures, retryAt } = await collectBountyCandidates(query);
+    throw new ModuleError(
+      "Discovery was recently requested. Wait two minutes before refreshing.",
+      429,
+    );
+  const previous = await get<import("./types").SourceState>(
+    "sources",
+    "github",
+  ).catch(() => undefined);
+  if (previous?.retryAt && Date.parse(previous.retryAt) > Date.now())
+    throw new ModuleError(
+      "GitHub is in its recorded rate-limit cooldown.",
+      429,
+      previous.retryAt,
+    );
+  const { items, diagnostics, failures, retryAt } =
+    await collectBountyCandidates(query);
   const repositories = new Map<string, Record<string, unknown>>();
-  const names = [...new Set(items.map((item) => normalizeIssue(item).repository))].slice(0, 6);
-  await Promise.allSettled(names.map(async (name) => {
-    try { repositories.set(name, object(await github(`/repos/${name.split("/").map(encodeURIComponent).join("/")}`))); } catch { /* Optional language metadata; preserve the issue. */ }
-  }));
+  const names = [
+    ...new Set(items.map((item) => normalizeIssue(item).repository)),
+  ].slice(0, 6);
+  await Promise.allSettled(
+    names.map(async (name) => {
+      try {
+        repositories.set(
+          name,
+          object(
+            await github(
+              `/repos/${name.split("/").map(encodeURIComponent).join("/")}`,
+            ),
+          ),
+        );
+      } catch {
+        /* Optional language metadata; preserve the issue. */
+      }
+    }),
+  );
+  let commentsChecked = 0;
   for (let offset = 0; offset < items.length; offset += 5) {
-    await Promise.all(items.slice(offset, offset + 5).map(async (item) => {
-      const initial = normalizeIssue(item);
-      const repo = repositories.get(initial.repository);
-      if (repo?.private) { diagnostics.rejected++; return; }
-      const saved = await persistBounty(normalizeIssue(item, repo), skills);
-      diagnostics.saved++;
-      const classification = bountyClassification(saved);
-      diagnostics.classifications[classification] = (diagnostics.classifications[classification] || 0) + 1;
-    }));
+    await Promise.all(
+      items.slice(offset, offset + 5).map(async (item) => {
+        const initial = normalizeIssue(item);
+        const repo = repositories.get(initial.repository);
+        if (repo?.private) {
+          diagnostics.rejected++;
+          return;
+        }
+        let candidate = normalizeIssue(item, repo);
+        if (
+          !candidate.rewardAnnouncement &&
+          candidate.comments &&
+          commentsChecked++ < 6
+        ) {
+          try {
+            candidate = await enrichRewardFromComments(candidate);
+          } catch {
+            /* Preserve an unverified signal; no funding is inferred. */
+          }
+        }
+        const saved = await persistBounty(candidate, skills);
+        diagnostics.saved++;
+        const classification = bountyClassification(saved);
+        diagnostics.classifications[classification] =
+          (diagnostics.classifications[classification] || 0) + 1;
+      }),
+    );
   }
   const success = diagnostics.queries.some((q) => q.success);
   await put("sources", {
-    id: "github", name: "GitHub", mode: "Official API", success,
+    id: "github",
+    name: "GitHub",
+    mode: "Official API",
+    success,
     message: `${diagnostics.raw} raw results; ${diagnostics.duplicates} duplicates; ${diagnostics.saved} unique tasks saved. ${failures.join(" ")}${diagnostics.bounded ? " Bounded or partial search; narrow keywords for more coverage." : ""}`,
-    checkedAt: new Date().toISOString(), retryAt,
+    checkedAt: new Date().toISOString(),
+    retryAt,
     lastSuccessAt: success ? new Date().toISOString() : previous?.lastSuccessAt,
     diagnostics,
   });
@@ -344,23 +521,81 @@ export async function importBounty(
     "github.com",
     "algora.io",
     "www.algora.io",
+    "opire.dev",
+    "www.opire.dev",
     "issuehunt.io",
     "oss.issuehunt.io",
   ]);
   let bounty: Bounty;
-  if (new URL(url).hostname === "github.com")
-    bounty = await fetchIssue(url, true);
-  else {
+  if (new URL(url).hostname === "github.com") {
+    try {
+      bounty = await fetchIssue(url, true);
+    } catch (error) {
+      if (
+        !(error instanceof ModuleError) ||
+        error.message === "Only public bounty repositories are supported."
+      )
+        throw error;
+      const origin = githubIssue(url);
+      bounty = {
+        id: `github:${origin.repository.toLowerCase()}:${origin.number}`,
+        title: text(body.title, "task title", 500, true),
+        description: text(body.description || "", "description", 18000),
+        source: "GitHub",
+        manual: true,
+        url: origin.url,
+        issueUrl: origin.url,
+        repository: origin.repository,
+        organization: origin.repository.split("/")[0],
+        language: "Unknown",
+        skills: [],
+        status: "unknown",
+        sponsor: "Unverified",
+        assignees: [],
+        difficulty: "unknown",
+        bountySignal: false,
+      };
+    }
+  } else {
     const issueUrl =
       typeof body.issueUrl === "string" && body.issueUrl
         ? githubIssue(body.issueUrl).url
         : undefined;
     const source = new URL(url).hostname.includes("algora")
       ? "Algora"
-      : "IssueHunt";
-    if (issueUrl)
-      bounty = { ...(await fetchIssue(issueUrl, true)), source, url };
-    else
+      : new URL(url).hostname.includes("opire")
+        ? "Opire"
+        : "IssueHunt";
+    if (issueUrl) {
+      try {
+        bounty = { ...(await fetchIssue(issueUrl, true)), source, url };
+      } catch (error) {
+        if (
+          !(error instanceof ModuleError) ||
+          error.message === "Only public bounty repositories are supported."
+        )
+          throw error;
+        const origin = githubIssue(issueUrl);
+        bounty = {
+          id: `github:${origin.repository.toLowerCase()}:${origin.number}`,
+          title: text(body.title, "task title", 500, true),
+          description: text(body.description || "", "description", 18000),
+          source,
+          manual: true,
+          url,
+          issueUrl: origin.url,
+          repository: origin.repository,
+          organization: origin.repository.split("/")[0],
+          language: "Unknown",
+          skills: [],
+          status: "unknown",
+          sponsor: "Unverified",
+          assignees: [],
+          difficulty: "unknown",
+          bountySignal: true,
+        };
+      }
+    } else
       bounty = {
         id: `manual:${createHash("sha256").update(url).digest("hex")}`,
         title: text(body.title, "task title", 500, true),
@@ -379,6 +614,24 @@ export async function importBounty(
         bountySignal: true,
       };
   }
+  if (body.rewardAdvertised === true) {
+    if (body.announcementConfirmed !== true)
+      throw new ModuleError(
+        "Confirm that a maintainer or recognized provider advertised this exact task reward.",
+      );
+    const advertised = (await import("./validation")).money(
+      body.amount,
+      body.currency,
+    );
+    bounty.rewardAnnouncement = {
+      reward: advertised,
+      announcedBy: text(body.announcedBy, "reward publisher", 300, true),
+      evidenceUrl:
+        typeof body.rewardEvidenceUrl === "string"
+          ? httpsUrl(body.rewardEvidenceUrl, true)
+          : url,
+    };
+  }
   return persistBounty(bounty, skills);
 }
 export async function verifySavedBounties(skills: string) {
@@ -395,9 +648,36 @@ export async function verifySavedBounties(skills: string) {
           const old = await get<Bounty>("bounties", item.bountyId);
           if (old.issueUrl)
             await persistBounty(
-              await fetchIssue(old.issueUrl, old.manual),
+              await (
+                await import("./bounty-repository")
+              ).inspectIssueActivity(
+                await fetchIssue(old.issueUrl, old.manual),
+              ),
               skills,
             );
+          if (item.submissionUrl)
+            await (
+              await import("./bounty-repository")
+            ).syncTrackedPullRequest(item);
+          if (
+            item.status === "Reward Claimed" &&
+            item.claimDate &&
+            Date.now() - Date.parse(item.claimDate) > 14 * 86400000
+          ) {
+            const noticeId = `bounty-claim:${item.bountyId}:${item.claimDate}`;
+            await (await db()).collection("notifications").updateOne(
+              { id: noticeId },
+              {
+                $setOnInsert: {
+                  id: noticeId,
+                  title: `Payment claim needs attention: ${old.title}`,
+                  createdAt: new Date().toISOString(),
+                  read: false,
+                },
+              },
+              { upsert: true },
+            );
+          }
         } catch (e) {
           result.push(
             e instanceof ModuleError ? e.message : "Saved bounty check failed.",
@@ -413,3 +693,35 @@ export {
   currencyTotals,
   bountyEarnings,
 } from "./bounties-client";
+
+export async function enrichRewardFromComments(
+  bounty: Bounty,
+  read: (path: string) => Promise<unknown> = (path) => github(path, 2500),
+): Promise<Bounty> {
+  if (!bounty.issueUrl) return bounty;
+  const issue = githubIssue(bounty.issueUrl),
+    comments = await read(
+      `/repos/${issue.repository.split("/").map(encodeURIComponent).join("/")}/issues/${issue.number}/comments?per_page=30`,
+    );
+  if (!Array.isArray(comments)) return bounty;
+  for (const value of comments) {
+    const comment = object(value),
+      url = String(comment.html_url || "");
+    if (!url.startsWith(issue.url + "#issuecomment-")) continue;
+    const user =
+      comment.user && typeof comment.user === "object"
+        ? object(comment.user)
+        : {};
+    const announcement = sourceRewardAnnouncement(
+      "",
+      String(comment.body || ""),
+      ["OWNER", "MEMBER", "COLLABORATOR"].includes(
+        String(comment.author_association),
+      ),
+      String(user.login || "Unknown"),
+      url,
+    );
+    if (announcement) return { ...bounty, rewardAnnouncement: announcement };
+  }
+  return bounty;
+}
