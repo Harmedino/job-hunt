@@ -1,5 +1,13 @@
+import { documentLinks } from "./document-links";
 import { resumeEntries, isEntrySection } from "./resume-layout";
-import { Document, Packer, Paragraph, TextRun, HeadingLevel } from "docx";
+import {
+  Document,
+  Packer,
+  Paragraph,
+  TextRun,
+  HeadingLevel,
+  ExternalHyperlink,
+} from "docx";
 import {
   resumeSections,
   orderedResumeSections,
@@ -17,17 +25,35 @@ export async function resumeDocx(
   template: ResumeTemplate = "classic",
   coverLetter?: string,
   legacy = false,
-  sectionOrder?:ResumeSection[],
+  sectionOrder?: ResumeSection[],
 ) {
   const compact = template === "compact";
   const accent = template === "modern" ? "1F5E5E" : "222D33";
+  const runs = (text: string): (TextRun | ExternalHyperlink)[] => {
+    const result: (TextRun | ExternalHyperlink)[] = [];
+    let position = 0;
+    for (const link of documentLinks(text)) {
+      if (link.index > position)
+        result.push(new TextRun(text.slice(position, link.index)));
+      result.push(
+        new ExternalHyperlink({
+          link: link.url,
+          children: [new TextRun({ text: link.text, style: "Hyperlink" })],
+        }),
+      );
+      position = link.index + link.text.length;
+    }
+    if (position < text.length) result.push(new TextRun(text.slice(position)));
+    return result;
+  };
   const paragraph = (text: string, spacing = 100) =>
     new Paragraph({
       spacing: { after: spacing, line: compact ? 260 : 290 },
       children: text
         .split("\n")
         .flatMap((line, index) => [
-          new TextRun({ text: line, break: index ? 1 : undefined }),
+          ...(index ? [new TextRun({ break: 1 })] : []),
+          ...runs(line),
         ]),
     });
   const children = [
@@ -56,7 +82,7 @@ export async function resumeDocx(
           text:
             coverLetter !== undefined
               ? `Re: ${target.title}${target.company ? " · " + target.company : ""}`
-              : target.title,
+              : `Target role: ${target.title}`,
           color: accent,
           size: 24,
         }),
@@ -70,7 +96,9 @@ export async function resumeDocx(
     );
   } else {
     const sections = legacy ? legacyResumeSections : resumeSections;
-    for (const key of (legacy ? Object.keys(sections) : orderedResumeSections(sectionOrder)) as (keyof ResumeContent)[]) {
+    for (const key of (legacy
+      ? Object.keys(sections)
+      : orderedResumeSections(sectionOrder)) as (keyof ResumeContent)[]) {
       const text = content[key] || "";
       if (!text.trim()) continue;
       children.push(
@@ -97,7 +125,7 @@ export async function resumeDocx(
             if (part.kind === "bullet")
               children.push(
                 new Paragraph({
-                  text: part.text,
+                  children: runs(part.text),
                   bullet: { level: 0 },
                   spacing: { after: 90, line: 290 },
                 }),

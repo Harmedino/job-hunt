@@ -39,6 +39,24 @@ export function applicationExport(app: Application) {
       "cvDraftId",
     ]),
     status: applicationStatusLabel(app.status),
+    customFields: (app.customFields || []).map((f) =>
+      pick(f, ["id", "name", "value", "confirmed"]),
+    ),
+    originalFiles: (app.originalFiles || []).map((f) =>
+      pick(f, [
+        "id",
+        "kind",
+        "name",
+        "mime",
+        "size",
+        "sha256",
+        "createdAt",
+        "source",
+        "supersedes",
+        "correctionReason",
+      ]),
+    ),
+    originalFileIds: app.originalFileIds,
     job: pick(app.job, [
       "id",
       "title",
@@ -65,6 +83,18 @@ export function applicationExport(app: Application) {
             "coverLetter",
             "coverLetterUsed",
           ]),
+          files: (snapshot.files || []).map((f) =>
+            pick(f, [
+              "id",
+              "kind",
+              "name",
+              "mime",
+              "size",
+              "sha256",
+              "createdAt",
+              "source",
+            ]),
+          ),
           cv: cv
             ? {
                 ...pick(cv, [

@@ -48,7 +48,8 @@ try {
     );
     assert.match(result.text, /CV Upload Test/);
     assert.equal(result.persisted, false);
-    assert.match(result.warning, /not saved/);
+    assert.equal(result.previewOnly, true);
+    assert.match(result.warning, /not changed/);
   }
   const bad = new FormData();
   bad.set("file", new File(["not-a-real-pdf"], "bad.pdf"));

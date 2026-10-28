@@ -45,6 +45,9 @@ export async function POST(request: Request) {
     const database = await db(),
       job =
         (await database.collection("jobs").findOne({ id: body.jobId })) ||
+        (await database
+          .collection("manual_jobs")
+          .findOne({ id: body.jobId })) ||
         (
           await database
             .collection("applications")
@@ -54,7 +57,10 @@ export async function POST(request: Request) {
       throw new ApplicationInputError(
         "Refresh discovery before saving this job, or record an outside application manually.",
       );
-    const app = await ensureJobApplication(job as unknown as Job);
+    const app = await ensureJobApplication(
+      job as unknown as Job,
+      job.manual ? "manual" : "discovered",
+    );
     return Response.json(
       body.markApplied
         ? await updateApplication({ ...body, id: app.id, status: "Submitted" })

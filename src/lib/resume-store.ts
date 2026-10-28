@@ -1,3 +1,5 @@
+import { manualJobDescription } from "./manual-jobs";
+import { validateKeywords } from "./job-keywords";
 import { AiError } from "./ai";
 import { db, errorResponse } from "./db";
 import {
@@ -19,9 +21,7 @@ export function validId(id: unknown): id is string {
 }
 export async function loadResume(id: unknown) {
   if (!validId(id)) throw new ResumeInputError("Invalid CV version.");
-  const record = await (
-    await db()
-  )
+  const record = await (await db())
     .collection<ResumeDraft>("resumes")
     .findOne({ id }, { projection: { _id: 0 } });
   if (!record) throw new ResumeInputError("CV version not found.", 404);
@@ -30,10 +30,28 @@ export async function loadResume(id: unknown) {
 export async function resumeTarget(
   body: Record<string, unknown>,
 ): Promise<ResumeTarget> {
+  if (body.masterTrack !== undefined) {
+    if (!["development", "cybersecurity"].includes(String(body.masterTrack)))
+      throw new ResumeInputError("Choose a valid master CV track.");
+    return {
+      title:
+        body.masterTrack === "development"
+          ? "Development Master CV"
+          : "Cybersecurity Internship Master CV",
+      company: "",
+      url: "",
+      description:
+        body.masterTrack === "development"
+          ? "Present actual junior and intermediate software development experience, projects, education and technical skills from the master profile."
+          : "Present actual cybersecurity learning, training and labs for internships, plus accurately labeled transferable software-development experience. Never claim professional SOC employment from development experience.",
+    };
+  }
   if (body.jobId !== undefined) {
     if (!validId(body.jobId)) throw new ResumeInputError("Invalid job.");
     const database = await db();
-    let job = await database.collection("jobs").findOne({ id: body.jobId });
+    let job =
+      (await database.collection("jobs").findOne({ id: body.jobId })) ||
+      (await database.collection("manual_jobs").findOne({ id: body.jobId }));
     if (body.applicationId !== undefined) {
       if (!validId(body.applicationId))
         throw new ResumeInputError("Invalid application.");
@@ -52,7 +70,11 @@ export async function resumeTarget(
     return {
       title: job.title,
       company: job.company,
-      description: job.description,
+      description: job.manual
+        ? manualJobDescription(job as unknown as import("./types").Job)
+        : job.description,
+      keywords: job.keywords,
+      customFields: job.customFields,
       url: job.url,
       jobId: body.jobId,
       ...(typeof body.applicationId === "string"
@@ -73,7 +95,7 @@ export async function resumeTarget(
   }
   if (
     !(value.title as string).trim() ||
-    (value.description as string).trim().length < 50
+    (body.useAi !== false && (value.description as string).trim().length < 50)
   )
     throw new ResumeInputError(
       "Add a role title and at least 50 characters of job description.",
@@ -90,6 +112,10 @@ export async function resumeTarget(
     }
   }
   return {
+    keywords:
+      value.keywords === undefined
+        ? undefined
+        : validateKeywords(value.keywords),
     title: (value.title as string).trim(),
     company: (value.company as string).trim(),
     description: (value.description as string).trim(),

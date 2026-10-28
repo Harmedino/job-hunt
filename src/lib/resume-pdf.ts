@@ -1,3 +1,4 @@
+import { documentLinks } from "./document-links";
 import {
   resumeEntries,
   isEntrySection,
@@ -5,7 +6,7 @@ import {
 } from "./resume-layout";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
-import { PDFDocument, rgb, type PDFFont } from "pdf-lib";
+import { PDFDocument, PDFName, PDFString, rgb, type PDFFont } from "pdf-lib";
 import fontkit from "@pdf-lib/fontkit";
 import {
   resumeSections,
@@ -28,7 +29,7 @@ export async function resumePdf(
   template: ResumeTemplate = "classic",
   coverLetter?: string,
   legacy = false,
-  sectionOrder?:ResumeSection[],
+  sectionOrder?: ResumeSection[],
 ) {
   const pdf = await PDFDocument.create();
   pdf.registerFontkit(fontkit);
@@ -44,7 +45,7 @@ export async function resumePdf(
   const compact = template === "compact";
   const accent =
     template === "modern" ? rgb(0.12, 0.37, 0.37) : rgb(0.13, 0.17, 0.2);
-  const lineHeight = compact ? 1.35 : 1.5;
+  const lineHeight = compact ? 1.3 : 1.4;
   const margin = compact ? 40 : 48,
     pageWidth = 595.28,
     pageHeight = 841.89,
@@ -96,6 +97,30 @@ export async function resumePdf(
         font,
         color,
       });
+      for (const link of documentLinks(row)) {
+        const x =
+          margin +
+          indent +
+          (rowIndex ? hanging : 0) +
+          font.widthOfTextAtSize(row.slice(0, link.index), size);
+        const annotation = pdf.context.obj({
+          Type: "Annot",
+          Subtype: "Link",
+          Rect: [x, y - size, x + font.widthOfTextAtSize(link.text, size), y],
+          Border: [0, 0, 0],
+          A: { Type: "Action", S: "URI", URI: pdf.context.obj(link.url) },
+        });
+        // URI strings must be literal PDF strings, not names.
+        annotation.set(
+          PDFName.of("A"),
+          pdf.context.obj({
+            Type: "Action",
+            S: "URI",
+            URI: PDFString.of(link.url),
+          }),
+        );
+        page.node.addAnnot(pdf.context.register(annotation));
+      }
       y -= size * lineHeight;
     }
   }
@@ -144,15 +169,17 @@ export async function resumePdf(
     y -= 18;
     draw(coverLetter, 10.5);
   } else {
-    draw(target.title, 11, regular, accent);
+    draw(`Target role: ${target.title}`, 11, regular, accent);
     const sections = legacy ? legacyResumeSections : resumeSections;
-    for (const key of (legacy ? Object.keys(sections) : orderedResumeSections(sectionOrder)) as (keyof ResumeContent)[]) {
+    for (const key of (legacy
+      ? Object.keys(sections)
+      : orderedResumeSections(sectionOrder)) as (keyof ResumeContent)[]) {
       const text = content[key] || "";
       if (!text.trim()) continue;
       const entries =
         !legacy && isEntrySection(key) ? resumeEntries(text) : undefined;
-      need(entries?.length ? 44 + entryHeight(entries[0]) : 60);
-      y -= compact ? 12 : 17;
+      need(entries?.length ? 36 + entryHeight(entries[0]) : 54);
+      y -= compact ? 10 : 13;
       draw(
         sections[key as keyof typeof sections].toUpperCase(),
         10,

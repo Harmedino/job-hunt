@@ -116,15 +116,24 @@ test(
     assert.equal(imported.status, 200);
     const importedCv = await imported.json();
     assert.match(importedCv.text, /Test Applicant/);
-    assert.equal(importedCv.persisted, true);
+    assert.equal(importedCv.persisted, false);
+    assert.equal(importedCv.previewOnly, true);
+    const beforeApproval = await (await getProfile()).json();
+    assert.equal(beforeApproval.cvText, "");
+    assert.equal(
+      (
+        await saveProfile(
+          request({ ...beforeApproval, cvText: importedCv.text }),
+        )
+      ).status,
+      200,
+    );
     assert.match(
       (await (await db()).collection("profile").findOne({ key: "owner" }))
         ?.profile.cvText,
       /Test Applicant/,
     );
-    const saved = await (
-      await db()
-    )
+    const saved = await (await db())
       .collection("applications")
       .findOne({ id: first.id });
     assert.deepEqual(saved?.cvFacts, [
@@ -133,8 +142,15 @@ test(
     ]);
     assert.equal(saved?.status, "Ready for review");
     assert.equal(
-      (await updateApplication(request({ id: first.id, status: "Submitted", submissionConfirmed:true })))
-        .status,
+      (
+        await updateApplication(
+          request({
+            id: first.id,
+            status: "Submitted",
+            submissionConfirmed: true,
+          }),
+        )
+      ).status,
       200,
     );
     assert.equal((await prepare(request({ id: first.id }))).status, 409);
@@ -148,8 +164,18 @@ test(
         String(input).includes("remotive") ? { jobs: [] } : { data: [] },
       );
     await discoverJobs();
-    assert.equal(await (await db()).collection("jobs").countDocuments({closedAt:{$exists:false}}), 0);
-    assert.equal(await (await db()).collection("jobs").countDocuments({closedAt:{$exists:true}}), 1);
+    assert.equal(
+      await (await db())
+        .collection("jobs")
+        .countDocuments({ closedAt: { $exists: false } }),
+      0,
+    );
+    assert.equal(
+      await (await db())
+        .collection("jobs")
+        .countDocuments({ closedAt: { $exists: true } }),
+      1,
+    );
     assert.equal(
       await (await db()).collection("applications").countDocuments(),
       1,
@@ -165,7 +191,7 @@ test("scheduled discovery rejects missing/incorrect authorization", async () => 
 });
 
 test(
-  "CV-to-profile patch persists blank fields, preserves existing entries and prepares an AI-ranked PDF",
+  "Explicitly approved CV proposals persist selected fields, preserves existing entries and prepares an AI-ranked PDF",
   { skip: !enabled, timeout: 30000 },
   async () => {
     delete process.env.OPENAI_API_KEY;
@@ -188,8 +214,22 @@ test(
       new Request("http://localhost/api/cv", { method: "POST", body: form }),
     );
     const uploaded = await response.json();
-    assert.equal(uploaded.persisted, true);
-    assert.ok(uploaded.patchedFields.includes("skills"));
+    assert.equal(uploaded.persisted, false);
+    assert.equal(uploaded.previewOnly, true);
+    const beforeApproval = await (await getProfile()).json();
+    assert.equal(beforeApproval.name, "Existing chosen name");
+    assert.equal(beforeApproval.skills, "");
+    // Simulate explicit approval of selected fields, preserving the owner-chosen name.
+    const { name: proposedName, ...approvedFields } = uploaded.fields;
+    assert.equal(typeof proposedName, "string");
+    assert.equal(
+      (
+        await saveProfile(
+          request({ ...beforeApproval, ...approvedFields, cvText: cv }),
+        )
+      ).status,
+      200,
+    );
     const profile = await (await getProfile()).json();
     assert.equal(profile.name, "Existing chosen name");
     assert.equal(profile.email, "applicant@example.org");
@@ -202,7 +242,7 @@ test(
     assert.equal(profile.projects, "React dashboard");
     assert.equal(profile.cvText, cv);
     assert.equal(
-      (await (await importSavedCV(request({}))).json()).persisted,
+      (await (await importSavedCV(request({}))).json()).previewOnly,
       true,
     );
     // Local source/API fixtures only. Verify the job description reaches the ranker and exact facts reach the PDF.
@@ -247,9 +287,7 @@ test(
         200,
       );
       assert.equal(aiCalled, true);
-      const saved = await (
-        await db()
-      )
+      const saved = await (await db())
         .collection("applications")
         .findOne({ id: application.id });
       assert.equal(saved?.preparationMethod, "AI-ranked profile evidence");
@@ -267,9 +305,7 @@ test(
       );
     } finally {
       delete process.env.OPENAI_API_KEY;
-      await (
-        await db()
-      )
+      await (await db())
         .collection("jobs")
         .deleteOne({ id: result.jobs[0].id });
     }
@@ -377,7 +413,10 @@ test(
     assert.equal(discovered.persisted, true);
     const cached = await (await cachedJobs()).json();
     assert.equal(cached.refreshRecommended, false);
-    assert.equal(cached.sources.length, jobPlatforms.filter(p => p.access !== "manual").length);
+    assert.equal(
+      cached.sources.length,
+      jobPlatforms.filter((p) => p.access !== "manual").length,
+    );
     await database
       .collection("discovery_state")
       .updateOne({ key: "latest" }, { $unset: { revision: "" } });
@@ -405,16 +444,16 @@ test(
       (await (await cachedJobs()).json()).sources.filter(
         (s: { status: string }) => s.status === "error",
       ).length,
-      jobPlatforms.filter(p => p.access === "public" || p.access === "employer-boards").length,
+      jobPlatforms.filter(
+        (p) => p.access === "public" || p.access === "employer-boards",
+      ).length,
     );
-    await database
-      .collection("discovery_state")
-      .updateOne(
-        { key: "latest" },
-        {
-          $set: { checkedAt: new Date(Date.now() - 20 * 60000).toISOString() },
-        },
-      );
+    await database.collection("discovery_state").updateOne(
+      { key: "latest" },
+      {
+        $set: { checkedAt: new Date(Date.now() - 20 * 60000).toISOString() },
+      },
+    );
     assert.equal((await (await cachedJobs()).json()).refreshRecommended, true);
   },
 );
@@ -441,22 +480,22 @@ test(
       matchedSkills: [],
     };
     await database.collection("jobs").insertOne({ ...old });
-    await database
-      .collection("applications")
-      .insertOne({
-        id: "tracked-old-window-fixture",
-        job: old,
-        status: "Submitted",
-        createdAt: old.postedAt,
-        updatedAt: old.postedAt,
-      });
+    await database.collection("applications").insertOne({
+      id: "tracked-old-window-fixture",
+      job: old,
+      status: "Submitted",
+      createdAt: old.postedAt,
+      updatedAt: old.postedAt,
+    });
     const cached = await (await cachedJobs()).json();
     assert.ok(!cached.jobs.some((job: { id: string }) => job.id === old.id));
     globalThis.fetch = async () => new Response("", { status: 503 });
     const searched = await (await discoverJobs()).json();
     assert.ok(!searched.jobs.some((job: { id: string }) => job.id === old.id));
     assert.equal(
-      await database.collection("jobs").countDocuments({ id: old.id,closedAt:{$exists:true} }),
+      await database
+        .collection("jobs")
+        .countDocuments({ id: old.id, closedAt: { $exists: true } }),
       1,
     );
     assert.equal(

@@ -1,3 +1,4 @@
+import { validateDocxContainer } from "./document-safety";
 import { cvFileProblem, MAX_CV_TEXT } from "./cv-limits";
 export class CvInputError extends Error {
   constructor(
@@ -16,12 +17,17 @@ export async function extractCv(file: File) {
   const bytes = Buffer.from(await file.arrayBuffer());
   let text = "";
   try {
-    if (/\.txt$/i.test(file.name)) text = bytes.toString("utf8");
+    if (/\.txt$/i.test(file.name))
+      text =
+        bytes[0] === 0xff && bytes[1] === 0xfe
+          ? new TextDecoder("utf-16le", { fatal: true }).decode(bytes)
+          : new TextDecoder("utf-8", { fatal: true }).decode(bytes);
     else if (/\.docx$/i.test(file.name)) {
       if (bytes[0] !== 0x50 || bytes[1] !== 0x4b)
         throw new CvInputError(
           "This DOCX is invalid or protected. Open it in Word and save an unprotected DOCX, PDF, or TXT copy.",
         );
+      validateDocxContainer(bytes);
       const { extractRawText } = await import("mammoth");
       text = (await extractRawText({ buffer: bytes })).value;
     } else {
@@ -37,6 +43,11 @@ export async function extractCv(file: File) {
         isEvalSupported: false,
       });
       try {
+        const info = await parser.getInfo();
+        if (info.total > 30)
+          throw new CvInputError(
+            "CV and cover-letter uploads must contain at most 30 pages.",
+          );
         text = (await parser.getText({ pageJoiner: "\n" })).text;
       } finally {
         await parser.destroy();
@@ -60,6 +71,8 @@ export async function extractCv(file: File) {
   if (!text)
     throw new CvInputError(
       "No readable text was found. Scanned PDFs need OCR; choose a text-based PDF, DOCX, or TXT file.",
+      422,
+      "NO_READABLE_TEXT",
     );
   if (text.length > MAX_CV_TEXT)
     throw new CvInputError(

@@ -1,3 +1,4 @@
+import { resumeFilename } from "@/lib/resume-filename";
 import { loadResume, privateHeaders, resumeError } from "@/lib/resume-store";
 import { resumePdf } from "@/lib/resume-pdf";
 export const runtime = "nodejs";
@@ -7,19 +8,21 @@ export async function GET(
 ) {
   try {
     const draft = await loadResume((await params).id);
-    const filename =
-      `${draft.content.name}-${draft.target.title}`
-        .normalize("NFKD")
-        .replace(/[^a-zA-Z0-9 -]/g, "")
-        .trim()
-        .slice(0, 100) || "tailored-cv";
+    const filename = resumeFilename(draft.content, draft.target, "cv", "pdf");
     return new Response(
-      await resumePdf(draft.content, draft.target, draft.template, undefined, draft.layoutVersion !== 2, draft.sectionOrder),
+      await resumePdf(
+        draft.content,
+        draft.target,
+        draft.template,
+        undefined,
+        draft.layoutVersion !== 2,
+        draft.sectionOrder,
+      ),
       {
         headers: {
           ...privateHeaders,
           "Content-Type": "application/pdf",
-          "Content-Disposition": `attachment; filename="${filename}.pdf"`,
+          "Content-Disposition": `attachment; filename="${filename}"`,
         },
       },
     );

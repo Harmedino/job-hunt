@@ -111,14 +111,14 @@ test("AI selects relevant project evidence, writes a curated CV and never prints
       });
     }
     assert.equal(data.target, undefined);
-    assert.equal(data.claims.length, 7);
+    assert.equal(data.claims.length, 5);
     assert.ok(
       data.claims.every(
         (claim: { evidence: string[] }) =>
           !claim.evidence.some((text) => /Gamma Shop|Delta Library/.test(text)),
       ),
     );
-    return response({ supported: [0, 1, 2, 3, 4, 5, 6] });
+    return response({ supported: [0, 1, 2, 3, 4] });
   };
   const draft = await buildResume(profile, target, true);
   assert.equal(calls, 3);
@@ -147,7 +147,7 @@ test("AI failure or rejected essential content never becomes a profile copy labe
         selectedEvidence: [0, 1, 3, 6],
       });
     if (calls === 2) return response({ items });
-    return response({ supported: [0, 1, 4, 5, 6] }); // Work and project writing failed verification.
+    return response({ supported: [0, 1, 4] }); // Work and project writing failed verification.
   };
   await assert.rejects(
     () => buildResume(profile, target, true),

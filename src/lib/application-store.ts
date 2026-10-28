@@ -65,7 +65,7 @@ export async function ensureJobApplication(
   }
   const now = new Date().toISOString(),
     vacancyKey = createHash("sha256")
-      .update(vacancyGroupKey(job))
+      .update(vacancyGroupKey(job) + (job.url ? "" : "|" + job.id))
       .digest("hex");
   const app: Application = {
     id: randomUUID(),
@@ -77,6 +77,7 @@ export async function ensureJobApplication(
     createdAt: now,
     updatedAt: now,
     followUp: "",
+    customFields: job.customFields || [],
     statusHistory: [{ status: "Saved", at: now }],
   };
   try {
@@ -98,7 +99,7 @@ export async function updateApplication(body: Record<string, unknown>) {
   } catch (e) {
     throw new ApplicationInputError((e as Error).message);
   }
-  const { id, fields, saved } = parsed,
+  const { id, fields, saved, customFields } = parsed,
     collection = await applicationIndexes(),
     app = await collection.findOne({ id });
   if (!app) throw new ApplicationInputError("Application not found.", 404);
@@ -109,6 +110,7 @@ export async function updateApplication(body: Record<string, unknown>) {
     );
   const now = new Date().toISOString(),
     changes: Record<string, unknown> = { ...fields, updatedAt: now };
+  if (customFields !== undefined) changes.customFields = customFields;
   if (saved !== undefined) {
     changes.saved = saved;
     if (!saved) changes.unsavedAt = now;
@@ -182,6 +184,25 @@ export async function updateApplication(body: Record<string, unknown>) {
       "This application changed in another request. Reload it before updating.",
       409,
     );
+  if (changes.documentSnapshot) {
+    const submitted = await collection.findOne({ id });
+    try {
+      if (submitted)
+        await (
+          await import("./application-files")
+        ).freezeSelectedDocuments(submitted);
+    } catch {
+      await collection.updateOne(
+        { id },
+        {
+          $set: {
+            "documentSnapshot.renderingWarning":
+              "The selected version is preserved, but a file rendering could not be frozen. Attach the original submitted files if available.",
+          },
+        },
+      );
+    }
+  }
   return await collection.findOne({ id });
 }
 export async function createManualApplication(body: Record<string, unknown>) {
@@ -275,22 +296,20 @@ export async function syncApplicationReminders(now = new Date()) {
   for (const action of actions) {
     const id = `application:${action.app.id}:${action.kind}:${action.date}:${action.overdue ? "overdue" : "upcoming"}`;
     active.push(id);
-    await database
-      .collection("notifications")
-      .updateOne(
-        { id },
-        {
-          $setOnInsert: {
-            id,
-            kind: "application-reminder",
-            applicationId: action.app.id,
-            title: `${action.kind} ${action.overdue ? "overdue" : "upcoming"}: ${action.app.job.company} — ${action.app.job.title} (${action.date})`,
-            createdAt: now.toISOString(),
-            read: false,
-          },
+    await database.collection("notifications").updateOne(
+      { id },
+      {
+        $setOnInsert: {
+          id,
+          kind: "application-reminder",
+          applicationId: action.app.id,
+          title: `${action.kind} ${action.overdue ? "overdue" : "upcoming"}: ${action.app.job.company} — ${action.app.job.title} (${action.date})`,
+          createdAt: now.toISOString(),
+          read: false,
         },
-        { upsert: true },
-      );
+      },
+      { upsert: true },
+    );
   }
   await database
     .collection("notifications")

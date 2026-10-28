@@ -60,7 +60,7 @@ test("CV extraction remains available without storage and never reports a false 
   const result = await response.json();
   assert.equal(response.status, 200);
   assert.equal(result.persisted, false);
-  assert.equal(result.storage, "missing");
+  assert.equal(result.previewOnly, true);
   assert.match(result.warning, /not saved/);
   assert.match(result.text, /React/);
 });

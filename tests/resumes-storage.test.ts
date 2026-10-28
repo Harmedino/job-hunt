@@ -137,7 +137,9 @@ test(
       new File([new Uint8Array(await pdf.arrayBuffer())], "tailored.pdf"),
     );
     assert.match(text, /React and TypeScript frontend skills/);
-    const list = await (await listResumes()).json();
+    const list = await (
+      await listResumes(new Request("http://localhost/api/resumes"))
+    ).json();
     assert.equal(list.drafts.length, 2);
     assert.equal(list.drafts[0].profileSnapshot, undefined);
     assert.equal(list.drafts[0].content, undefined);
@@ -199,9 +201,7 @@ test(
       (await attachResume(request({}), params(draft.id))).status,
       200,
     );
-    const linked = await (
-      await db()
-    )
+    const linked = await (await db())
       .collection("applications")
       .findOne({ id: application.id });
     assert.equal(linked?.cvDraftId, draft.id);
@@ -213,7 +213,11 @@ test(
     );
     assert.equal(pdf.headers.get("Content-Type"), "application/pdf");
     await updateApplication(
-      request({ id: application.id, status: "Submitted", submissionConfirmed:true }),
+      request({
+        id: application.id,
+        status: "Submitted",
+        submissionConfirmed: true,
+      }),
     );
     const next = await (
       await createResume(
@@ -234,9 +238,7 @@ test(
     );
     assert.equal(
       (
-        await (
-          await db()
-        )
+        await (await db())
           .collection("applications")
           .findOne({ id: application.id })
       )?.cvDraftId,
@@ -249,9 +251,7 @@ test(
     assert.equal(original.coverLetter, draft.coverLetter);
     assert.equal(
       (
-        await (
-          await db()
-        )
+        await (await db())
           .collection("applications")
           .findOne({ id: application.id })
       )?.coverLetter,
@@ -309,21 +309,19 @@ test(
       additional: "LEGACY SOURCE HEADER\nRepeated source text.",
     };
     const database = await db();
-    await database
-      .collection("resumes")
-      .insertOne({
-        id: "legacy-layout-fixture",
-        familyId: "legacy-layout-fixture",
-        createdAt: new Date().toISOString(),
-        content,
-        target,
-        profileSnapshot: profile,
-        evidence: [],
-        method: "Legacy fixture",
-        warnings: [],
-        requirementsToReview: [],
-        manualEdits: false,
-      });
+    await database.collection("resumes").insertOne({
+      id: "legacy-layout-fixture",
+      familyId: "legacy-layout-fixture",
+      createdAt: new Date().toISOString(),
+      content,
+      target,
+      profileSnapshot: profile,
+      evidence: [],
+      method: "Legacy fixture",
+      warnings: [],
+      requirementsToReview: [],
+      manualEdits: false,
+    });
     const cleaned = await createResume(
       request({
         action: "save",

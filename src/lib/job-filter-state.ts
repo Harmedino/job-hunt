@@ -1,28 +1,290 @@
-import type {Job} from './types';
-import {careerPath,developmentTrack} from './career-policy';
-export type JobFilters={query:string;career:'development'|'cybersecurity';category:string;jobType:string;level:string;fresh:string;review:boolean;includeOtherStacks:boolean;showHandled:boolean;opportunityView:string;sort:string;minimumSalary:number;salaryCurrency:string;quick:string};
-export const defaultJobFilters:JobFilters={query:'',career:'development',category:'All opportunities',jobType:'all',level:'all',fresh:'3',review:true,includeOtherStacks:false,showHandled:false,opportunityView:'all',sort:'best',minimumSalary:0,salaryCurrency:'NGN',quick:'all'};
-const choices={career:['development','cybersecurity'],category:['All opportunities','Development','Cybersecurity','Frontend','Backend','Full-stack','Software engineering'],jobType:['all','Full-time','Part-time','Contract','Freelance','Internship'],level:['all','Internship','Entry-level','Junior','Mid-level','Senior'],fresh:['1','3','7','14','30','active','available'],opportunityView:['all','strong','new','eligible','review','needs_review','salary_unknown','salary_review','saved','applied'],sort:['best','newest','company','experience','salary_high','salary_low','skills','eligible'],quick:['all','junior_frontend','mid_frontend','backend','node_intern','fullstack','security_intern','salary_unknown']} as const;
-export function validateJobFilters(value:unknown):JobFilters {
- if(!value||typeof value!=='object'||Array.isArray(value))throw new Error('Provide valid job filters.');const v=value as Record<string,unknown>,result={...defaultJobFilters};
- if(v.query!==undefined){if(typeof v.query!=='string'||v.query.length>200)throw new Error('Keep search keywords under 200 characters.');result.query=v.query;}
- for(const key of Object.keys(choices) as (keyof typeof choices)[]){const item=v[key];if(item===undefined)continue;if(typeof item!=='string'||!(choices[key] as readonly string[]).includes(item))throw new Error(`Invalid search filter: ${key}.`);result[key]=item as never;}
- if(v.career===undefined&&v.category==='Cybersecurity')result.career='cybersecurity';
- for(const key of ['review','includeOtherStacks','showHandled'] as const){if(v[key]!==undefined&&typeof v[key]!=='boolean')throw new Error('Invalid search preference.');if(typeof v[key]==='boolean')result[key]=v[key];}
- if(v.minimumSalary!==undefined){if(typeof v.minimumSalary!=='number'||!Number.isFinite(v.minimumSalary)||v.minimumSalary<0||v.minimumSalary>1e10)throw new Error('Enter a valid minimum monthly salary.');result.minimumSalary=v.minimumSalary;}
- if(v.salaryCurrency!==undefined){if(typeof v.salaryCurrency!=='string'||! /^[A-Z]{3}$/.test(v.salaryCurrency))throw new Error('Choose a valid ISO salary currency.');result.salaryCurrency=v.salaryCurrency;}
- return result;
+import { skillMention } from "./job-intelligence";
+import type { Job } from "./types";
+import { careerPath, developmentTrack } from "./career-policy";
+export type JobFilters = {
+  titles?: string;
+  technologies?: string;
+  requiredKeywords?: string;
+  excludedKeywords?: string;
+  query: string;
+  career: "development" | "cybersecurity";
+  category: string;
+  jobType: string;
+  level: string;
+  fresh: string;
+  review: boolean;
+  includeOtherStacks: boolean;
+  showHandled: boolean;
+  opportunityView: string;
+  sort: string;
+  minimumSalary: number;
+  salaryCurrency: string;
+  quick: string;
+};
+export const defaultJobFilters: JobFilters = {
+  query: "",
+  career: "development",
+  category: "All opportunities",
+  jobType: "all",
+  level: "all",
+  fresh: "3",
+  review: true,
+  includeOtherStacks: false,
+  showHandled: false,
+  opportunityView: "all",
+  sort: "best",
+  minimumSalary: 0,
+  salaryCurrency: "NGN",
+  quick: "all",
+};
+const choices = {
+  career: ["development", "cybersecurity"],
+  category: [
+    "All opportunities",
+    "Development",
+    "Cybersecurity",
+    "Frontend",
+    "Backend",
+    "Full-stack",
+    "Software engineering",
+  ],
+  jobType: [
+    "all",
+    "Full-time",
+    "Part-time",
+    "Contract",
+    "Freelance",
+    "Internship",
+  ],
+  level: ["all", "Internship", "Entry-level", "Junior", "Mid-level", "Senior"],
+  fresh: ["1", "3", "7", "14", "30", "active", "available"],
+  opportunityView: [
+    "all",
+    "strong",
+    "new",
+    "eligible",
+    "review",
+    "needs_review",
+    "salary_unknown",
+    "salary_review",
+    "saved",
+    "applied",
+    "manual",
+  ],
+  sort: [
+    "best",
+    "newest",
+    "company",
+    "experience",
+    "salary_high",
+    "salary_low",
+    "skills",
+    "eligible",
+  ],
+  quick: [
+    "all",
+    "junior_frontend",
+    "mid_frontend",
+    "backend",
+    "node_intern",
+    "fullstack",
+    "security_intern",
+    "salary_unknown",
+  ],
+} as const;
+export function validateJobFilters(value: unknown): JobFilters {
+  if (!value || typeof value !== "object" || Array.isArray(value))
+    throw new Error("Provide valid job filters.");
+  const v = value as Record<string, unknown>,
+    result = { ...defaultJobFilters };
+  if (v.query !== undefined) {
+    if (typeof v.query !== "string" || v.query.length > 200)
+      throw new Error("Keep search keywords under 200 characters.");
+    result.query = v.query;
+  }
+  for (const key of Object.keys(choices) as (keyof typeof choices)[]) {
+    const item = v[key];
+    if (item === undefined) continue;
+    if (
+      typeof item !== "string" ||
+      !(choices[key] as readonly string[]).includes(item)
+    )
+      throw new Error(`Invalid search filter: ${key}.`);
+    result[key] = item as never;
+  }
+  if (v.career === undefined && v.category === "Cybersecurity")
+    result.career = "cybersecurity";
+  for (const key of ["review", "includeOtherStacks", "showHandled"] as const) {
+    if (v[key] !== undefined && typeof v[key] !== "boolean")
+      throw new Error("Invalid search preference.");
+    if (typeof v[key] === "boolean") result[key] = v[key];
+  }
+  if (v.minimumSalary !== undefined) {
+    if (
+      typeof v.minimumSalary !== "number" ||
+      !Number.isFinite(v.minimumSalary) ||
+      v.minimumSalary < 0 ||
+      v.minimumSalary > 1e10
+    )
+      throw new Error("Enter a valid minimum monthly salary.");
+    result.minimumSalary = v.minimumSalary;
+  }
+  if (v.salaryCurrency !== undefined) {
+    if (
+      typeof v.salaryCurrency !== "string" ||
+      !/^[A-Z]{3}$/.test(v.salaryCurrency)
+    )
+      throw new Error("Choose a valid ISO salary currency.");
+    result.salaryCurrency = v.salaryCurrency;
+  }
+  for (const key of [
+    "titles",
+    "technologies",
+    "requiredKeywords",
+    "excludedKeywords",
+  ] as const) {
+    if (v[key] !== undefined) {
+      if (typeof v[key] !== "string" || v[key].length > 1500)
+        throw new Error(
+          "Keep saved search terms under 1,500 characters per field.",
+        );
+      result[key] = v[key];
+    }
+  }
+  return result;
 }
-export function matchesKeywords(job:Pick<Job,'title'|'company'|'description'>,query:string){const text=[job.title,job.company,job.description].join(' ').toLowerCase();return query.trim().toLowerCase().split(/\s+/).filter(Boolean).every(word=>text.includes(word));}
-export function matchesRole(job:Pick<Job,'title'|'description'>,role:string){if(role==='All opportunities')return true;if(role==='Development')return careerPath(job.title,job.description)==='development';if(role==='Cybersecurity')return careerPath(job.title,job.description)==='cybersecurity';const track=developmentTrack(job.title,job.description);if(role==='Frontend')return track==='frontend';if(role==='Backend')return track==='backend';if(role==='Full-stack')return track==='fullstack';return /software|engineer|developer/i.test(job.title)&&careerPath(job.title,job.description)!=='cybersecurity';}
-export function matchesQuick(job:Job,quick:string){if(quick==='all')return true;if(quick==='junior_frontend')return job.developmentTrack==='frontend'&&['Junior','Entry-level'].includes(job.experienceLevel||'')&&job.salaryAssessment?.status==='meets';if(quick==='mid_frontend')return job.developmentTrack==='frontend'&&job.experienceLevel==='Mid-level';if(quick==='backend')return job.developmentTrack==='backend'&&['Junior','Mid-level'].includes(job.experienceLevel||'');if(quick==='node_intern')return job.developmentTrack==='backend'&&job.isInternship&&job.compensation==='paid';if(quick==='fullstack')return job.developmentTrack==='fullstack';if(quick==='security_intern')return job.careerPath==='cybersecurity'&&job.isInternship;if(quick==='salary_unknown')return ['unknown','needs_review'].includes(job.salaryAssessment?.status||'unknown');return true;}
-const levels=['Internship','Entry-level','Junior','Mid-level','Senior'];
-export function sortJobResults(jobs:Job[],sort:string){return [...jobs].sort((a,b)=>{
- if(sort==='company')return a.company.localeCompare(b.company)||a.title.localeCompare(b.title);
- if(sort==='experience')return (levels.includes(a.experienceLevel||'')?levels.indexOf(a.experienceLevel!):9)-(levels.includes(b.experienceLevel||'')?levels.indexOf(b.experienceLevel!):9)||b.score-a.score;
- if(sort==='salary_high'||sort==='salary_low'){const av=a.salaryAssessment?.conversionCurrent?a.salaryAssessment.ngnMin:undefined,bv=b.salaryAssessment?.conversionCurrent?b.salaryAssessment.ngnMin:undefined;if(av===undefined||bv===undefined)return av===undefined?bv===undefined?0:1:-1;return sort==='salary_high'?bv-av:av-bv;}
- if(sort==='skills')return (b.matchedSkills?.length||0)-(a.matchedSkills?.length||0)||b.score-a.score;
- if(sort==='eligible')return Number(b.eligibility==='eligible')-Number(a.eligibility==='eligible')||b.score-a.score;
- if(sort==='newest')return (Date.parse(b.postedAt)||0)-(Date.parse(a.postedAt)||0);
- return b.score-a.score||Number(b.eligibility==='eligible')-Number(a.eligibility==='eligible')||(b.compensation==='paid'?1:0)-(a.compensation==='paid'?1:0)||(Date.parse(b.postedAt)||0)-(Date.parse(a.postedAt)||0);
-});}
+export function matchesKeywords(
+  job: Pick<Job, "title" | "company" | "description">,
+  query: string,
+) {
+  const text = [job.title, job.company, job.description]
+    .join(" ")
+    .toLowerCase();
+  return query
+    .trim()
+    .toLowerCase()
+    .split(/\s+/)
+    .filter(Boolean)
+    .every((word) => text.includes(word));
+}
+export function matchesRole(
+  job: Pick<Job, "title" | "description">,
+  role: string,
+) {
+  if (role === "All opportunities") return true;
+  if (role === "Development")
+    return careerPath(job.title, job.description) === "development";
+  if (role === "Cybersecurity")
+    return careerPath(job.title, job.description) === "cybersecurity";
+  const track = developmentTrack(job.title, job.description);
+  if (role === "Frontend") return track === "frontend";
+  if (role === "Backend") return track === "backend";
+  if (role === "Full-stack") return track === "fullstack";
+  return (
+    /software|engineer|developer/i.test(job.title) &&
+    careerPath(job.title, job.description) !== "cybersecurity"
+  );
+}
+export function matchesQuick(job: Job, quick: string) {
+  if (quick === "all") return true;
+  if (quick === "junior_frontend")
+    return (
+      job.developmentTrack === "frontend" &&
+      ["Junior", "Entry-level"].includes(job.experienceLevel || "") &&
+      job.salaryAssessment?.status === "meets"
+    );
+  if (quick === "mid_frontend")
+    return (
+      job.developmentTrack === "frontend" && job.experienceLevel === "Mid-level"
+    );
+  if (quick === "backend")
+    return (
+      job.developmentTrack === "backend" &&
+      ["Junior", "Mid-level"].includes(job.experienceLevel || "")
+    );
+  if (quick === "node_intern")
+    return (
+      job.developmentTrack === "backend" &&
+      job.isInternship &&
+      job.compensation === "paid"
+    );
+  if (quick === "fullstack") return job.developmentTrack === "fullstack";
+  if (quick === "security_intern")
+    return job.careerPath === "cybersecurity" && job.isInternship;
+  if (quick === "salary_unknown")
+    return ["unknown", "needs_review"].includes(
+      job.salaryAssessment?.status || "unknown",
+    );
+  return true;
+}
+const levels = ["Internship", "Entry-level", "Junior", "Mid-level", "Senior"];
+export function sortJobResults(jobs: Job[], sort: string) {
+  return [...jobs].sort((a, b) => {
+    if (sort === "company")
+      return (
+        a.company.localeCompare(b.company) || a.title.localeCompare(b.title)
+      );
+    if (sort === "experience")
+      return (
+        (levels.includes(a.experienceLevel || "")
+          ? levels.indexOf(a.experienceLevel!)
+          : 9) -
+          (levels.includes(b.experienceLevel || "")
+            ? levels.indexOf(b.experienceLevel!)
+            : 9) || b.score - a.score
+      );
+    if (sort === "salary_high" || sort === "salary_low") {
+      const av = a.salaryAssessment?.conversionCurrent
+          ? a.salaryAssessment.ngnMin
+          : undefined,
+        bv = b.salaryAssessment?.conversionCurrent
+          ? b.salaryAssessment.ngnMin
+          : undefined;
+      if (av === undefined || bv === undefined)
+        return av === undefined ? (bv === undefined ? 0 : 1) : -1;
+      return sort === "salary_high" ? bv - av : av - bv;
+    }
+    if (sort === "skills")
+      return (
+        (b.matchedSkills?.length || 0) - (a.matchedSkills?.length || 0) ||
+        b.score - a.score
+      );
+    if (sort === "eligible")
+      return (
+        Number(b.eligibility === "eligible") -
+          Number(a.eligibility === "eligible") || b.score - a.score
+      );
+    if (sort === "newest")
+      return (Date.parse(b.postedAt) || 0) - (Date.parse(a.postedAt) || 0);
+    return (
+      b.score - a.score ||
+      Number(b.eligibility === "eligible") -
+        Number(a.eligibility === "eligible") ||
+      (b.compensation === "paid" ? 1 : 0) -
+        (a.compensation === "paid" ? 1 : 0) ||
+      (Date.parse(b.postedAt) || 0) - (Date.parse(a.postedAt) || 0)
+    );
+  });
+}
+
+export function matchesSearchPreset(
+  job: Pick<Job, "title" | "description">,
+  filters: JobFilters,
+) {
+  const parts = (value: string | undefined) =>
+      (value || "")
+        .split(/[,;\n]/)
+        .map((v) => v.trim())
+        .filter(Boolean),
+    text = job.title + " " + job.description;
+  return (
+    (!parts(filters.titles).length ||
+      parts(filters.titles).some((title) =>
+        job.title.toLowerCase().includes(title.toLowerCase()),
+      )) &&
+    (!parts(filters.technologies).length ||
+      parts(filters.technologies).some((skill) => skillMention(text, skill))) &&
+    parts(filters.requiredKeywords).every((term) => skillMention(text, term)) &&
+    !parts(filters.excludedKeywords).some((term) => skillMention(text, term))
+  );
+}

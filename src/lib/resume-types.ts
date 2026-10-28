@@ -8,6 +8,7 @@ export const resumeSections = {
   contributions: "Open-source contributions",
   training: "Training & community",
   certifications: "Certifications",
+  additionalInfo: "Additional Information",
 } as const;
 export const legacyResumeSections = {
   summary: "Professional summary",
@@ -37,11 +38,17 @@ export type ResumeContent = Pick<
   > &
   Partial<
     Record<
-      "contributions" | "training" | "certifications" | "additional",
+      | "contributions"
+      | "training"
+      | "certifications"
+      | "additional"
+      | "additionalInfo",
       string
     >
   >;
 export type ResumeTarget = {
+  keywords?: import("./job-keywords").JobKeyword[];
+  customFields?: import("./custom-fields").CustomField[];
   title: string;
   company: string;
   description: string;
@@ -53,6 +60,8 @@ export type ResumeEvidence = {
   section: ResumeSection | "source" | "additional";
   text: string;
   label?: string;
+  recordId?: string;
+  identity?: string[];
 };
 export type ResumeAnalysis = {
   priorities: { requirement: string; evidence: number[] }[];
@@ -64,12 +73,49 @@ export const resumeTemplates = {
   compact: "Compact minimal",
 } as const;
 export type ResumeTemplate = keyof typeof resumeTemplates;
-export function orderedResumeSections(value?:readonly ResumeSection[]):ResumeSection[] {return [...new Set([...(value||[]),...Object.keys(resumeSections) as ResumeSection[]])].filter(key=>key in resumeSections);}
-export function validateSectionOrder(value:unknown):ResumeSection[]{if(value===undefined)return orderedResumeSections();if(!Array.isArray(value)||value.length>8||value.some(key=>typeof key!=='string'||!Object.hasOwn(resumeSections,key))||new Set(value).size!==value.length)throw new ResumeInputError('Invalid CV section order.');return orderedResumeSections(value);}
+export function orderedResumeSections(
+  value?: readonly ResumeSection[],
+): ResumeSection[] {
+  return [
+    ...new Set([
+      ...(value || []),
+      ...(Object.keys(resumeSections) as ResumeSection[]),
+    ]),
+  ].filter((key) => key in resumeSections);
+}
+export function validateSectionOrder(value: unknown): ResumeSection[] {
+  if (value === undefined) return orderedResumeSections();
+  if (
+    !Array.isArray(value) ||
+    value.length > Object.keys(resumeSections).length ||
+    value.some(
+      (key) => typeof key !== "string" || !Object.hasOwn(resumeSections, key),
+    ) ||
+    new Set(value).size !== value.length
+  )
+    throw new ResumeInputError("Invalid CV section order.");
+  return orderedResumeSections(value);
+}
 export type ResumeDraft = {
-  sectionOrder?:ResumeSection[];
+  kind?: "master-development" | "master-cybersecurity" | "tailored";
+  statements?: {
+    id: string;
+    section: ResumeSection | "coverLetter";
+    text: string;
+    sources: number[];
+    checked: boolean;
+  }[];
+  statementReviews?: Record<string, "approved" | "rejected" | "edited">;
+  options?: import("./resume-options").ResumeOptions;
+  letterGeneration?: { provider: string; model: string; verifiedAt: string };
+  sectionOrder?: ResumeSection[];
   analysis?: ResumeAnalysis;
-  aiGeneration?: { provider: string; model: string; verifiedAt: string; modelsUsed?: string[] };
+  aiGeneration?: {
+    provider: string;
+    model: string;
+    verifiedAt: string;
+    modelsUsed?: string[];
+  };
   layoutVersion?: 2;
   coverLetter?: string;
   template?: ResumeTemplate;
@@ -88,8 +134,11 @@ export type ResumeDraft = {
 };
 export type ResumeListItem = Pick<
   ResumeDraft,
-  "id" | "familyId" | "createdAt" | "method" | "manualEdits"
-> & { target: Pick<ResumeTarget, "title" | "company" | "applicationId"> };
+  "id" | "familyId" | "createdAt" | "method" | "manualEdits" | "kind"
+> & {
+  options?: Pick<import("./resume-options").ResumeOptions, "track">;
+  target: Pick<ResumeTarget, "title" | "company" | "applicationId">;
+};
 export type BuilderJob = {
   id: string;
   title: string;
@@ -98,6 +147,7 @@ export type BuilderJob = {
   url: string;
   applicationId?: string;
   draftId?: string;
+  keywords?: import("./job-keywords").JobKeyword[];
 };
 export class ResumeInputError extends Error {
   constructor(
@@ -119,7 +169,12 @@ export function validateResumeContent(value: unknown): ResumeContent {
     ...(Object.keys(resumeSections) as ResumeSection[]),
   ]) {
     if (
-      ["contributions", "training", "certifications"].includes(key) &&
+      [
+        "contributions",
+        "training",
+        "certifications",
+        "additionalInfo",
+      ].includes(key) &&
       body[key] === undefined
     ) {
       result[key] = "";
@@ -170,19 +225,41 @@ export function profileCoverLetter(
   target: ResumeTarget,
   body?: string,
 ): string {
-  const skills = content.skills.trim().replace(/\s+/g, " ");
-  const experience = (content.projects || content.experience)
-    .trim()
-    .slice(0, 1200);
+  const skills = content.skills
+    .split(/[,;\n]/)
+    .map((s) => s.trim())
+    .filter((s) => s && s.length < 120)
+    .slice(0, 8)
+    .join(", ");
+  const block = (content.projects || content.experience)
+    .split(/\n\s*\n/)
+    .find((value) => /^\s*[•*-]\s+/m.test(value));
+  const rows = (block || "")
+      .split("\n")
+      .map((s) => s.trim())
+      .filter(Boolean),
+    heading = rows[0] && !/^[•*-]/.test(rows[0]) ? rows[0] : "",
+    examples = rows
+      .filter((s) => /^[•*-]\s+/.test(s))
+      .slice(0, 2)
+      .map((s) => s.replace(/^[•*-]\s+/, ""));
   const paragraphs =
-    body ||
-    [
-      skills
-        ? `My skills include ${skills.replace(/[.!]+$/, "")}.`
-        : content.summary,
-      experience ? `Relevant work from my CV:\n${experience}` : "",
-    ]
-      .filter(Boolean)
-      .join("\n\n");
-  return `Dear Hiring Team,\n\nI am applying for the ${target.title} position${target.company ? " at " + target.company : ""}.\n\n${paragraphs}\n\nI would welcome the opportunity to discuss how my qualifications relate to this role. Thank you for considering my application.\n\nKind regards,\n${content.name}`;
+    body !== undefined
+      ? body
+      : [
+          skills
+            ? `My listed technical skills include ${skills}.`
+            : content.summary,
+          examples.length
+            ? [
+                heading
+                  ? `Relevant work includes ${heading}.`
+                  : "Relevant work from my background includes:",
+                ...examples,
+              ].join(" ")
+            : "",
+        ]
+          .filter(Boolean)
+          .join("\n\n");
+  return `Dear Hiring Team,\n\nI am applying for the ${target.title} position${target.company ? " at " + target.company : ""}.\n\n${paragraphs}\n\nThank you for considering my application.\n\nKind regards,\n${content.name}`;
 }

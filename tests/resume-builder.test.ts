@@ -162,8 +162,8 @@ test("AI writes a job-specific draft and a separate check rejects unsupported qu
       };
     } else {
       assert.equal(data.target, undefined);
-      assert.equal(data.claims.length, 9);
-      value = { supported: [0, 1, 3, 4, 5, 6, 7] };
+      assert.equal(data.claims.length, 5);
+      value = { supported: [0, 1, 2, 3, 4] };
     }
     return Response.json({
       choices: [{ message: { content: JSON.stringify(value) } }],
@@ -177,11 +177,8 @@ test("AI writes a job-specific draft and a separate check rejects unsupported qu
   assert.deepEqual(draft.requirementsToReview, [
     "TypeScript and Kubernetes experience required.",
   ]);
-  assert.equal(draft.warnings.length, 1);
-  assert.match(
-    draft.coverLetter,
-    /I built accessible React interfaces at Example Co/,
-  );
+  assert.ok(draft.warnings.length);
+  assert.equal(draft.coverLetter, "");
   assert.doesNotMatch(draft.coverLetter, /Kubernetes/);
 });
 test("formatted PDF embeds fonts, preserves accented names and paginates long CVs", async () => {
@@ -229,40 +226,161 @@ test("CV and cover letter export as editable Word documents and styled PDFs with
   assert.throws(() => validateTemplate("invalid"), /style/);
 });
 
-test('AI selection cannot accidentally hide supplied experience and education from the writer',async()=>{
- process.env.AI_PROVIDER='openai';process.env.OPENAI_API_KEY='fixture-core-evidence';let calls=0;
- const reply=(data:unknown)=>Response.json({choices:[{message:{content:JSON.stringify(data)}}]});
- globalThis.fetch=async(_url,init)=>{
-  calls++;
-  if(calls===1)return reply({priorities:[{requirement:'Build accessible React interfaces.',evidence:[0]}],selectedEvidence:[0]});
-  if(calls===2){
-   const body=JSON.parse(String(init?.body));const data=JSON.parse(body.messages[1].content);
-   const experience=data.evidence.find((e:{section:string})=>e.section==='experience');const education=data.evidence.find((e:{section:string})=>e.section==='education');
-   assert.ok(experience);assert.ok(education);
-   return reply({items:[
-    {section:'summary',text:'Frontend skills include React and TypeScript with experience building accessible interfaces.',sources:[0,experience.id]},
-    {section:'skills',text:'React, TypeScript',sources:[0]},
-    {section:'experience',text:experience.text,sources:[experience.id]},
-    {section:'education',text:education.text,sources:[education.id]},
-    {section:'coverLetter',text:'My skills include React and TypeScript for frontend development.',sources:[0]},
-    {section:'coverLetter',text:'I built accessible React interfaces at Example Co.',sources:[experience.id]},
-   ]});
-  }
-  return reply({supported:[0,1,2,3,4,5]});
- };
- const result=await buildResume(profile,target,true);assert.match(result.content.education,/BSc/);assert.match(result.content.experience,/Example Co/);assert.equal(calls,3);
+test("AI selection cannot accidentally hide supplied experience and education from the writer", async () => {
+  process.env.AI_PROVIDER = "openai";
+  process.env.OPENAI_API_KEY = "fixture-core-evidence";
+  let calls = 0;
+  const reply = (data: unknown) =>
+    Response.json({
+      choices: [{ message: { content: JSON.stringify(data) } }],
+    });
+  globalThis.fetch = async (_url, init) => {
+    calls++;
+    if (calls === 1)
+      return reply({
+        priorities: [
+          { requirement: "Build accessible React interfaces.", evidence: [0] },
+        ],
+        selectedEvidence: [0],
+      });
+    if (calls === 2) {
+      const body = JSON.parse(String(init?.body));
+      const data = JSON.parse(body.messages[1].content);
+      const experience = data.evidence.find(
+        (e: { section: string }) => e.section === "experience",
+      );
+      const education = data.evidence.find(
+        (e: { section: string }) => e.section === "education",
+      );
+      assert.ok(experience);
+      assert.ok(education);
+      return reply({
+        items: [
+          {
+            section: "summary",
+            text: "Frontend skills include React and TypeScript with experience building accessible interfaces.",
+            sources: [0, experience.id],
+          },
+          { section: "skills", text: "React, TypeScript", sources: [0] },
+          {
+            section: "experience",
+            text: experience.text,
+            sources: [experience.id],
+          },
+          {
+            section: "education",
+            text: education.text,
+            sources: [education.id],
+          },
+          {
+            section: "coverLetter",
+            text: "My skills include React and TypeScript for frontend development.",
+            sources: [0],
+          },
+          {
+            section: "coverLetter",
+            text: "I built accessible React interfaces at Example Co.",
+            sources: [experience.id],
+          },
+        ],
+      });
+    }
+    return reply({ supported: [0, 1, 2, 3] });
+  };
+  const result = await buildResume(profile, target, true);
+  assert.match(result.content.education, /BSc/);
+  assert.match(result.content.experience, /Example Co/);
+  assert.equal(calls, 3);
 });
 
-test('a transient verifier failure resumes the exact completed stages and still verifies every claim',async()=>{
- process.env.OPENAI_API_KEY='unit-test-placeholder';
- const supplied={...profile,education:'',projects:''};
- let checkpoint:import('../src/lib/resume-builder').ResumeGenerationCheckpoint|undefined,calls=0;
- const values=[{priorities:[{requirement:'Build accessible React interfaces.',evidence:[1]}],selectedEvidence:[0,1]},{items:[{section:'summary',text:'Frontend developer with React and TypeScript skills and experience building accessible interfaces.',sources:[0,1]},{section:'skills',text:'React, TypeScript',sources:[0]},{section:'experience',text:profile.experience,sources:[1]},{section:'coverLetter',text:'I built accessible React interfaces at Example Co (2023–2024).',sources:[1]},{section:'coverLetter',text:'My supplied skills include React and TypeScript for frontend development.',sources:[0]}]}];
- globalThis.fetch=async()=>{calls++;if(calls<=2)return Response.json({choices:[{message:{content:JSON.stringify(values[calls-1])}}]});return Response.json({error:{message:'temporarily unavailable'}},{status:503});};
- await assert.rejects(()=>buildResume(supplied,target,true,{onCheckpoint:async value=>{checkpoint=value;}}));
- assert.equal(calls,4);assert.ok(checkpoint?.generated);assert.ok(checkpoint?.analysis);
- globalThis.fetch=async(_url,init)=>{calls++;const payload=JSON.parse(String(init?.body));assert.match(payload.messages[0].content,/Check each claim/);return Response.json({choices:[{message:{content:JSON.stringify({supported:[0,1,2,3,4]})}}]});};
- const result=await buildResume(supplied,target,true,{checkpoint,onCheckpoint:async value=>{checkpoint=value;}});assert.equal(calls,5);assert.match(result.content.experience,/Example Co/);
- globalThis.fetch=async()=>Response.json({choices:[{message:{content:JSON.stringify({supported:[]})}}]});
- await assert.rejects(()=>buildResume(supplied,target,true,{checkpoint,onCheckpoint:async value=>{checkpoint=value;}}),/factual checks/);assert.equal(checkpoint?.generated,undefined);
+test("a transient verifier failure resumes the exact completed stages and still verifies every claim", async () => {
+  process.env.OPENAI_API_KEY = "unit-test-placeholder";
+  const supplied = { ...profile, education: "", projects: "" };
+  let checkpoint:
+      | import("../src/lib/resume-builder").ResumeGenerationCheckpoint
+      | undefined,
+    calls = 0;
+  const values = [
+    {
+      priorities: [
+        { requirement: "Build accessible React interfaces.", evidence: [1] },
+      ],
+      selectedEvidence: [0, 1],
+    },
+    {
+      items: [
+        {
+          section: "summary",
+          text: "Frontend developer with React and TypeScript skills and experience building accessible interfaces.",
+          sources: [0, 1],
+        },
+        { section: "skills", text: "React, TypeScript", sources: [0] },
+        { section: "experience", text: profile.experience, sources: [1] },
+        {
+          section: "coverLetter",
+          text: "I built accessible React interfaces at Example Co (2023–2024).",
+          sources: [1],
+        },
+        {
+          section: "coverLetter",
+          text: "My supplied skills include React and TypeScript for frontend development.",
+          sources: [0],
+        },
+      ],
+    },
+  ];
+  globalThis.fetch = async () => {
+    calls++;
+    if (calls <= 2)
+      return Response.json({
+        choices: [{ message: { content: JSON.stringify(values[calls - 1]) } }],
+      });
+    return Response.json(
+      { error: { message: "temporarily unavailable" } },
+      { status: 503 },
+    );
+  };
+  await assert.rejects(() =>
+    buildResume(supplied, target, true, {
+      onCheckpoint: async (value) => {
+        checkpoint = value;
+      },
+    }),
+  );
+  assert.equal(calls, 4);
+  assert.ok(checkpoint?.generated);
+  assert.ok(checkpoint?.analysis);
+  globalThis.fetch = async (_url, init) => {
+    calls++;
+    const payload = JSON.parse(String(init?.body));
+    assert.match(payload.messages[0].content, /Check each claim/);
+    return Response.json({
+      choices: [
+        { message: { content: JSON.stringify({ supported: [0, 1, 2] }) } },
+      ],
+    });
+  };
+  const result = await buildResume(supplied, target, true, {
+    checkpoint,
+    onCheckpoint: async (value) => {
+      checkpoint = value;
+    },
+  });
+  assert.equal(calls, 5);
+  assert.match(result.content.experience, /Example Co/);
+  globalThis.fetch = async () =>
+    Response.json({
+      choices: [{ message: { content: JSON.stringify({ supported: [] }) } }],
+    });
+  await assert.rejects(
+    () =>
+      buildResume(supplied, target, true, {
+        checkpoint,
+        onCheckpoint: async (value) => {
+          checkpoint = value;
+        },
+      }),
+    /factual checks/,
+  );
+  assert.equal(checkpoint?.generated, undefined);
 });

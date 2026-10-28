@@ -1,3 +1,4 @@
+import { fileResponse } from "@/lib/application-files";
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 import { resumePdf } from "@/lib/resume-pdf";
 import type { ResumeDraft } from "@/lib/resume-types";
@@ -9,10 +10,41 @@ export async function GET(
   try {
     const { id } = await params;
     const app = await (await db()).collection("applications").findOne({ id });
+    const originalId =
+      app?.originalFileIds?.cv ||
+      app?.documentSnapshot?.files?.find(
+        (file: { kind: string; mime: string }) =>
+          file.kind === "cv" && file.mime === "application/pdf",
+      )?.id;
+    if (originalId) return fileResponse(id, originalId);
     if (app?.cvDraftId) {
-      const draft = app.documentSnapshot ? app.documentSnapshot.cv : await (await db()).collection<ResumeDraft>("resumes").findOne({ id: app.cvDraftId });
-      if (!draft) return Response.json({ error: "Saved CV version not found." }, { status: 404 });
-      return new Response(await resumePdf(draft.content, draft.target, draft.template, undefined, draft.layoutVersion !== 2, draft.sectionOrder), { headers: { "Content-Type": "application/pdf", "Content-Disposition": 'attachment; filename="tailored-cv.pdf"', "Cache-Control": "no-store" } });
+      const draft = app.documentSnapshot
+        ? app.documentSnapshot.cv
+        : await (await db())
+            .collection<ResumeDraft>("resumes")
+            .findOne({ id: app.cvDraftId });
+      if (!draft)
+        return Response.json(
+          { error: "Saved CV version not found." },
+          { status: 404 },
+        );
+      return new Response(
+        await resumePdf(
+          draft.content,
+          draft.target,
+          draft.template,
+          undefined,
+          draft.layoutVersion !== 2,
+          draft.sectionOrder,
+        ),
+        {
+          headers: {
+            "Content-Type": "application/pdf",
+            "Content-Disposition": 'attachment; filename="tailored-cv.pdf"',
+            "Cache-Control": "no-store",
+          },
+        },
+      );
     }
     if (!app?.profileSnapshot || !app.cvFacts)
       return Response.json(

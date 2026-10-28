@@ -1,3 +1,4 @@
+import { validateCustomFields } from "./custom-fields";
 import { statuses } from "./types";
 export const applicationStatusLabel = (status: string) =>
   status === "Ready for review"
@@ -73,5 +74,13 @@ export function applicationUpdate(body: unknown) {
     throw new Error("The actual application date cannot be in the future.");
   if (value.saved !== undefined && typeof value.saved !== "boolean")
     throw new Error("Invalid saved-job preference.");
-  return { id: value.id, fields, saved: value.saved as boolean | undefined };
+  return {
+    id: value.id,
+    fields,
+    saved: value.saved as boolean | undefined,
+    customFields:
+      value.customFields === undefined
+        ? undefined
+        : validateCustomFields(value.customFields),
+  };
 }

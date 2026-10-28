@@ -57,14 +57,22 @@ function technologies(line: string) {
 }
 function entryMeta(line: string) {
   return (
+    /^(?:(?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)\s+)?(?:19|20)\d{2}(?:[-/]\d{2})?(?:[-/]\d{2})?(?:\b|\s)/i.test(
+      line,
+    ) ||
     technologies(line) ||
     /^\d+\s+(?:editions?|events?|contributions?)$/i.test(line)
   );
 }
 export function isEntrySection(section: string) {
-  return ["projects", "contributions", "training", "certifications"].includes(
-    section,
-  );
+  return [
+    "experience",
+    "education",
+    "projects",
+    "contributions",
+    "training",
+    "certifications",
+  ].includes(section);
 }
 /** Conservative formatting: preserve words and bullet continuations, never invent titles or technologies. */
 export function resumeEntries(text: string): ResumeEntry[] {

@@ -1,3 +1,4 @@
+import { fileResponse } from "@/lib/application-files";
 import { db, errorResponse } from "@/lib/db";
 import type { Application } from "@/lib/types";
 import { applicationWasApplied } from "@/lib/vacancy-groups";
@@ -30,6 +31,24 @@ export async function GET(
         .collection<Application>("applications")
         .findOne({ id });
     if (!app) throw new ApplicationInputError("Application not found.", 404);
+    const originalId = app.originalFileIds?.[kind === "cv" ? "cv" : "letter"];
+    if (originalId) {
+      const original = app.originalFiles?.find(
+        (file) => file.id === originalId,
+      );
+      const originalFormat = original?.name.split(".").at(-1)?.toLowerCase();
+      if (originalFormat !== format)
+        throw new ApplicationInputError(
+          "An actual original file is recorded. Download it unchanged from the application details; no generated replacement was substituted.",
+          409,
+        );
+      return fileResponse(app.id, originalId);
+    }
+    const frozen = app.documentSnapshot?.files?.find(
+      (file) =>
+        file.kind === kind && file.name.toLowerCase().endsWith("." + format),
+    );
+    if (frozen) return fileResponse(app.id, frozen.id);
     const submitted = applicationWasApplied(app),
       snapshot = app.documentSnapshot;
     const cv = snapshot
