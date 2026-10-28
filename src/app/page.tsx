@@ -1,5 +1,8 @@
 "use client";
 import Link from "next/link";
+import AvailabilityFields from '@/components/availability-fields';
+import ApplicationsWorkspace from '@/components/applications-workspace';
+import ApplicationEntry from '@/components/application-entry';
 import SavedJobSearches from "@/components/saved-job-searches";
 import CareerPreferencesFields from "@/components/career-preferences";
 import JobSalary from "@/components/job-salary";
@@ -9,7 +12,7 @@ import {evaluateJobPreferences} from "@/lib/job-ranking";
 import {minimumInNgn} from "@/lib/job-salary";
 import {groupVacancies,matchingApplication,sameVacancy,applicationIsHandled,applicationWasApplied} from "@/lib/vacancy-groups";
 import {plainText} from "@/lib/job-text";
-import {applicationStatusLabel} from "@/lib/application-updates";
+
 import {defaultJobFilters,matchesQuick,matchesRole,sortJobResults,matchesKeywords,validateJobFilters,type JobFilters} from "@/lib/job-filter-state";
 import { jobTypes, experienceLevels, eligibilityLabels, jobAvailable, assessStackFit } from "@/lib/job-intelligence";
 import BountyWorkspace from "@/components/modules/bounty-workspace";
@@ -56,7 +59,6 @@ import {
 } from "lucide-react";
 import {
   emptyProfile,
-  statuses,
   type Application,
   type Job,
   type Profile,
@@ -133,8 +135,14 @@ export default function Home() {
   const filters=useMemo(()=>({query,career,category,jobType,level,fresh,review,includeOtherStacks,showHandled,opportunityView,sort,minimumSalary,salaryCurrency,quick}),[query,career,category,jobType,level,fresh,review,includeOtherStacks,showHandled,opportunityView,sort,minimumSalary,salaryCurrency,quick]);
   const applyFilters=useCallback((input:JobFilters)=>{const f=validateJobFilters(input);setQuery(f.query);setCareer(f.career);setShowHandled(f.showHandled);setMinimumSalary(f.minimumSalary);setSalaryCurrency(f.salaryCurrency);setQuick(f.quick);setCategory(f.category);setJobType(f.jobType);setLevel(f.level);setFresh(f.fresh);setReview(f.review);setIncludeOtherStacks(f.includeOtherStacks);setOpportunityView(f.opportunityView);setSort(f.sort);setJobPage(1);},[]);
   useEffect(()=>{const timer=setTimeout(()=>{try{const value=localStorage.getItem("launchpad-job-filters");const paths=localStorage.getItem("launchpad-career-filters");if(paths){const parsed=JSON.parse(paths);for(const path of ["development","cybersecurity"] as const)if(parsed[path])pathFilters.current[path]=validateJobFilters(parsed[path]);}if(value){restoredFromBrowser.current=true;applyFilters(validateJobFilters(JSON.parse(value)));}}catch{}setFiltersReady(true);},0);return()=>clearTimeout(timer);},[applyFilters]);
-  useEffect(()=>{if(!filtersReady)return;const timer=setTimeout(()=>{try{pathFilters.current[filters.career]=filters;localStorage.setItem("launchpad-job-filters",JSON.stringify(filters));localStorage.setItem("launchpad-career-filters",JSON.stringify(pathFilters.current));}catch{}},250);return()=>clearTimeout(timer);},[filters,filtersReady]);
+  useEffect(()=>{if(!filtersReady)return;try{pathFilters.current[filters.career]=filters;localStorage.setItem("launchpad-job-filters",JSON.stringify(filters));localStorage.setItem("launchpad-career-filters",JSON.stringify(pathFilters.current));}catch{}},[filters,filtersReady]);
   const [selected, setSelected] = useState<Job>();
+  const [applyingJob,setApplyingJob]=useState<Job>();
+  const [externalJob,setExternalJob]=useState<Job>();
+  useEffect(()=>{const timer=setTimeout(()=>{try{const stored=sessionStorage.getItem('launchpad-opened-application');if(stored)setExternalJob(JSON.parse(stored));}catch{}},0);return()=>clearTimeout(timer);},[]);
+  function openApplicationPage(job:Job){setExternalJob(job);try{sessionStorage.setItem('launchpad-opened-application',JSON.stringify(job));}catch{}}
+  function clearOpenedApplication(){setExternalJob(undefined);try{sessionStorage.removeItem('launchpad-opened-application');}catch{}}
+
   const [notices, setNotices] = useState<{ id: string; title: string }[]>([]);
   const [showNotices, setShowNotices] = useState(false);
   const [viewApp, setViewApp] = useState<Application>();
@@ -233,6 +241,7 @@ export default function Home() {
   const newCandidates=careerCandidates.filter(j=>!handled(j));
   const filtered = sortJobResults(profileJobs.filter(j=>{
     const app=matchingApplication(j,applications),history=opportunityView==='saved'||opportunityView==='applied',salaryReviewView=['needs_review','salary_unknown','salary_review'].includes(opportunityView)||quick==='salary_unknown';
+    if(history)return !!app&&(opportunityView==='applied'?applicationWasApplied(app):app.saved!==false&&!applicationWasApplied(app)&&app.status!=='Archived');
     if(j.careerPath!==career)return false;
     if(!history&&(!j.isCurrentDiscovery||!jobAvailable(j,now)||j.eligibility==='restricted'||!j.careerAllowed||j.salaryPolicy==='excluded'||!showHandled&&handled(j)))return false;
     if(!history&&(!includeOtherStacks&&j.stackFit==='incompatible'||!review&&j.eligibility!=='eligible'||!salaryReviewView&&j.salaryPolicy==='review'))return false;
@@ -281,6 +290,7 @@ export default function Home() {
             <button
               key={name}
               title={name}
+              aria-label={name}
               className={`nav-item ${tab === name ? "active" : ""}`}
               onClick={() => setTab(name)}
             >
@@ -641,7 +651,7 @@ export default function Home() {
                       >
                         View Details <ArrowUpRight size={15} />
                       </button>
-                      <a className="primary" href={job.url} target="_blank" rel="noopener noreferrer">Apply <ExternalLink size={14}/></a></div>
+                      {!applicationWasApplied(applications.find(a=>sameVacancy(job,a.job))||{status:'Saved'} as Application)&&<button className="secondary" disabled={!!busy||!health?.database} onClick={()=>setApplyingJob(job)}>Mark as Applied</button>}<a className="primary" href={job.url||undefined} onClick={()=>openApplicationPage(job)} target="_blank" rel="noopener noreferrer">Open Application Page <ExternalLink size={14}/></a></div>
                       {job.eligibility === "review" && (
                         <small className="location-warning">
                           Applicant location needs review
@@ -785,7 +795,7 @@ export default function Home() {
                     />
                   </label>
                 ))}
-                <CareerPreferencesFields profile={profile} onChange={setProfile} filters={filters}/>
+                <AvailabilityFields profile={profile} onChange={setProfile}/><CareerPreferencesFields profile={profile} onChange={setProfile} filters={filters}/>
                 <button
                   className="primary"
                   disabled={!!busy || !health?.database}
@@ -878,156 +888,12 @@ export default function Home() {
               </div>
             </div>
           )}
-          {tab === "Applications" && (
-            <>
-              <div className="pipeline">
-                {statuses.map((status) => (
-                  <div key={status}>
-                    <b>
-                      {applications.filter((a) => a.status === status).length}
-                    </b>
-                    <span>{applicationStatusLabel(status)}</span>
-                  </div>
-                ))}
-              </div>
-              {applications.length ? (
-                <div className="application-list">
-                  {applications.map((app) => (
-                    <article className="panel application" key={app.id}>
-                      <div className="application-heading">
-                        <span className="company-logo">
-                          {app.job.company[0]}
-                        </span>
-                        <div>
-                          <h3>{app.job.title}</h3>
-                          <p>
-                            {app.job.company} · Saved{" "}
-                            {new Date(app.createdAt).toLocaleDateString()}
-                          </p>
-                        </div>
-                        <select
-                          aria-label={`Status for ${app.job.title}`}
-                          value={app.status}
-                          disabled={!!busy}
-                          onChange={(e) => {
-                            const status = e.target.value;
-                            if (
-                              status === "Submitted" &&
-                              !window.confirm(
-                                "Have you submitted this application on the employer’s website? This only updates your tracker.",
-                              )
-                            )
-                              return;
-                            void task(app.id, async () => {
-                              await api("applications", "PATCH", {
-                                id: app.id,
-                                status,
-                                submissionConfirmed:status==='Submitted',
-                              });
-                              await refreshApplications();
-                            });
-                          }}
-                        >
-                          {statuses.map((s) => (
-                            <option key={s} value={s}>{applicationStatusLabel(s)}</option>
-                          ))}
-                        </select>
-                      </div>
-                      <p>{app.saved===false&&!applicationWasApplied(app)?'Unsaved · work history retained':applicationWasApplied(app)?'Applied job · preserved history':'Saved opportunity · not submitted'}</p>
-                      <div className="application-actions">{!applicationWasApplied(app)&&<button className="secondary" disabled={!!busy} onClick={()=>app.saved===false?save(app.job):unsave(app)}>{app.saved===false?'Save again':'Unsave job'}</button>}
-                        <a
-                          className="secondary"
-                          href={app.job.url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                        >
-                          Original posting <ExternalLink size={14} />
-                        </a>
-                        <button
-                          className="secondary"
-                          disabled={!!busy}
-                          onClick={() => openBuilder(app.job, app)}
-                        >
-                          <Sparkles size={14} />
-                          {app.cvDraftId ? "Open CV builder" : "Build tailored CV"}
-                        </button>
-                        {(app.cvFacts || app.cvDraftId) && (
-                          <>
-                            <a
-                              className="secondary"
-                              href={`/api/documents/${app.id}`}
-                            >
-                              <Download size={14} />
-                              Tailored PDF
-                            </a>
-                            <button
-                              className="secondary"
-                              onClick={() => setViewApp(app)}
-                            >
-                              Review package <ArrowUpRight size={14} />
-                            </button>
-                          </>
-                        )}
-                      </div>
-                      <label className="follow-up">
-                        Follow-up notes
-                        <textarea
-                          rows={2}
-                          defaultValue={app.followUp}
-                          placeholder="Next steps, interview dates, or questions to follow up…"
-                          onBlur={(e) => {
-                            if (e.target.value !== app.followUp)
-                              void task(app.id, async () => {
-                                await api("applications", "PATCH", {
-                                  id: app.id,
-                                  followUp: e.target.value,
-                                });
-                                await refreshApplications();
-                              });
-                          }}
-                        />
-                      </label>
-                      <p className="application-package-info">CV version: {app.cvDraftId ? app.cvDraftId.slice(0,8) : 'Not prepared'} · Cover letter: {app.coverLetter ? 'Saved' : 'Not prepared'}{app.submittedAt?' · Submitted documents preserved':''}</p>
-                      {app.followUpDate && <p className="follow-up-reminder" role="note">{app.followUpDate<=new Date(now).toLocaleDateString('en-CA')?'Follow-up due':'Follow-up planned'}: {app.followUpDate}</p>}
-                      <details className="application-tracking"><summary>Application dates, notes and interview details</summary><div className="form-grid">{(['applicationDate','followUpDate'] as const).map(key=><label key={key}>{key==='applicationDate'?'Application date':'Follow-up date'}<input type="date" aria-label={`${key==='applicationDate'?'Application date':'Follow-up date'} for ${app.job.title}`} defaultValue={app[key]||''} disabled={!!busy} onBlur={e=>{if(e.target.value!==(app[key]||''))void task(app.id,async()=>{await api('applications','PATCH',{id:app.id,[key]:e.target.value});await refreshApplications();});}}/></label>)}</div>{(['notes','interviewInfo'] as const).map(key=><label key={key}>{key==='notes'?'Personal notes':'Interview information'}<textarea rows={3} maxLength={key==='notes'?8000:4000} aria-label={`${key==='notes'?'Personal notes':'Interview information'} for ${app.job.title}`} defaultValue={app[key]||''} disabled={!!busy} onBlur={e=>{if(e.target.value!==(app[key]||''))void task(app.id,async()=>{await api('applications','PATCH',{id:app.id,[key]:e.target.value});await refreshApplications();});}}/></label>)}<p>Dates are your own records. Setting an application date does not mark it submitted. Follow-up dates appear here as reminders.</p></details>
-                      {app.submittedAt && (
-                        <small>
-                          Marked submitted{" "}
-                          {new Date(app.submittedAt).toLocaleString()}
-                        </small>
-                      )}
-                    </article>
-                  ))}
-                </div>
-              ) : (
-                <div className="empty-state">
-                  <div className="empty-icon">
-                    <Bookmark size={29} />
-                  </div>
-                  <h3>A little organization. A lot of momentum.</h3>
-                  <p>
-                    Save a job from the finder to start tracking it. Prepare
-                    your CV, review your application, and keep every next step
-                    here.
-                  </p>
-                  <button
-                    className="primary"
-                    onClick={() => setTab("Job Finder")}
-                  >
-                    Explore opportunities <ArrowUpRight size={16} />
-                  </button>
-                </div>
-              )}
-              <div className="disclaimer">
-                <ShieldCheck size={17} />
-                Applications open on the employer’s website for your review and
-                submission. Automatic form filling is not enabled; no
-                application is submitted by this app.
-              </div>
-            </>
-          )}
+          {tab === "Applications" && <ApplicationsWorkspace now={now} applications={applications} pending={busy} connected={!!health?.database} refreshApplications={refreshApplications} save={save} unsave={unsave} openBuilder={openBuilder} setViewApp={setViewApp} setTab={setTab} onOpenApplication={openApplicationPage}/>}
+
+          {externalJob&&<aside className="panel application-return" aria-label="Record an external application"><p>You opened {externalJob.company} — {externalJob.title}. Did you submit it? Opening the page has not marked it applied.</p><div className="module-actions"><button className="primary" disabled={!health?.database} onClick={()=>setApplyingJob(externalJob)}>Record submitted application</button><button className="secondary" onClick={clearOpenedApplication}>Not submitted / dismiss</button></div></aside>}
         </main>
       </div>
+      {applyingJob&&<ApplicationEntry job={applyingJob} application={applications.find(a=>sameVacancy(applyingJob,a.job))} onClose={()=>setApplyingJob(undefined)} onSaved={async()=>{await refreshApplications();clearOpenedApplication();setSelected(undefined);setMessage('Submitted application recorded with its actual date and original documents.');}}/>}
       {selected && (
         <div className="modal-backdrop" onClick={() => setSelected(undefined)}>
           <section
@@ -1070,15 +936,17 @@ export default function Home() {
                 onClick={() => save(selected)}
               >
                 <Bookmark size={16} />
-                Save to applications
+                Save Job
               </button>
+              <button className="secondary" disabled={!!busy||!health?.database} onClick={()=>{setApplyingJob(selected);setSelected(undefined);}}>Mark as Applied</button>
               <a
-                href={selected.url}
+                href={selected.url||undefined}
+                onClick={()=>openApplicationPage(selected)}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="secondary"
               >
-                Verify original posting <ExternalLink size={15} />
+                Open Application Page <ExternalLink size={15} />
               </a>
             </div>
             <small>
@@ -1119,7 +987,7 @@ export default function Home() {
               </p>
             ))}
             <h3>Cover letter draft</h3>
-            <pre className="cover-letter">{viewApp.coverLetter}</pre>
+            <pre className="cover-letter">{viewApp.documentSnapshot?viewApp.documentSnapshot.coverLetter:viewApp.coverLetter}</pre>
             <div className="modal-actions">
               <a className="primary" href={`/api/documents/${viewApp.id}`}>
                 <Download size={16} />
