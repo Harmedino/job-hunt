@@ -15,7 +15,7 @@ Live job connectors, public company-board discovery, saved searches, social/manu
 - CV generation succeeds independently of an optional cover letter. Overload cannot replace a successful CV with a basic or incomplete AI result. Completed generation stages can be retried without repeating them when the input and provider match.
 - Imports show conflicting old/new values before changing the master profile. Public upload/import endpoints are proposal-only. Approving fields fills the form; Save profile persists the chosen changes.
 - Unsupported known technologies and numeric facts are rejected before the AI factual check. Structured employment/project rewrites must retain their exact heading/date identity and cite their own record. Keyword requests are never candidate evidence.
-- Short documents no longer gain a nearly empty second page. Employment, education and project records have distinct headings, metadata and editable bullet lists; the target role is explicitly labeled.
+- Short documents no longer gain a nearly empty second page. Employment, education and project records have distinct headings, metadata and editable bullet lists; the application target stays in the workspace instead of being printed in the CV.
 - The saved PDF page preview renders the downloadable PDF. The optional HTML approximation is labeled separately. Unsaved edits require saving and refreshing the PDF preview.
 
 ## What was added

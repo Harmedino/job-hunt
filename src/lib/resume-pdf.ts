@@ -169,7 +169,6 @@ export async function resumePdf(
     y -= 18;
     draw(coverLetter, 10.5);
   } else {
-    draw(`Target role: ${target.title}`, 11, regular, accent);
     const sections = legacy ? legacyResumeSections : resumeSections;
     for (const key of (legacy
       ? Object.keys(sections)

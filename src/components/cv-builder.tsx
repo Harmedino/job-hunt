@@ -1616,13 +1616,14 @@ export default function CvBuilder({
                           {url}
                         </p>
                       ))}
-                    <p className="resume-target">
-                      {documentKind === "letter" ? "Re: " : "Target role: "}
-                      {draft.target.title}
-                      {documentKind === "letter" && draft.target.company
-                        ? ` · ${draft.target.company}`
-                        : ""}
-                    </p>
+                    {documentKind === "letter" && (
+                      <p className="resume-target">
+                        Re: {draft.target.title}
+                        {draft.target.company
+                          ? ` · ${draft.target.company}`
+                          : ""}
+                      </p>
+                    )}
                     {documentKind === "letter" && (
                       <div className="letter-body">{coverLetter}</div>
                     )}

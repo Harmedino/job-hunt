@@ -76,22 +76,19 @@ export async function resumeDocx(
     ...[content.github, content.linkedin, content.portfolio]
       .filter(Boolean)
       .map((link) => paragraph(link, 40)),
-    new Paragraph({
-      children: [
-        new TextRun({
-          text:
-            coverLetter !== undefined
-              ? `Re: ${target.title}${target.company ? " · " + target.company : ""}`
-              : `Target role: ${target.title}`,
-          color: accent,
-          size: 24,
-        }),
-      ],
-      spacing: { before: 160, after: 160 },
-    }),
   ];
   if (coverLetter !== undefined) {
     children.push(
+      new Paragraph({
+        children: [
+          new TextRun({
+            text: `Re: ${target.title}${target.company ? " · " + target.company : ""}`,
+            color: accent,
+            size: 24,
+          }),
+        ],
+        spacing: { before: 160, after: 160 },
+      }),
       ...coverLetter.split(/\n\s*\n/).map((text) => paragraph(text, 180)),
     );
   } else {
