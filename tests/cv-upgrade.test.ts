@@ -349,12 +349,46 @@ test(
       assert.match(second.coverLetter, /Dear Hiring Team/);
       assert.equal(second.previousId, first.id);
       assert.equal(stages, 2);
+      await database
+        .collection("resumes")
+        .updateOne(
+          { id: second.id },
+          {
+            $set: {
+              statementReviews: {
+                "experience-0": "approved",
+                "coverLetter-0": "approved",
+              },
+              statements: [
+                ...second.statements,
+                {
+                  id: "experience-0",
+                  section: "experience",
+                  text: first.content.experience,
+                  sources: [1],
+                  checked: true,
+                },
+              ],
+            },
+          },
+        );
       const sectionResponse = await writing(
         req({ section: "experience", useAi: false }),
         params(second.id),
       );
       assert.equal(sectionResponse.status, 200);
       const sectionVersion = await sectionResponse.json();
+      assert.equal(sectionVersion.manualEdits, true);
+      assert.equal(sectionVersion.statementReviews["experience-0"], undefined);
+      assert.equal(
+        sectionVersion.statementReviews["coverLetter-0"],
+        "approved",
+      );
+      assert.equal(
+        (await database.collection("resumes").findOne({ id: second.id }))!
+          .statementReviews["experience-0"],
+        "approved",
+      );
       assert.equal(sectionVersion.coverLetter, second.coverLetter);
       assert.equal(sectionVersion.content.skills, second.content.skills);
       assert.equal(sectionVersion.content.experience, first.content.experience);

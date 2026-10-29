@@ -37,6 +37,7 @@ export async function POST(
       key = createHash("sha256")
         .update(
           JSON.stringify([
+            2,
             original.id,
             section,
             provider.provider,
@@ -72,6 +73,17 @@ export async function POST(
     const now = new Date().toISOString();
     const draft: ResumeDraft = {
       ...original,
+      evidence: result.evidence,
+      manualEdits: original.manualEdits || !body.useAi,
+      statementReviews: Object.fromEntries(
+        Object.entries(original.statementReviews || {}).filter(
+          ([id]) =>
+            !(original.statements || []).some(
+              (statement) =>
+                statement.section === section && statement.id === id,
+            ),
+        ),
+      ),
       id: randomUUID(),
       previousId: original.id,
       createdAt: now,

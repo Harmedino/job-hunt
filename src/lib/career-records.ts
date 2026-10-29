@@ -1,3 +1,4 @@
+import { normalizeResumeBullets } from "./resume-bullets";
 import type { Profile } from "./types";
 import type { CustomField } from "./custom-fields";
 import { calendarToday, validCalendarDate } from "./application-updates";
@@ -212,7 +213,7 @@ export function validateCvTracks(value: unknown): CvTrackProfiles {
   return result;
 }
 const lines = (value: string) =>
-  value
+  normalizeResumeBullets(value)
     .split("\n")
     .map((v) => v.trim())
     .filter(Boolean);

@@ -1,3 +1,4 @@
+import { careerPath } from "./career-policy";
 import {
   materializeCareerProfile,
   careerAdditionalEvidence,
@@ -112,23 +113,51 @@ export function resumeEvidence(
     } else evidence.push({ section, text });
   }
   const summary = profile.cvTracks?.[track]?.summary;
-  if (summary?.trim())
-    evidence.unshift({ section: "summary", text: withoutNyscClaims(summary) });
+  if (summary?.trim() || track === "cybersecurity") {
+    for (let i = evidence.length - 1; i >= 0; i--)
+      if (evidence[i].section === "summary") evidence.splice(i, 1);
+    if (summary?.trim())
+      evidence.unshift({
+        section: "summary",
+        text: withoutNyscClaims(summary),
+      });
+  }
   if (track === "cybersecurity") {
-    if (profile.career?.securitySkills?.trim()) {
-      const skills = evidence.find((item) => item.section === "skills");
-      if (skills)
-        skills.text =
-          "Security foundations (learning): " +
-          profile.career.securitySkills +
-          "\nDevelopment foundations: " +
-          skills.text;
-      else
-        evidence.push({
-          section: "skills",
-          text:
-            "Security foundations (learning): " + profile.career.securitySkills,
-        });
+    const skillEvidence = evidence.find((item) => item.section === "skills");
+    const tokens = (value: string) =>
+      value
+        .split(/[,;\n]/)
+        .map((v) =>
+          v
+            .trim()
+            .replace(
+              /^(?:languages|frontend|backend|technical skills|skills|development foundations|security foundations(?: \(learning\))?)\s*:\s*/i,
+              "",
+            ),
+        )
+        .filter(Boolean);
+    const unique = (values: string[]) => [
+      ...new Map(values.map((v) => [v.toLowerCase(), v])).values(),
+    ];
+    const securityTerm =
+      /cyber|security|\bsoc\b|\bsiem\b|network|\blinux\b|wireshark|\bnmap\b|incident|vulnera|owasp|threat|\bburp\b|splunk|firewall|forensic/i;
+    const all = tokens(skillEvidence?.text || ""),
+      security = unique([
+        ...tokens(profile.career?.securitySkills || ""),
+        ...all.filter((v) => securityTerm.test(v)),
+      ]);
+    const transferable = all.filter((v) => !securityTerm.test(v));
+    const grouped = [
+      security.length ? "Security foundations: " + security.join(", ") : "",
+      transferable.length
+        ? "Development and transferable skills: " + transferable.join(", ")
+        : "",
+    ]
+      .filter(Boolean)
+      .join("\n");
+    if (grouped) {
+      if (skillEvidence) skillEvidence.text = grouped;
+      else evidence.push({ section: "skills", text: grouped });
     }
     if (profile.career?.securityExperience?.trim())
       evidence.push({
@@ -146,7 +175,20 @@ export function resumeEvidence(
     for (const fact of facts(profile).filter((f) =>
       f.startsWith("Existing CV: "),
     )) {
-      const text = withoutNyscClaims(fact.slice("Existing CV: ".length));
+      let text = withoutNyscClaims(fact.slice("Existing CV: ".length));
+      if (track === "cybersecurity") {
+        const genericLines = new Set(
+          (sections.summary || "").split("\n").map(normalize),
+        );
+        text = text
+          .split("\n")
+          .filter(
+            (line) =>
+              !genericLines.has(normalize(line)) &&
+              !/^(?:professional )?summary:?$/i.test(line.trim()),
+          )
+          .join("\n");
+      }
       if (text.trim()) evidence.push({ section: "source", text });
     }
   const extra = [
@@ -164,8 +206,17 @@ export function resumeEvidence(
 export function profileResume(
   profile: Profile,
   target: ResumeTarget,
-  evidence = resumeEvidence(profile),
+  suppliedEvidence?: ResumeEvidence[],
+  options?: ResumeOptions,
 ): ResumeContent {
+  const track =
+    options?.track ||
+    (careerPath(target.title, target.description) === "cybersecurity"
+      ? "cybersecurity"
+      : "development");
+  const evidence =
+    suppliedEvidence ||
+    resumeEvidence(profile, validateResumeOptions({ track }));
   const { name, email, phone, location, github, linkedin, portfolio } = profile;
   const result: ResumeContent = {
     name,
@@ -208,7 +259,41 @@ export function profileResume(
           ) && skillMention(item.text, skill),
       ),
   );
-  if (!result.summary && matchedSkills.length)
+  if (
+    track === "cybersecurity" &&
+    !profile.cvTracks?.cybersecurity?.summary.trim()
+  ) {
+    const security = result.skills
+      .match(/^Security foundations: (.+)$/m)?.[1]
+      ?.split(", ")
+      .slice(0, 5)
+      .join(", ");
+    const development = evidence.filter(
+      (item) =>
+        item.section === "experience" &&
+        careerPath(item.label || item.text.split("\n")[0], item.text) ===
+          "development",
+    );
+    const demonstrated = knownSkills
+      .filter((skill) =>
+        development.some((item) => skillMention(item.text, skill)),
+      )
+      .sort((a, b) => Number(wanted.includes(b)) - Number(wanted.includes(a)))
+      .slice(0, 3);
+    result.summary = [
+      "Seeking a cybersecurity internship.",
+      security ? "Security foundations include " + security + "." : "",
+      development.length
+        ? demonstrated.length
+          ? "Transferable software development work includes " +
+            demonstrated.join(", ") +
+            "."
+          : "Brings a software development background as transferable experience."
+        : "",
+    ]
+      .filter(Boolean)
+      .join(" ");
+  } else if (!result.summary && matchedSkills.length)
     result.summary = `Skills include ${matchedSkills.join(", ")}.`;
   return cleanResumeLayout(result);
 }
@@ -342,8 +427,16 @@ export async function buildResume(
   useAi: boolean,
   recovery: ResumeGenerationOptions = {},
 ) {
-  const evidence = resumeEvidence(profile, recovery.cvOptions);
-  const source = profileResume(profile, target, evidence);
+  const cvOptions =
+    recovery.cvOptions ||
+    validateResumeOptions({
+      track:
+        careerPath(target.title, target.description) === "cybersecurity"
+          ? "cybersecurity"
+          : "development",
+    });
+  const evidence = resumeEvidence(profile, cvOptions);
+  const source = profileResume(profile, target, evidence, cvOptions);
   if (!useAi)
     return {
       content: source,
@@ -380,7 +473,7 @@ export async function buildResume(
     recovery.checkpoint?.analysis ??
       (await aiJson(
         'Analyse the job before writing. Return {"priorities":[{"requirement":"verbatim job-description excerpt","evidence":[0]}],"selectedEvidence":[0,1]}. Identify up to 8 actual requirements, map each to candidate evidence indices, and use an empty evidence array for unsupported requirements. Select the strongest evidence for a concise professional CV: actual work experience, skills, education and at most 3 relevant complete projects. Prefer evidence that demonstrates the job tasks, rather than keyword repetition. Include relevant transferable work but never assume the candidate possesses a job requirement. Keep education and employment context. Use only valid zero-based indices and literal requirement excerpts. Do not write the CV in this response.',
-        { target, evidence },
+        { target, track: cvOptions.track, evidence },
         stageOptions(),
       )),
     target,
@@ -402,9 +495,10 @@ export async function buildResume(
   const generated =
     recovery.checkpoint?.generated ??
     (await aiJson(
-      'Write a concise, job-specific CV using selected master-profile evidence. Generate CV sections only; do not generate a cover letter. Return {"items":[{"section":"summary|skills|experience|projects|education|contributions|training|certifications|additionalInfo","text":"complete entry, paragraph or skills list","sources":[0]}]}. Sources are the original evidence IDs supplied with each selected record. Write a specific 2–3 sentence professional summary grounded in real qualifications; prioritise relevant accomplishments and use clear active language. Select relevant skills, preserve employer/title/date context in experience, and keep exact project names on the first line without Markdown, their own technologies and achievement bullets together in a single item per project. Include at most 3 selected projects. Do not repeat the candidate name, contact information, headings, generic objectives or the entire raw CV. Omit irrelevant detail, repetition and filler. Include skills, experience and education section items whenever those evidence sections are supplied. Every factual statement must be supported by its cited selected evidence. Do not invent qualifications, metrics, years, employers, titles, technologies, proficiency or achievements, or move claims between projects. Job requirements are not candidate qualifications. Keep the CV under 900 words. Write each employment record as a separate item. Preserve its exact first-line employer/title heading and original date strings. Rewrite and reorder its own genuine bullets for this role, improving grammar and prioritising demonstrated relevant work. Do not transfer responsibilities across employers or projects. For cybersecurity internships, label development employment accurately and emphasise actual learning and transferable work; never turn it into SOC employment. Include education when available. Unsupported requirements stay out of the documents.',
+      'Write a concise, job-specific CV using selected master-profile evidence. Generate CV sections only; do not generate a cover letter. Return {"items":[{"section":"summary|skills|experience|projects|education|contributions|training|certifications|additionalInfo","text":"complete entry, paragraph or skills list","sources":[0]}]}. Sources are the original evidence IDs supplied with each selected record. Write a specific 2–3 sentence professional summary grounded in real qualifications; prioritise relevant accomplishments and use clear active language. Select relevant skills, preserve employer/title/date context in experience, and keep exact project names on the first line without Markdown, their own technologies and achievement bullets together in a single item per project. Include at most 3 selected projects. Do not repeat the candidate name, contact information, headings, generic objectives or the entire raw CV. Omit irrelevant detail, repetition and filler. Include skills, experience and education section items whenever those evidence sections are supplied. Every factual statement must be supported by its cited selected evidence. Do not invent qualifications, metrics, years, employers, titles, technologies, proficiency or achievements, or move claims between projects. Job requirements are not candidate qualifications. Keep the CV under 900 words. Write each employment record as a separate item. Put every achievement bullet on its own line, using the • marker; do not join bullet lists into a paragraph. Preserve its exact first-line employer/title heading and original date strings. Rewrite and reorder its own genuine bullets for this role, improving grammar and prioritising demonstrated relevant work. Do not transfer responsibilities across employers or projects. For cybersecurity internships, label development employment accurately and emphasise actual learning and transferable work; never turn it into SOC employment. Include education when available. Unsupported requirements stay out of the documents.',
       {
         target,
+        track: cvOptions.track,
         analysis,
         evidence: analysis.selectedEvidence.map((id) => ({
           id,

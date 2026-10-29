@@ -1,3 +1,4 @@
+import { normalizeResumeBullets } from "./resume-bullets";
 import {
   orderedResumeSections,
   resumeSections,
@@ -15,7 +16,7 @@ export function readabilityReview(
 ) {
   const warnings: string[] = [],
     normalized = (s: string) =>
-      s
+      normalizeResumeBullets(s)
         .replace(/^#{1,4}\s+/gm, "")
         .replace(/^\*\*(.*?)\*\*$/gm, "$1")
         .replace(/^[ \t]*[•▪◦*–-]\s+/gm, "")
@@ -77,9 +78,9 @@ export function readabilityReview(
       "Some saved experience or education dates were not extracted.",
     );
   const bullets = (
-    Object.values(content)
-      .join("\n")
-      .match(/^\s*[•▪◦*–-]\s/gm) || []
+    normalizeResumeBullets(Object.values(content).join("\n")).match(
+      /^\s*[•*–-]\s/gm,
+    ) || []
   ).length;
   if (bullets && !/[•▪◦]/.test(extracted))
     warnings.push("Check that achievement bullets remain readable in the PDF.");

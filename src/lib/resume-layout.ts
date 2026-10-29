@@ -1,3 +1,4 @@
+import { normalizeResumeBullets } from "./resume-bullets";
 import { resumeSections, type ResumeContent } from "./resume-types";
 import { splitCvSections } from "./resume-sections";
 
@@ -82,8 +83,7 @@ export function isEntrySection(section: string) {
 }
 /** Conservative formatting: preserve words and bullet continuations, never invent titles or technologies. */
 export function resumeEntries(text: string): ResumeEntry[] {
-  const lines = text
-    .replace(/\r/g, "")
+  const lines = normalizeResumeBullets(text)
     .split("\n")
     .map((line) => line.trim());
   const entries: ResumeEntry[] = [];

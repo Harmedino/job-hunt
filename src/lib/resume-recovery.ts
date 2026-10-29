@@ -12,7 +12,7 @@ export function resumeRecoveryKey(
   return createHash("sha256")
     .update(
       JSON.stringify({
-        schema: 2,
+        schema: 3,
         profile,
         target,
         options,
