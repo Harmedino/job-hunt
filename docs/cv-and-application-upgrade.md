@@ -1,5 +1,7 @@
 # CV Builder, manual jobs and 2027 application readiness
 
+See the [2026-10-29 formatting and internship-tailoring follow-up](cv-screenshot-fixes.md) for the latest screenshot fixes and saved-CV refresh steps.
+
 This upgrade extends the existing Job Finder, Applications and CV Builder on `master`. It does not reset MongoDB, replace saved CVs or change the Coding Bounties/YouTube modules. Existing development seniority, cybersecurity internship, salary and applicant-location preferences remain in place.
 
 ## What already existed

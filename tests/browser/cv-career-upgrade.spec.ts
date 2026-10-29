@@ -316,3 +316,135 @@ test("entry editing, independent cover letter retry and actual PDF pagination pr
     ),
   ).toBe(true);
 });
+
+test("pasted security jobs choose the internship CV track and copied bullets stay individually editable", async ({
+  page,
+}, info) => {
+  await base(page);
+  const copied = {
+    ...profile,
+    careerRecords: undefined,
+    skills: "React, Angular, TypeScript, Linux, Security Testing Tools",
+    experience:
+      "Fictional Web Studio — Frontend Developer\n2024 – Present\n● Maintain Angular forms. ● Integrate documented APIs. ● Investigate actual UI issues.",
+    projects:
+      "Fictional Portal\nReact · TypeScript\n● Build reusable interfaces. ● Test form validation.",
+  };
+  await page.route("**/api/profile", (r) => r.fulfill({ json: copied }));
+  let generated = false;
+  await page.route("**/api/resumes", (r) => {
+    if (r.request().method() === "GET")
+      return r.fulfill({ json: { drafts: [] } });
+    const body = r.request().postDataJSON();
+    expect(body.options.track).toBe("cybersecurity");
+    generated = true;
+    const evidence = resumeEvidence(copied, body.options);
+    return r.fulfill({
+      json: {
+        id: "copied-bullets",
+        familyId: "copied-bullets",
+        createdAt: new Date().toISOString(),
+        target: body.target,
+        options: body.options,
+        content: profileResume(copied, body.target, evidence, body.options),
+        profileSnapshot: copied,
+        evidence,
+        method: "Basic layout only · no AI writing",
+        coverLetter: "",
+        warnings: [],
+        requirementsToReview: [],
+        manualEdits: false,
+        layoutVersion: 2,
+      },
+    });
+  });
+  await page.route("**/api/resumes/*/preview?*", (r) =>
+    r.fulfill({ json: { pageCount: 0 } }),
+  );
+  await page.reload();
+  await page.getByRole("button", { name: "CV Builder", exact: true }).click();
+  const builder = page.getByRole("region", { name: "CV builder", exact: true });
+  await builder
+    .getByLabel("Target role", { exact: true })
+    .fill("Security Engineer Internship");
+  await expect(builder.getByLabel("CV career track")).toHaveValue(
+    "cybersecurity",
+  );
+  await builder.getByLabel("CV career track").selectOption("development");
+  await builder
+    .getByLabel("Job description", { exact: true })
+    .fill(
+      "Supervised Linux and web application security internship for beginners.",
+    );
+  await expect(builder.getByLabel("CV career track")).toHaveValue(
+    "development",
+  );
+  await builder
+    .getByRole("button", { name: "Use this job’s career track", exact: true })
+    .click();
+  await expect(builder.getByLabel("CV career track")).toHaveValue(
+    "cybersecurity",
+  );
+  await builder
+    .getByRole("radio", { name: "Basic layout only (no AI)", exact: true })
+    .check();
+  await builder
+    .getByRole("button", { name: "Create basic layout", exact: true })
+    .click();
+  await expect(
+    builder.getByLabel("Professional summary", { exact: true }),
+  ).toHaveValue(/Seeking a cybersecurity internship/);
+  await expect(builder.getByLabel("Skills", { exact: true })).toHaveValue(
+    /Security foundations: Linux/,
+  );
+  await expect(
+    builder.getByRole("button", {
+      name: "Refresh Professional summary for internship (no AI)",
+      exact: true,
+    }),
+  ).toBeVisible();
+  await builder
+    .getByText("Edit individual entries and bullets", { exact: true })
+    .first()
+    .click();
+  const bulletEditors = builder.getByRole("textbox", {
+    name: "Experience / project bullet",
+    exact: true,
+  });
+  await expect(bulletEditors).toHaveCount(3);
+  await expect(bulletEditors.nth(0)).toHaveValue("Maintain Angular forms.");
+  await expect(bulletEditors.nth(1)).toHaveValue("Integrate documented APIs.");
+  await expect(bulletEditors.nth(2)).toHaveValue(
+    "Investigate actual UI issues.",
+  );
+  if (info.project.name === "mobile")
+    await builder.getByRole("button", { name: "Preview", exact: true }).click();
+  await builder
+    .getByText("Editable HTML preview (approximate)", { exact: true })
+    .click();
+  const preview = builder.getByRole("region", {
+    name: "CV preview",
+    exact: true,
+  });
+  await expect(
+    preview
+      .getByRole("heading", {
+        name: "Fictional Web Studio — Frontend Developer",
+        exact: true,
+      })
+      .locator("..")
+      .getByRole("listitem"),
+  ).toHaveCount(3);
+  await expect(
+    preview
+      .getByRole("heading", { name: "Fictional Portal", exact: true })
+      .locator("..")
+      .getByRole("listitem"),
+  ).toHaveCount(2);
+  expect(generated).toBe(true);
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    ),
+  ).toBe(true);
+});

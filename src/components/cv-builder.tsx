@@ -307,12 +307,21 @@ export default function CvBuilder({
   }
   function editTarget(changes: Partial<TargetForm>) {
     setGenerationKind("tailored");
-    setTarget((value) => ({
-      ...value,
+    const next = {
+      ...target,
       ...changes,
       jobId: undefined,
       applicationId: undefined,
-    }));
+    };
+    const previousPath = careerPath(target.title, target.description),
+      nextPath = careerPath(next.title, next.description);
+    if (previousPath !== nextPath && nextPath !== "other")
+      setCvOptions((current) => ({
+        ...current,
+        track: nextPath,
+        selectedRecordIds: undefined,
+      }));
+    setTarget(next);
     setChoice("manual");
   }
   function remember(value: ResumeDraft) {
@@ -880,6 +889,34 @@ export default function CvBuilder({
                 </>
               )}
             </section>
+            {careerPath(target.title, target.description) !== "other" &&
+              cvOptions.track !==
+                careerPath(target.title, target.description) && (
+                <div className="notice" role="note">
+                  <p>
+                    The selected CV track differs from this job. Choose the
+                    matching career profile and build a new CV, or refresh its
+                    summary and skills below.
+                  </p>
+                  <button
+                    type="button"
+                    className="secondary"
+                    onClick={() =>
+                      setCvOptions((current) => ({
+                        ...current,
+                        track:
+                          careerPath(target.title, target.description) ===
+                          "cybersecurity"
+                            ? "cybersecurity"
+                            : "development",
+                        selectedRecordIds: undefined,
+                      }))
+                    }
+                  >
+                    Use this job’s career track
+                  </button>
+                </div>
+              )}
             <ResumeOptionsEditor
               profile={master}
               options={cvOptions}
@@ -1355,6 +1392,18 @@ export default function CvBuilder({
                           >
                             Regenerate {resumeSections[key]} only
                           </button>
+                          {cvOptions.track === "cybersecurity" &&
+                            ["summary", "skills"].includes(key) && (
+                              <button
+                                type="button"
+                                className="secondary"
+                                disabled={!!busy}
+                                onClick={() => void writePart(key, false)}
+                              >
+                                Refresh {resumeSections[key]} for internship (no
+                                AI)
+                              </button>
+                            )}
                           {failedAction === `writing-${key}` && (
                             <button
                               className="secondary"
