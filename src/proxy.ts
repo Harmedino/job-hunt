@@ -9,6 +9,7 @@ export function proxy(request: NextRequest) {
   const path = request.nextUrl.pathname;
   if (
     path === "/api/cron" ||
+    path.startsWith("/api/assisted-companion/") ||
     path === "/login" ||
     path === "/privacy" ||
     ["/manifest.webmanifest", "/share-worker.js", "/launchpad.svg"].includes(path) ||

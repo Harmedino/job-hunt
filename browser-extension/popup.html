@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Launchpad Application Companion</title>
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+    <h1>Launchpad Application Companion</h1>
+    <p>Extension ID: <code id="extension-id"></code></p>
+    <p id="error" role="alert"></p>
+    <section id="pairing">
+      <label
+        >One-time handoff from Launchpad<textarea
+          id="code"
+          rows="3"
+          autocomplete="off"
+        ></textarea></label
+      ><button id="pair">Pair approved application</button>
+    </section>
+    <section id="workflow" hidden>
+      <h2 id="job"></h2>
+      <p id="state" role="status"></p>
+      <p id="hash"></p>
+      <button id="open">Open employer page</button
+      ><button id="fill">Fill approved fields</button
+      ><button id="inspect">Read form values</button
+      ><button id="download">
+        Download approved documents for manual upload
+      </button>
+      <div id="files"></div>
+      <p>
+        Complete unknown questions, custom controls and legal agreements
+        yourself on the employer page. Return here and read back the form again.
+        CAPTCHA and login are always yours to complete.
+      </p>
+      <button id="suggest">Suggest contact mappings (optional AI)</button>
+      <div id="suggestions"></div>
+      <div class="scroll">
+        <table>
+          <thead>
+            <tr>
+              <th>Field</th>
+              <th>Expected</th>
+              <th>Observed</th>
+              <th>Verification</th>
+            </tr>
+          </thead>
+          <tbody id="fields"></tbody>
+        </table>
+      </div>
+      <ul id="blockers"></ul>
+      <label
+        ><input type="checkbox" id="manual" /> I checked the manually entered
+        answers shown above and confirm they are accurate.</label
+      ><button id="verify">Verify all entered values</button>
+      <fieldset>
+        <legend>Explicit submission approval</legend>
+        <label
+          ><input type="checkbox" id="confirmed" /> I reviewed this exact form,
+          documents and agreements, and authorize one submission.</label
+        ><label>Type SUBMIT<input id="confirmation" autocomplete="off" /></label
+        ><button id="submit" disabled>Confirm and submit once</button>
+      </fieldset>
+      <button id="receipt">Check employer confirmation</button
+      ><button id="disconnect">Disconnect companion</button>
+      <p>
+        Clicking Submit is an attempt, not proof of receipt. Uncertain outcomes
+        require reconciliation in Launchpad.
+      </p>
+    </section>
+    <script type="module" src="popup.js"></script>
+  </body>
+</html>

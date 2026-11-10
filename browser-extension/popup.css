@@ -1,0 +1,78 @@
+:root {
+  font-family: system-ui, sans-serif;
+  color: #e4eee8;
+  background: #111914;
+}
+body {
+  width: 580px;
+  max-width: 90vw;
+  padding: 14px;
+  margin: 0;
+  line-height: 1.5;
+}
+h1 {
+  font-size: 20px;
+}
+h2 {
+  font-size: 17px;
+}
+label {
+  display: block;
+  margin: 12px 0;
+}
+textarea,
+input:not([type="checkbox"]) {
+  box-sizing: border-box;
+  width: 100%;
+  padding: 8px;
+  background: #1d2921;
+  color: inherit;
+  border: 1px solid #698776;
+  border-radius: 5px;
+}
+button {
+  margin: 5px 5px 5px 0;
+  padding: 9px;
+  border: 1px solid #698776;
+  background: #285c43;
+  color: inherit;
+  border-radius: 5px;
+  cursor: pointer;
+}
+button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+table {
+  border-collapse: collapse;
+  font-size: 12px;
+  width: 100%;
+}
+td,
+th {
+  border: 1px solid #526657;
+  text-align: left;
+  padding: 7px;
+  vertical-align: top;
+  overflow-wrap: anywhere;
+  min-width: 90px;
+}
+.scroll {
+  overflow: auto;
+  max-height: 320px;
+}
+#error,
+#blockers {
+  color: #ffbaab;
+}
+code,
+#hash {
+  overflow-wrap: anywhere;
+  font-size: 11px;
+}
+fieldset {
+  margin: 12px 0;
+}
+a {
+  color: #a4dfbc;
+}

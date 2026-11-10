@@ -10,9 +10,11 @@ import { resumePdf } from "./resume-pdf";
 import { resumeFilename } from "./resume-filename";
 import type { Application } from "./types";
 import type { ResumeDraft } from "./resume-types";
+import { ResumeInputError } from "./resume-types";
+import { AiError } from "./ai";
 import {
   factKeys,
-  greenhouseTarget,
+  applicationTarget,
   questionKey,
   verifyForm,
   type AssistedPackage,
@@ -34,7 +36,9 @@ export class AssistedError extends Error {
   }
 }
 export function assistedError(error: unknown) {
-  return error instanceof AssistedError
+  return error instanceof AssistedError ||
+    error instanceof ResumeInputError ||
+    error instanceof AiError
     ? Response.json(
         { error: error.message },
         { status: error.status, headers: assistedHeaders },
@@ -64,6 +68,7 @@ export type Attempt = {
   updatedAt: string;
   closedAt?: string;
   lease?: { hash: string; expires: number };
+  companionOrigin?: string;
   report?: Verification;
   reportHash?: string;
   verifiedAt?: string;
@@ -96,7 +101,13 @@ export function publicAttempt(a: Attempt) {
     approvedAt: a.package.approvedAt,
     facts: a.package.facts,
     answers: a.package.answers,
-    files: a.package.files.map((file) => ({ kind: file.kind, name: file.name, mime: file.mime, size: file.size, sha256: file.sha256 })),
+    files: a.package.files.map((file) => ({
+      kind: file.kind,
+      name: file.name,
+      mime: file.mime,
+      size: file.size,
+      sha256: file.sha256,
+    })),
     report: a.report,
     reportHash: a.reportHash,
     verifiedAt: a.verifiedAt,
@@ -122,22 +133,47 @@ export async function loadAttempt(id: string) {
   return attempt;
 }
 export async function bankAnswers(vacancyKey?: string) {
-  return (await db())
+  const profileHash = await currentProfileHash();
+  const rows = await (
+    await db()
+  )
     .collection<BankAnswer>("assisted_answers")
-    .find(vacancyKey ? { vacancyKey } : {}, { projection: { _id: 0 } })
+    .find(vacancyKey ? { vacancyKey: { $in: [vacancyKey, "*"] } } : {}, {
+      projection: { _id: 0 },
+    })
     .sort({ question: 1 })
     .toArray();
+  return rows.map((row) => ({
+    ...row,
+    invalidated: row.profileHash !== profileHash,
+  }));
+}
+export async function currentProfileHash() {
+  const row = await (await db())
+    .collection("profile")
+    .findOne({ key: "owner" });
+  return digest(JSON.stringify(row?.profile || {}));
 }
 export async function saveAnswer(body: Record<string, unknown>) {
   if (body.confirmed !== true)
     throw new AssistedError(
       "Confirm that this is your accurate answer to this employer’s exact question.",
     );
-  const target = greenhouseTarget(
-    bounded(body.url, "Greenhouse job URL", 2000),
+  const target = applicationTarget(
+    bounded(body.url, "supported job URL", 2000),
   );
   const question = bounded(body.question, "exact employer question", 4000),
     answer = bounded(body.answer, "answer", 8000);
+  if (
+    body.reusable === true &&
+    /authoriz|citizenship|citizen|visa|sponsor|legal|consent|agree|salary|compensation|relocat|country/i.test(
+      question,
+    )
+  )
+    throw new AssistedError(
+      "Keep eligibility, compensation and legal answers scoped to the exact vacancy.",
+    );
+  const vacancyKey = body.reusable === true ? "*" : target.key;
   const collection = (await db()).collection("assisted_answers");
   await collection.createIndex(
     { vacancyKey: 1, questionKey: 1 },
@@ -147,11 +183,18 @@ export async function saveAnswer(body: Record<string, unknown>) {
     id: randomUUID(),
     question,
     answer,
-    vacancyKey: target.key,
+    vacancyKey,
     confirmedAt: new Date().toISOString(),
+    source:
+      typeof body.source === "string"
+        ? body.source.slice(0, 1000)
+        : "Owner-confirmed personal information",
+    updatedAt: new Date().toISOString(),
+    disabled: body.disabled === true,
+    profileHash: await currentProfileHash(),
   };
   await collection.updateOne(
-    { vacancyKey: target.key, questionKey: questionKey(question) },
+    { vacancyKey, questionKey: questionKey(question) },
     { $set: entry },
     { upsert: true },
   );
@@ -179,7 +222,7 @@ export async function approveAttempt(body: Record<string, unknown>) {
     );
   let target;
   try {
-    target = greenhouseTarget(app.job.url);
+    target = applicationTarget(app.job.url);
   } catch (error) {
     throw new AssistedError((error as Error).message);
   }
@@ -194,7 +237,7 @@ export async function approveAttempt(body: Record<string, unknown>) {
         (sameVacancy(other.job, app.job) ||
           (() => {
             try {
-              return greenhouseTarget(other.job.url).key === target.key;
+              return applicationTarget(other.job.url).key === target.key;
             } catch {
               return false;
             }
@@ -211,10 +254,10 @@ export async function approveAttempt(body: Record<string, unknown>) {
   if (
     draft.kind?.startsWith("master-") ||
     !draft.target.url ||
-    greenhouseTarget(draft.target.url).key !== target.key
+    applicationTarget(draft.target.url).key !== target.key
   )
     throw new AssistedError(
-      "Select a tailored CV saved for this exact Greenhouse vacancy.",
+      "Select a tailored CV saved for this exact supported vacancy.",
     );
   const selected = body.verifiedFacts;
   if (
@@ -279,6 +322,17 @@ export async function approveAttempt(body: Record<string, unknown>) {
       base64: bytes.toString("base64"),
     });
   }
+  const answers = (await bankAnswers(target.key)).filter(
+    (a) => !a.invalidated && !a.disabled,
+  );
+  if (
+    body.reviewedAnswers !== undefined &&
+    JSON.stringify(body.reviewedAnswers) !== JSON.stringify(answers)
+  )
+    throw new AssistedError(
+      "Private answers changed after review. Reopen the CV selection and review the current answers before approving.",
+      409,
+    );
   const id = randomUUID(),
     pack: AssistedPackage = {
       version: 1,
@@ -290,8 +344,9 @@ export async function approveAttempt(body: Record<string, unknown>) {
       company: app.job.company,
       title: app.job.title,
       facts,
-      answers: await bankAnswers(target.key),
+      answers,
       files,
+      profileHash: await currentProfileHash(),
     };
   const attempt: Attempt = {
     id,
@@ -319,7 +374,7 @@ export async function approveAttempt(body: Record<string, unknown>) {
   } catch (error) {
     if ((error as { code?: number }).code === 11000)
       throw new AssistedError(
-        "An active or confirmed attempt already exists for this Greenhouse vacancy. Resume it instead of creating a duplicate.",
+        "An active or confirmed attempt already exists for this supported vacancy. Resume it instead of creating a duplicate.",
         409,
       );
     throw error;
@@ -359,6 +414,9 @@ function parseReport(value: unknown): {
         "checkbox",
         "file",
         "unsupported",
+        "radio",
+        "checkbox-group",
+        "date",
       ].includes(f.kind) ||
       typeof f.required !== "boolean" ||
       typeof f.valid !== "boolean" ||
@@ -392,7 +450,44 @@ export async function attemptCommand(
       409,
     );
   const action = body.action;
+  if (action === "revoke") {
+    if (body.confirmed !== true)
+      throw new AssistedError(
+        "Confirm that the companion should stop. Any attempted submission remains uncertain.",
+      );
+    await cas(
+      a,
+      {
+        state:
+          a.state === "confirmed-submission"
+            ? a.state
+            : a.submissionIntentAt
+              ? "uncertain-submission"
+              : "awaiting-user",
+      },
+      { lease: "", companionOrigin: "", reportHash: "", verifiedAt: "" },
+      "Owner revoked the browser handoff. Fresh pairing and verification required.",
+    );
+    return publicAttempt(await loadAttempt(id));
+  }
+  if (action === "sync") {
+    if (a.state !== "confirmed-submission")
+      throw new AssistedError(
+        "Only confirmed outcomes can be synchronized.",
+        409,
+      );
+    await syncConfirmed(a);
+    return publicAttempt(await loadAttempt(id));
+  }
   if (action === "claim") {
+    if (
+      a.package.profileHash &&
+      a.package.profileHash !== (await currentProfileHash())
+    )
+      throw new AssistedError(
+        "Your master profile changed after approval. Close this unsubmitted attempt and approve a fresh package.",
+        409,
+      );
     if (
       a.state === "confirmed-submission" ||
       a.state === "uncertain-submission"
@@ -566,6 +661,31 @@ export async function attemptCommand(
         ? "Every entered field and document read back and reviewed."
         : "Readback found missing, changed or unsupported fields; owner action required.",
     );
+    const shape = report.fields.map((f) => ({
+      idHash: digest(f.id),
+      labelHash: digest(f.label),
+      kind: f.kind,
+      required: f.required,
+      optionCount: f.options?.length || 0,
+    }));
+    const layoutHash = digest(JSON.stringify(shape));
+    await (await db())
+      .collection("assisted_form_knowledge")
+      .updateOne(
+        { key: `${a.package.target.platform || "Greenhouse"}:${layoutHash}` },
+        {
+          $set: {
+            platform: a.package.target.platform || "Greenhouse",
+            layoutHash,
+            fields: shape,
+            lastSeen: now,
+            lastResult: report.ready ? "verified" : "needs-owner",
+            adapterVersion: 1,
+          },
+          $inc: { observations: 1 },
+        },
+        { upsert: true },
+      );
     return publicAttempt(await loadAttempt(id));
   }
   if (action === "submit-intent") {
@@ -589,6 +709,57 @@ export async function attemptCommand(
         "The application was already submitted or removed. No duplicate click is allowed.",
         409,
       );
+    const { assistantPolicy, withinOperatingHours, policyDay } = await import(
+        "./assistant-policy"
+      ),
+      policy = await assistantPolicy();
+    if (!withinOperatingHours(policy))
+      throw new AssistedError(
+        "This attempt is outside your configured application hours. Edit the policy or return during those hours.",
+        409,
+      );
+    if (
+      !policy.allowedBoards.includes(
+        a.package.target.platform || "Greenhouse",
+      ) ||
+      policy.excludedCompanies.some(
+        (c) =>
+          c.trim().toLowerCase() === a.package.company.trim().toLowerCase(),
+      )
+    )
+      throw new AssistedError(
+        "This employer or board is excluded by your current application policy.",
+        409,
+      );
+    const daily = (
+      await collection.find({ submissionIntentAt: { $exists: true } }).toArray()
+    ).filter(
+      (other) =>
+        policyDay(new Date(other.submissionIntentAt!), policy.timezone) ===
+        policyDay(new Date(), policy.timezone),
+    ).length;
+    const dailyLimits = (await db()).collection<{
+        _id: string;
+        count: number;
+        slots: string[];
+      }>("assisted_daily_limits"),
+      day = policyDay(new Date(), policy.timezone),
+      slot = `${a.id}:${a.revision}`;
+    await dailyLimits.updateOne(
+      { _id: day },
+      { $setOnInsert: { count: daily, slots: [] } },
+      { upsert: true },
+    );
+    const reserved = await dailyLimits.findOneAndUpdate(
+      { _id: day, count: { $lt: policy.maxPerDay }, slots: { $ne: slot } },
+      { $inc: { count: 1 }, $addToSet: { slots: slot } },
+      { returnDocument: "after" },
+    );
+    if (!reserved)
+      throw new AssistedError(
+        "Your daily submission-attempt limit is reached or this intent was already reserved. Uncertain attempts count; do not retry them blindly.",
+        409,
+      );
     await cas(
       a,
       { state: "uncertain-submission", submissionIntentAt: now },
@@ -608,15 +779,18 @@ export async function attemptCommand(
     const parsed = new URL(url);
     if (
       parsed.protocol !== "https:" ||
-      !["boards.greenhouse.io", "job-boards.greenhouse.io"].includes(
-        parsed.hostname,
-      ) ||
+      (parsed.hostname !== new URL(a.package.target.url).hostname &&
+        !(
+          a.package.target.platform === "Greenhouse" &&
+          parsed.hostname === "boards.greenhouse.io"
+        )) ||
+      !parsed.pathname.startsWith(`/${a.package.target.board}/`) ||
       !/thank you for applying|application (?:has been |was )?(?:successfully )?(?:submitted|received)|thank you for your (?:application|interest)/i.test(
         text,
       )
     )
       throw new AssistedError(
-        "No recognized Greenhouse confirmation was observed. Submission remains uncertain.",
+        "No recognized employer confirmation was observed. Submission remains uncertain.",
         409,
       );
     await cas(
@@ -677,7 +851,12 @@ async function syncConfirmed(a: Attempt) {
       app = await apps.findOne({ id: a.applicationId });
     if (!app) throw new Error("missing application");
     if (applicationWasApplied(app)) {
-      if (app.documentSnapshot?.capturedAt === a.package.approvedAt) return;
+      if (app.documentSnapshot?.capturedAt === a.package.approvedAt) {
+        await (
+          await assistedCollection()
+        ).updateOne({ id: a.id }, { $unset: { syncWarning: "" } });
+        return;
+      }
       throw new Error("existing submission retained");
     }
     const files = a.package.files.map((f) => ({
@@ -691,22 +870,18 @@ async function syncConfirmed(a: Attempt) {
       source: "rendered selected version" as const,
     }));
     for (let i = 0; i < files.length; i++)
-      await database
-        .collection("application_files")
-        .updateOne(
-          { id: files[i].id, applicationId: app.id },
-          {
-            $setOnInsert: {
-              ...files[i],
-              applicationId: app.id,
-              data: new Binary(
-                Buffer.from(a.package.files[i].base64, "base64"),
-              ),
-            },
+      await database.collection("application_files").updateOne(
+        { id: files[i].id, applicationId: app.id },
+        {
+          $setOnInsert: {
+            ...files[i],
+            applicationId: app.id,
+            data: new Binary(Buffer.from(a.package.files[i].base64, "base64")),
           },
-          { upsert: true },
-        );
-    const at = a.receipt!.observedAt;
+        },
+        { upsert: true },
+      );
+    const at = a.submissionIntentAt || a.receipt!.observedAt;
     const result = await apps.updateOne(
       {
         id: app.id,
@@ -739,6 +914,9 @@ async function syncConfirmed(a: Attempt) {
       },
     );
     if (!result.matchedCount) throw new Error("concurrent submission retained");
+    await (
+      await assistedCollection()
+    ).updateOne({ id: a.id }, { $unset: { syncWarning: "" } });
   } catch {
     await (
       await assistedCollection()

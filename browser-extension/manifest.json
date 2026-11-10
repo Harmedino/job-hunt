@@ -1,0 +1,22 @@
+{
+  "manifest_version": 3,
+  "name": "Launchpad Application Companion",
+  "version": "1.0.0",
+  "description": "Fill and verify one owner-approved Launchpad application. Submission always requires explicit confirmation.",
+  "permissions": ["activeTab", "scripting", "storage"],
+  "optional_host_permissions": [
+    "https://*.vercel.app/*",
+    "http://localhost/*",
+    "http://127.0.0.1/*",
+    "https://boards.greenhouse.io/*",
+    "https://job-boards.greenhouse.io/*",
+    "https://jobs.lever.co/*",
+    "https://jobs.eu.lever.co/*",
+    "https://jobs.ashbyhq.com/*"
+  ],
+  "background": { "service_worker": "background.js", "type": "module" },
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Launchpad Application Companion"
+  }
+}

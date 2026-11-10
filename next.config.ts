@@ -8,6 +8,7 @@ const nextConfig: NextConfig = {
     "mammoth",
   ],
   outputFileTracingIncludes: {
+    "/api/assisted-apply": ["./src/assets/fonts/*.ttf"],
     "/api/applications/*/files": [
       "./node_modules/pdf-parse/dist/worker/pdf.worker.mjs",
       "./node_modules/pdfjs-dist/legacy/build/pdf.worker.mjs",

@@ -22,6 +22,13 @@ import {
 } from "../src/lib/assisted-store";
 import { emptyProfile, type Application } from "../src/lib/types";
 import type { ResumeDraft } from "../src/lib/resume-types";
+import {
+  createHandoff,
+  consumeHandoff,
+  authenticateCompanion,
+} from "../src/lib/assisted-handoff";
+import { POST as companionCommand } from "../src/app/api/assisted-companion/[id]/route";
+import { proposeMappings } from "../src/lib/assisted-mapping";
 const target = greenhouseTarget(
   "https://boards.greenhouse.io/testfixture/jobs/123?gh_src=tracking",
 );
@@ -619,6 +626,150 @@ test(
             (await loadAttempt(a.id)).package.answers[0].answer,
             "Yes",
           );
+        },
+      );
+      await t.test(
+        "one-time handoffs bind origin, attempt, expiry and permissions",
+        async () => {
+          const f = await fixture(),
+            a = await approveAttempt(f.body),
+            ext = "a".repeat(32),
+            code = await createHandoff(a.id, ext);
+          const request = (token?: string, other = ext) =>
+            new Request(
+              "https://launchpad.example/api/assisted-companion/handoff",
+              {
+                method: "POST",
+                headers: {
+                  "x-launchpad-extension": other,
+                  Origin: `chrome-extension://${other}`,
+                  ...(token ? { Authorization: `Bearer ${token}` } : {}),
+                },
+              },
+            );
+          await assert.rejects(
+            consumeHandoff(request(undefined, "b".repeat(32)), {
+              token: code.token,
+            }),
+            /expired/,
+          );
+          const claim = (await consumeHandoff(request(), {
+            token: code.token,
+          })) as { leaseToken: string };
+          await assert.rejects(
+            consumeHandoff(request(), { token: code.token }),
+            /already used/,
+          );
+          const scoped = request(claim.leaseToken);
+          assert.equal(
+            (await authenticateCompanion(scoped, a.id)).attempt.id,
+            a.id,
+          );
+          const other = await approveAttempt((await fixture()).body);
+          await assert.rejects(
+            authenticateCompanion(scoped, other.id),
+            /not authorized/,
+          );
+          await assert.rejects(
+            authenticateCompanion(
+              request(claim.leaseToken, "b".repeat(32)),
+              a.id,
+            ),
+            /not authorized/,
+          );
+          const denied = await companionCommand(
+            new Request(
+              "https://launchpad.example/api/assisted-companion/" + a.id,
+              {
+                method: "POST",
+                headers: Object.fromEntries(scoped.headers),
+                body: JSON.stringify({ action: "claim" }),
+              },
+            ),
+            { params: Promise.resolve({ id: a.id }) },
+          );
+          assert.equal(denied.status, 403);
+          await attemptCommand(a.id, { action: "revoke", confirmed: true });
+          await assert.rejects(
+            authenticateCompanion(scoped, a.id),
+            /not authorized/,
+          );
+          const expired = await createHandoff(other.id, ext);
+          await database
+            .collection("assisted_handoffs")
+            .updateOne(
+              { hash: digest(expired.token) },
+              { $set: { expiresAt: new Date(0) } },
+            );
+          await assert.rejects(
+            consumeHandoff(request(), { token: expired.token }),
+            /expired/,
+          );
+        },
+      );
+      await t.test(
+        "profile revisions invalidate answer memory and block stale-package handoffs",
+        async () => {
+          const f = await fixture();
+          await saveAnswer({
+            url: f.app.job.url,
+            question: "Sponsorship?",
+            answer: "Yes",
+            confirmed: true,
+          });
+          const a = await approveAttempt(f.body);
+          await database
+            .collection("profile")
+            .insertOne({
+              key: "owner",
+              profile: { ...profile, name: "Changed profile name" },
+            });
+          assert.equal(
+            (await bankAnswers(greenhouseTarget(f.app.job.url).key))[0]
+              .invalidated,
+            true,
+          );
+          await assert.rejects(
+            attemptCommand(a.id, { action: "claim" }),
+            /profile changed/,
+          );
+          assert.equal(
+            (await loadAttempt(a.id)).package.answers[0].answer,
+            "Yes",
+          );
+          await database.collection("profile").deleteOne({ key: "owner" });
+        },
+      );
+      await t.test(
+        "no provider never creates invented mapping proposals and leaves manual review available",
+        async () => {
+          const a = await approveAttempt((await fixture()).body),
+            stored = await loadAttempt(a.id);
+          stored.report = verifyForm(stored.package, {
+            url: stored.package.target.url,
+            challenge: "",
+            unsupported: "",
+            fields: [...fields(), field("q", "Unclear contact detail", "")],
+          });
+          const old = [
+            process.env.AI_PROVIDER,
+            process.env.GEMINI_API_KEY,
+            process.env.OPENAI_API_KEY,
+          ];
+          delete process.env.GEMINI_API_KEY;
+          delete process.env.OPENAI_API_KEY;
+          process.env.AI_PROVIDER = "auto";
+          try {
+            await assert.rejects(proposeMappings(stored), /unavailable/);
+          } finally {
+            for (const [i, key] of [
+              "AI_PROVIDER",
+              "GEMINI_API_KEY",
+              "OPENAI_API_KEY",
+            ].entries())
+              if (old[i] === undefined) delete process.env[key];
+              else process.env[key] = old[i];
+          }
         },
       );
     } finally {
