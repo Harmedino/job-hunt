@@ -14,6 +14,10 @@ try {
     /Finish setting up your workspace/,
   );
   assert.equal((await fetch(missing.url + "/api/profile")).status, 503);
+  assert.equal(
+    (await fetch(missing.url + "/api/assisted-apply/answers")).status,
+    503,
+  );
   console.log(
     "Unconfigured production: setup page is reachable; private API stays locked.",
   );
@@ -27,6 +31,22 @@ try {
   const denied = await fetch(server.url + "/api/profile");
   assert.equal(denied.status, 401);
   assert.equal(denied.headers.get("www-authenticate"), null);
+  for (const path of [
+    "/api/assisted-apply",
+    "/api/assisted-apply/answers",
+    "/api/assisted-apply/settings",
+    "/api/assisted-apply/dashboard",
+    "/api/assisted-apply/fixture/package",
+  ])
+    assert.equal((await fetch(server.url + path)).status, 401);
+  assert.equal(
+    (
+      await fetch(server.url + "/api/assisted-companion/fixture", {
+        headers: { "x-launchpad-extension": "a".repeat(32) },
+      })
+    ).status,
+    401,
+  );
   browser = await chromium.launch({
     executablePath:
       process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH || undefined,

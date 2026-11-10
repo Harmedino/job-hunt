@@ -37,6 +37,9 @@ jobs:
         env:
           TEST_MONGODB_URI: mongodb://127.0.0.1:27017
       - run: npm run test:auth
+      - run: npm run test:assistant
+        env:
+          TEST_MONGODB_URI: mongodb://127.0.0.1:27017
       - run: npm run test:e2e
       - run: npm run extension:build
       - run: git diff --exit-code -- browser-extension/generated/policy.js

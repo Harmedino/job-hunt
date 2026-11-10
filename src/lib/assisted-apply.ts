@@ -101,6 +101,7 @@ export type BankAnswer = {
   vacancyKey: string;
   confirmedAt: string;
   source?: string;
+  sourceUrl?: string;
   updatedAt?: string;
   disabled?: boolean;
   profileHash?: string;

@@ -4,6 +4,8 @@ A private Next.js + TypeScript + Tailwind workspace for remote development and e
 
 ## Run locally
 
+The integrated **Application Assistant** and first-party Chrome companion are documented in [Assisted Apply setup and supported forms](docs/assisted-apply.md). Preparation, verified readback, uncertain outcomes and confirmed submissions are tracked separately; submission always requires your explicit approval.
+
 Requires Node.js 24 (see `.node-version`), npm, and MongoDB 8 or a MongoDB Atlas connection.
 
 ```sh
@@ -20,7 +22,7 @@ For production, set a strong `APP_PASSWORD`, then run `npm run build && npm star
 
 ## What works in this stage
 
-- Responsive Job Finder, Applications, CV Builder, and My Profile navigation.
+- Responsive Job Finder, Applications, Application Assistant, CV Builder, and My Profile navigation.
 - Real Remotive and Arbeitnow public feeds, Remote OK JSON, We Work Remotely full RSS, and Himalayas keyword search; source links, company, salary when provided, description, posting date, recency filters, and duplicate removal.
 - Fully remote development and cybersecurity openings from worldwide employers. Explicit office/hybrid work and applicant-location restrictions are screened. Unknown locations remain visible for manual review with a clear label. Nigeria, worldwide and Africa coverage use source evidence; this does not establish legal work authorization.
 - Discovery retains dated jobs for up to 30 days and active employer-board vacancies verified within 24 hours. The default view covers 72 hours, with 24-hour, 7/14/30-day and active-board views. Unknown dates are never called new. Only complete successful company inventories can establish missing/closed vacancies; outages and partial pagination preserve records. Application history remains available separately.
@@ -28,7 +30,7 @@ For production, set a strong `APP_PASSWORD`, then run `npm run build && npm star
 - Explainable profile match scores use supplied skills, experience and projects. Known incompatible primary stacks are hidden by default and can be included explicitly. Seniority mismatches are labeled and capped below Strong match. Scores compare evidence; they are not hiring probabilities.
 - Optional Google Gemini or OpenAI CV extraction, job-specific CV and cover-letter writing, and evidence ranking. Profile import requires exact excerpts. The CV Builder writes source-cited paragraphs, rejects unsupported numbers and dates, and uses a separate factual-checking request against the original evidence before accepting rewrites. Unsupported rewrites are omitted; incomplete AI drafts fail visibly instead of falling back to raw profile sections. Without a configured provider key, the explicitly selected basic layout still works. Provider errors are surfaced.
 - Four CV stages: choose a discovered, saved or pasted job; compare requirements with your master profile; build/edit with live preview; save/use the package. Section reordering, templates, recovery/autosave, revert, immutable versions, actual PDF layout preview, selectable-text readability checks and PDF/Word/cover-letter exports are supported. The master profile is unchanged.
-- Saved/Preparing/Ready for review/Submitted/Interview/Rejected/Offer tracking and follow-up notes. Submitted is a user-reported status, not proof that an employer received anything.
+- Saved/Preparing/Ready for review/Submitted/Interview/Rejected/Offer tracking and follow-up notes. Manually recorded submissions are user-reported; the Application Assistant separately records browser-observed confirmation evidence and owner-reconciled outcomes.
 - New strong matches posted within 72 hours generate a deduplicated in-app notification. Notifications are read when the dashboard opens or discovery finishes; email/push delivery is not implemented.
 
 ## Why an empty finder can happen

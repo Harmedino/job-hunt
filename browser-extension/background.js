@@ -205,6 +205,12 @@ async function run(message) {
     );
   await command(pair, { action: "heartbeat" });
   if (message.action === "suggest") {
+    const snapshot = await content(pair, { action: "inspect" });
+    if (JSON.stringify(snapshot) !== JSON.stringify(pair.lastSnapshot))
+      throw new Error(
+        "Read the current form values before requesting suggestions.",
+      );
+    pair.proposalSnapshotHash = await sha(JSON.stringify(snapshot));
     const result = await command(pair, { action: "suggest" });
     pair.proposals = result.proposals.map((p) => ({
       ...p,
@@ -226,12 +232,24 @@ async function run(message) {
       throw new Error(
         "Review and approve this contact mapping before filling it.",
       );
+    const current = await content(pair, { action: "inspect" });
+    if ((await sha(JSON.stringify(current))) !== pair.proposalSnapshotHash)
+      throw new Error(
+        "The form changed. Read it again and request fresh mapping suggestions.",
+      );
     await content(pair, {
       action: "fill",
       plans: [{ id: suggestion.fieldId, value: suggestion.value }],
     });
     pair.state = "awaiting-user";
     pair.lastSnapshot = undefined;
+    pair.proposals = [];
+    pair.pendingMappings = [
+      ...(pair.pendingMappings || []).filter(
+        (m) => m.fieldId !== suggestion.fieldId,
+      ),
+      { fieldId: suggestion.fieldId, factKey: suggestion.factKey },
+    ];
     await save(pair);
     return publicPair(pair);
   }
@@ -269,6 +287,8 @@ async function run(message) {
       report: snapshot,
       manualReviewed,
       manualConfirmed: message.manualConfirmed === true,
+      technicalMappings:
+        message.manualConfirmed === true ? pair.pendingMappings || [] : [],
     });
     pair.report = verified.report;
     pair.reportHash = verified.reportHash;
@@ -303,6 +323,19 @@ async function run(message) {
         "The form changed after review. Review and verify it again before confirming submission.",
       );
     }
+    const manualReviewed = pair.report.fields
+      .filter((f) => f.verification === "manual-reviewed")
+      .map((f) => f.id);
+    const verified = await command(pair, {
+      action: "verify",
+      report: fresh,
+      manualReviewed,
+      manualConfirmed: manualReviewed.length > 0,
+      technicalMappings: pair.pendingMappings || [],
+    });
+    if (!verified.report?.ready)
+      throw new Error("A fresh verification failed. Review the form again.");
+    pair.reportHash = verified.reportHash;
     pair.inFlight = true;
     pair.state = "uncertain-submission";
     await save(pair);

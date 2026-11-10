@@ -112,6 +112,8 @@ export async function authenticateCompanion(request: Request, id: string) {
   const token = request.headers
     .get("authorization")
     ?.match(/^Bearer ([\w-]{43})$/)?.[1];
+  if (!token)
+    throw new AssistedError("A scoped companion token is required.", 401);
   const a = await loadAttempt(id);
   if (
     !token ||

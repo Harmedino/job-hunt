@@ -95,7 +95,29 @@ async function harness(
       },
     ],
   };
-  pack.answers.push(...[{id:"relocation-answer",question:"Would you relocate?",answer:"No"},{id:"tech-answer",question:"Which technologies have you used?",answer:"React"},{id:"availability-answer",question:"Your confirmed availability date",answer:"2027-01-15"}].map(a=>({...a,vacancyKey:pack.target.key,confirmedAt:new Date().toISOString()})));
+  pack.answers.push(
+    ...[
+      {
+        id: "relocation-answer",
+        question: "Would you relocate?",
+        answer: "No",
+      },
+      {
+        id: "tech-answer",
+        question: "Which technologies have you used?",
+        answer: "React",
+      },
+      {
+        id: "availability-answer",
+        question: "Your confirmed availability date",
+        answer: "2027-01-15",
+      },
+    ].map((a) => ({
+      ...a,
+      vacancyKey: pack.target.key,
+      confirmedAt: new Date().toISOString(),
+    })),
+  );
   const actions: string[] = [];
   let state = "awaiting-user";
   const server = createServer(async (req, res) => {
@@ -304,7 +326,15 @@ async function harness(
           sendMessage: (message: unknown) =>
             Reflect.get(window, "fixturePopupSend")(message),
         },
-        permissions: { request: async () => true },
+        permissions: {
+          request: async (permission: { origins: string[] }) => {
+            if (permission.origins.some((pattern) => new URL(pattern).port))
+              throw new Error(
+                "Chrome host permission patterns cannot restrict ports",
+              );
+            return true;
+          },
+        },
       }),
     { extensionId },
   );
@@ -357,10 +387,16 @@ async function fillAndReview(h: Harness) {
   );
   await expect(h.employer.locator("#eligibility")).toHaveValue("no");
   await expect(h.employer.locator("#legal")).not.toBeChecked();
-  await expect(h.employer.locator('[name="relocation"][value="no"]')).toBeChecked();
-  await expect(h.employer.locator('[name="technologies"][value="react"]')).toBeChecked();
-  await expect(h.employer.locator('[name="technologies"][value="angular"]')).not.toBeChecked();
-  await expect(h.employer.locator('#start_date')).toHaveValue('2027-01-15');
+  await expect(
+    h.employer.locator('[name="relocation"][value="no"]'),
+  ).toBeChecked();
+  await expect(
+    h.employer.locator('[name="technologies"][value="react"]'),
+  ).toBeChecked();
+  await expect(
+    h.employer.locator('[name="technologies"][value="angular"]'),
+  ).not.toBeChecked();
+  await expect(h.employer.locator("#start_date")).toHaveValue("2027-01-15");
   await h.employer
     .locator("#motivation")
     .fill("My actual React project experience matches this role.");

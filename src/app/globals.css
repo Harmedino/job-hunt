@@ -3392,3 +3392,15 @@ footer > span {
   max-height: 350px;
   overflow: auto;
 }
+.assistant-workspace { display: grid; gap: 22px; min-width: 0; }
+.assistant-workspace .panel, .assistant-answer-bank { min-width: 0; padding: 24px; }
+.assistant-workspace label, .assistant-answer-bank label { display: block; margin: 14px 0; }
+.assistant-workspace input:not([type=checkbox]), .assistant-workspace select, .assistant-workspace textarea,
+.assistant-answer-bank input:not([type=checkbox]), .assistant-answer-bank textarea { width: 100%; box-sizing: border-box; }
+.assistant-workspace article, .assistant-answer-bank article { padding: 16px 0; border-bottom: 1px solid var(--border, #344038); }
+.assistant-workspace p, .assistant-workspace td, .assistant-answer-bank p { overflow-wrap: anywhere; }
+.assistant-table { max-width: 100%; overflow: auto; }
+.assistant-table table { width: 100%; border-collapse: collapse; }
+.assistant-table td, .assistant-table th { text-align: left; padding: 10px; border: 1px solid var(--border, #344038); vertical-align: top; min-width: 130px; }
+.assistant-counts { display: flex; flex-wrap: wrap; gap: 8px 24px; }
+@media (max-width: 600px) { .assistant-workspace .panel, .assistant-answer-bank { padding: 16px; } }

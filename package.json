@@ -15,6 +15,7 @@
     "typecheck": "tsc --noEmit",
     "extension:build": "node scripts/build-extension.mjs",
     "test:companion": "playwright test --config playwright.companion.config.ts",
+    "test:assistant": "node tests/production/assistant.mjs",
     "db:migrate:modules": "node --env-file-if-exists=.env.local --import tsx scripts/migrate-modules.ts",
     "registry:verify": "node --import tsx scripts/verify-public-boards.ts"
   },

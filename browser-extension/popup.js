@@ -71,8 +71,14 @@ el("pair").onclick = () =>
     const handoff = JSON.parse(
       atob(data.replaceAll("-", "+").replaceAll("_", "/")),
     );
-    const origin = new URL(handoff.origin).origin;
-    if (!(await chrome.permissions.request({ origins: [origin + "/*"] })))
+    const origin = new URL(handoff.origin);
+    // Chrome host patterns are host-scoped, including all local ports. The bearer
+    // handoff still binds requests to the exact server origin and attempt.
+    if (
+      !(await chrome.permissions.request({
+        origins: [`${origin.protocol}//${origin.hostname}/*`],
+      }))
+    )
       throw new Error("Launchpad host permission was not granted.");
     const result = await send("pair", { code });
     el("code").value = "";

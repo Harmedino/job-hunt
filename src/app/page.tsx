@@ -5,6 +5,8 @@ import ManualJobEntry from "@/components/manual-job-entry";
 import { manualJobDescription, type ManualJob } from "@/lib/manual-jobs";
 import AvailabilityFields from "@/components/availability-fields";
 import ApplicationsWorkspace from "@/components/applications-workspace";
+import ApplicationAssistant from "@/components/application-assistant";
+import ApplicationAnswers from "@/components/application-answers";
 import ApplicationEntry from "@/components/application-entry";
 import SavedJobSearches from "@/components/saved-job-searches";
 import CareerPreferencesFields from "@/components/career-preferences";
@@ -121,6 +123,7 @@ const ago = (value: string, now: number) => {
 export default function Home() {
   const [now, setNow] = useState(() => Date.now());
   const [tab, setTab] = useState("Job Finder");
+  const [assistantApplicationId, setAssistantApplicationId] = useState("");
   const [intakeRequest, setIntakeRequest] = useState<{
     id: number;
     platform?: string;
@@ -693,6 +696,7 @@ export default function Home() {
           {[
             { name: "Job Finder", icon: Search },
             { name: "Applications", icon: BriefcaseBusiness },
+            { name: "Application Assistant", icon: ShieldCheck },
             { name: "CV Builder", icon: FileText },
             { name: "My Profile", icon: UserRound },
             { name: "Coding Bounties", icon: Code2 },
@@ -784,26 +788,30 @@ export default function Home() {
                   ? "Find your next opportunity."
                   : tab === "Applications"
                     ? "Every application. One place."
-                    : tab === "Coding Bounties"
-                      ? "Turn your skills into paid contributions."
-                      : tab === "YouTube Research"
-                        ? "Research. Create. Plan your next video."
-                        : tab === "CV Builder"
-                          ? "Your experience. Tailored to the role."
-                          : "Let your experience shine."}
+                    : tab === "Application Assistant"
+                      ? "Prepare. Verify. Apply with confidence."
+                      : tab === "Coding Bounties"
+                        ? "Turn your skills into paid contributions."
+                        : tab === "YouTube Research"
+                          ? "Research. Create. Plan your next video."
+                          : tab === "CV Builder"
+                            ? "Your experience. Tailored to the role."
+                            : "Let your experience shine."}
               </h1>
               <p>
                 {tab === "Job Finder"
                   ? "Remote-only roles from employers worldwide. Find your next move early."
                   : tab === "Applications"
                     ? "Keep your momentum, from the first save to the final offer."
-                    : tab === "Coding Bounties"
-                      ? "Find real tasks, verify funding and track your work and receipts."
-                      : tab === "YouTube Research"
-                        ? "Original concepts and content planning, supported by official YouTube data."
-                        : tab === "CV Builder"
-                          ? "Build, edit and download a CV for any job description."
-                          : "Your real skills and experience power every match and application."}
+                    : tab === "Application Assistant"
+                      ? "Approve the facts, review the actual form and decide when to submit."
+                      : tab === "Coding Bounties"
+                        ? "Find real tasks, verify funding and track your work and receipts."
+                        : tab === "YouTube Research"
+                          ? "Original concepts and content planning, supported by official YouTube data."
+                          : tab === "CV Builder"
+                            ? "Build, edit and download a CV for any job description."
+                            : "Your real skills and experience power every match and application."}
               </p>
             </div>
             {tab === "Job Finder" && (
@@ -1919,6 +1927,7 @@ export default function Home() {
                 </button>
               </form>
               <div className="profile-side">
+                <ApplicationAnswers />
                 <CvUpload
                   disabled={!!busy}
                   cvText={profile.cvText}
@@ -2065,6 +2074,15 @@ export default function Home() {
               </div>
             </div>
           )}
+          <ApplicationAssistant
+            active={tab === "Application Assistant"}
+            applications={applications}
+            selectedId={assistantApplicationId}
+            onSelect={setAssistantApplicationId}
+            openBuilder={openBuilder}
+            onApplications={refreshApplications}
+            onProfile={() => setTab("My Profile")}
+          />
           {tab === "Applications" && (
             <ApplicationsWorkspace
               now={now}
@@ -2079,6 +2097,10 @@ export default function Home() {
               setTab={setTab}
               onOpenApplication={openApplicationPage}
               onAddJob={() => setManualJobForm(null)}
+              onAssistant={(app) => {
+                setAssistantApplicationId(app.id);
+                setTab("Application Assistant");
+              }}
             />
           )}
 

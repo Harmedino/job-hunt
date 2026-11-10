@@ -5,6 +5,7 @@ import {
   AssistedError,
   currentProfileHash,
   digest,
+  technicalShape,
   type Attempt,
 } from "./assisted-store";
 import { factKeys, mapField, type FactKey } from "./assisted-apply";
@@ -41,6 +42,32 @@ export async function proposeMappings(a: Attempt) {
     key = digest(JSON.stringify([a.packageHash, fields, keys])),
     database = await db(),
     cache = database.collection("assisted_mapping_cache");
+  const layoutHash = digest(JSON.stringify(technicalShape(a.report)));
+  const known = await database
+    .collection("assisted_form_knowledge")
+    .findOne({
+      key: `${a.package.target.platform || "Greenhouse"}:${layoutHash}`,
+      adapterVersion: 1,
+    });
+  const remembered = (
+    Array.isArray(known?.mappedContacts) ? known.mappedContacts : []
+  ).flatMap((m: Record<string, unknown>) => {
+    const field = fields.find(
+      (f) => digest(f.id) === m.fieldIdHash && digest(f.label) === m.labelHash,
+    );
+    return field && keys.includes(m.factKey as FactKey)
+      ? [
+          {
+            fieldId: field.id,
+            factKey: m.factKey,
+            reason:
+              "Previously owner-reviewed contact mapping for this exact form layout. Review the current approved value before filling.",
+          },
+        ]
+      : [];
+  });
+  if (remembered.length)
+    return { proposals: remembered, cached: true, calls: 0 };
   await cache.createIndex({ key: 1 }, { unique: true });
   await cache.createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 });
   const cached = await cache.findOne({ key, expiresAt: { $gt: new Date() } });

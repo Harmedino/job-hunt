@@ -22,6 +22,7 @@ import {
 import ApplicationOriginalFiles from "./application-original-files";
 import ApplicationCustomFields from "./application-custom-fields";
 import ApplicationEntry from "./application-entry";
+import { applicationTarget } from "@/lib/assisted-apply";
 async function api(path: string, method: string, body: unknown) {
   const r = await fetch("/api/" + path, {
     method,
@@ -45,6 +46,7 @@ export default function ApplicationsWorkspace({
   setTab,
   onOpenApplication,
   onAddJob,
+  onAssistant,
 }: {
   applications: Application[];
   pending: string;
@@ -58,6 +60,7 @@ export default function ApplicationsWorkspace({
   setTab: (tab: string) => void;
   onOpenApplication: (job: Job) => void;
   onAddJob: () => void;
+  onAssistant?: (app: Application) => void;
 }) {
   const [stage, setStage] = useState(""),
     [query, setQuery] = useState(""),
@@ -287,6 +290,23 @@ export default function ApplicationsWorkspace({
                     : "Saved opportunity · not submitted"}
               </p>
               <div className="application-actions">
+                {!applicationWasApplied(app) &&
+                  onAssistant &&
+                  (() => {
+                    try {
+                      applicationTarget(app.job.url);
+                      return true;
+                    } catch {
+                      return false;
+                    }
+                  })() && (
+                    <button
+                      className="secondary"
+                      onClick={() => onAssistant(app)}
+                    >
+                      Application Assistant
+                    </button>
+                  )}
                 <button className="secondary" onClick={() => setDetail(app.id)}>
                   Application details
                 </button>
@@ -365,6 +385,9 @@ export default function ApplicationsWorkspace({
                 />
               </label>
               <p className="application-package-info">
+                {app.assistedSubmission
+                  ? `${app.assistedSubmission.source === "browser-observed" ? "Employer confirmation observed in browser" : "Submission reconciled by you"} · `
+                  : ""}
                 CV version:{" "}
                 {app.cvDraftId ? app.cvDraftId.slice(0, 8) : "Not prepared"} ·
                 Cover letter: {app.coverLetter ? "Saved" : "Not prepared"}

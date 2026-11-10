@@ -73,7 +73,12 @@ export type Attempt = {
   reportHash?: string;
   verifiedAt?: string;
   submissionIntentAt?: string;
-  receipt?: { url: string; text: string; observedAt: string };
+  receipt?: {
+    url: string;
+    text: string;
+    observedAt: string;
+    source?: "browser-observed" | "owner-reconciled";
+  };
   history: { state: AssistedState; at: string; reason: string }[];
   syncWarning?: string;
 };
@@ -154,6 +159,15 @@ export async function currentProfileHash() {
     .findOne({ key: "owner" });
   return digest(JSON.stringify(row?.profile || {}));
 }
+export function technicalShape(report: Verification) {
+  return report.fields.map((f) => ({
+    idHash: digest(f.id),
+    labelHash: digest(f.label),
+    kind: f.kind,
+    required: f.required,
+    optionCount: f.options?.length || 0,
+  }));
+}
 export async function saveAnswer(body: Record<string, unknown>) {
   if (body.confirmed !== true)
     throw new AssistedError(
@@ -186,9 +200,10 @@ export async function saveAnswer(body: Record<string, unknown>) {
     vacancyKey,
     confirmedAt: new Date().toISOString(),
     source:
-      typeof body.source === "string"
+      typeof body.source === "string" && body.source.trim()
         ? body.source.slice(0, 1000)
         : "Owner-confirmed personal information",
+    sourceUrl: target.url,
     updatedAt: new Date().toISOString(),
     disabled: body.disabled === true,
     profileHash: await currentProfileHash(),
@@ -272,6 +287,10 @@ export async function approveAttempt(body: Record<string, unknown>) {
     );
   const firstName = bounded(body.firstName, "first name", 200),
     lastName = bounded(body.lastName, "last name", 200);
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(draft.content.email))
+    throw new AssistedError(
+      "The saved CV needs a valid email address before approval.",
+    );
   if (
     questionKey(`${firstName} ${lastName}`) !== questionKey(draft.content.name)
   )
@@ -369,6 +388,10 @@ export async function approveAttempt(body: Record<string, unknown>) {
       },
     ],
   };
+  if (Buffer.byteLength(JSON.stringify(pack)) > 3.5 * 1024 * 1024)
+    throw new AssistedError(
+      "The frozen package exceeds the 3.5 MB browser handoff limit. Reduce optional documents or answers and approve a smaller package.",
+    );
   try {
     await (await assistedCollection()).insertOne(attempt);
   } catch (error) {
@@ -585,6 +608,7 @@ export async function attemptCommand(
                   url: a.package.target.url,
                   text: reason,
                   observedAt: now,
+                  source: "owner-reconciled" as const,
                 },
               }
             : {}),
@@ -621,6 +645,15 @@ export async function attemptCommand(
     );
     return publicAttempt(await loadAttempt(id));
   }
+  if (
+    ["heartbeat", "verify", "submit-intent"].includes(String(action)) &&
+    a.package.profileHash &&
+    a.package.profileHash !== (await currentProfileHash())
+  )
+    throw new AssistedError(
+      "The saved master profile changed after approval. Stop the companion and approve a fresh package; historical documents are preserved.",
+      409,
+    );
   if (action === "heartbeat") {
     await collection.updateOne(
       { id, "lease.hash": a.lease.hash, "lease.expires": { $gt: Date.now() } },
@@ -661,31 +694,52 @@ export async function attemptCommand(
         ? "Every entered field and document read back and reviewed."
         : "Readback found missing, changed or unsupported fields; owner action required.",
     );
-    const shape = report.fields.map((f) => ({
-      idHash: digest(f.id),
-      labelHash: digest(f.label),
-      kind: f.kind,
-      required: f.required,
-      optionCount: f.options?.length || 0,
-    }));
+    const shape = technicalShape(report);
     const layoutHash = digest(JSON.stringify(shape));
-    await (await db())
-      .collection("assisted_form_knowledge")
-      .updateOne(
-        { key: `${a.package.target.platform || "Greenhouse"}:${layoutHash}` },
-        {
-          $set: {
-            platform: a.package.target.platform || "Greenhouse",
-            layoutHash,
-            fields: shape,
-            lastSeen: now,
-            lastResult: report.ready ? "verified" : "needs-owner",
-            adapterVersion: 1,
-          },
-          $inc: { observations: 1 },
+    const requestedMappings = Array.isArray(body.technicalMappings)
+      ? body.technicalMappings.slice(0, 20)
+      : [];
+    const mappedContacts =
+      body.manualConfirmed === true
+        ? requestedMappings.flatMap((m: Record<string, unknown>) => {
+            if (!m || typeof m !== "object") return [];
+            const field = report.fields.find((f) => f.id === m.fieldId);
+            const key = m.factKey as (typeof factKeys)[number];
+            return field &&
+              field.verification === "manual-reviewed" &&
+              field.kind === "text" &&
+              factKeys.includes(key) &&
+              a.package.facts[key] &&
+              field.value === a.package.facts[key] &&
+              !/authoriz|citizen|visa|sponsor|salary|compensation|legal|consent|agree|education|experience|degree|credential|relocat|notice|availability|password/i.test(
+                field.label,
+              )
+              ? [
+                  {
+                    fieldIdHash: digest(field.id),
+                    labelHash: digest(field.label),
+                    factKey: key,
+                  },
+                ]
+              : [];
+          })
+        : [];
+    await (await db()).collection("assisted_form_knowledge").updateOne(
+      { key: `${a.package.target.platform || "Greenhouse"}:${layoutHash}` },
+      {
+        $set: {
+          platform: a.package.target.platform || "Greenhouse",
+          layoutHash,
+          fields: shape,
+          lastSeen: now,
+          lastResult: report.ready ? "verified" : "needs-owner",
+          adapterVersion: 1,
+          ...(mappedContacts.length ? { mappedContacts } : {}),
         },
-        { upsert: true },
-      );
+        $inc: { observations: 1 },
+      },
+      { upsert: true },
+    );
     return publicAttempt(await loadAttempt(id));
   }
   if (action === "submit-intent") {
@@ -707,6 +761,31 @@ export async function attemptCommand(
     if (!app || applicationWasApplied(app))
       throw new AssistedError(
         "The application was already submitted or removed. No duplicate click is allowed.",
+        409,
+      );
+    const otherSubmissions = await (
+      await db()
+    )
+      .collection<Application>("applications")
+      .find({ id: { $ne: a.applicationId } })
+      .toArray();
+    if (
+      otherSubmissions.some(
+        (other) =>
+          applicationWasApplied(other) &&
+          (() => {
+            try {
+              return (
+                applicationTarget(other.job.url).key === a.package.target.key
+              );
+            } catch {
+              return sameVacancy(other.job, app.job);
+            }
+          })(),
+      )
+    )
+      throw new AssistedError(
+        "This vacancy was submitted elsewhere after package approval. No duplicate click is permitted.",
         409,
       );
     const { assistantPolicy, withinOperatingHours, policyDay } = await import(
@@ -797,7 +876,7 @@ export async function attemptCommand(
       a,
       {
         state: "confirmed-submission",
-        receipt: { url, text, observedAt: now },
+        receipt: { url, text, observedAt: now, source: "browser-observed" },
       },
       { lease: "" },
       "Companion observed an explicit Greenhouse application confirmation after the owner-confirmed click.",
@@ -892,6 +971,19 @@ async function syncConfirmed(a: Attempt) {
       {
         $set: {
           status: "Submitted",
+          cvDraftId: a.package.draftId,
+          profileSnapshot: a.draft.profileSnapshot,
+          coverLetter: a.package.files.some((f) => f.kind === "letter")
+            ? a.draft.coverLetter || ""
+            : "",
+          preparationMethod: "Assisted Apply approved immutable package",
+          assistedSubmission: {
+            attemptId: a.id,
+            source: a.receipt!.source || "owner-reconciled",
+            confirmedAt: a.receipt!.observedAt,
+            url: a.receipt!.url,
+            packageHash: a.packageHash,
+          },
           hasApplied: true,
           submittedAt: at,
           applicationDate: calendarToday(new Date(at)),

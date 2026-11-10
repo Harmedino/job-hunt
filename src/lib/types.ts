@@ -130,6 +130,13 @@ export type Application = {
   createdAt: string;
   updatedAt: string;
   submittedAt?: string;
+  assistedSubmission?: {
+    attemptId: string;
+    source: "browser-observed" | "owner-reconciled";
+    confirmedAt: string;
+    url: string;
+    packageHash: string;
+  };
   origin?: "manual" | "discovered";
   hasApplied?: boolean;
   originalFiles?: import("./application-files").SubmissionFileInfo[];

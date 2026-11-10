@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
-import { MongoClient } from "mongodb";
+import { MongoClient, ObjectId } from "mongodb";
 import { NextRequest } from "next/server";
 import { proxy } from "../src/proxy";
 import { closeDb } from "../src/lib/db";
@@ -574,6 +574,8 @@ test(
             .collection<Application>("applications")
             .findOne({ id: f.app.id });
           assert.equal(app!.status, "Submitted");
+          assert.equal(app!.cvDraftId, f.draft.id);
+          assert.equal(app!.assistedSubmission!.source, "browser-observed");
           assert.equal(app!.followUp, "Original notes");
           assert.equal(
             app!.documentSnapshot!.files![0].sha256,
@@ -718,12 +720,10 @@ test(
             confirmed: true,
           });
           const a = await approveAttempt(f.body);
-          await database
-            .collection("profile")
-            .insertOne({
-              key: "owner",
-              profile: { ...profile, name: "Changed profile name" },
-            });
+          await database.collection("profile").insertOne({
+            key: "owner",
+            profile: { ...profile, name: "Changed profile name" },
+          });
           assert.equal(
             (await bankAnswers(greenhouseTarget(f.app.job.url).key))[0]
               .invalidated,
@@ -770,6 +770,221 @@ test(
               if (old[i] === undefined) delete process.env[key];
               else process.env[key] = old[i];
           }
+        },
+      );
+      async function readyFixture() {
+        const f = await fixture(),
+          a = await approveAttempt(f.body),
+          claim = (await attemptCommand(a.id, { action: "claim" })) as {
+            leaseToken: string;
+          },
+          saved = await loadAttempt(a.id);
+        const report = {
+          url: saved.package.target.url,
+          challenge: "",
+          unsupported: "",
+          fields: fields().map((x) =>
+            x.id === "resume"
+              ? {
+                  ...x,
+                  files: saved.package.files.map((y) => ({
+                    name: y.name,
+                    size: y.size,
+                    sha256: y.sha256,
+                  })),
+                }
+              : x,
+          ),
+        };
+        const ready = (await attemptCommand(a.id, {
+          action: "verify",
+          leaseToken: claim.leaseToken,
+          manualReviewed: [],
+          report,
+        })) as { reportHash: string };
+        return {
+          f,
+          a,
+          body: {
+            action: "submit-intent",
+            leaseToken: claim.leaseToken,
+            reportHash: ready.reportHash,
+            confirmed: true,
+          },
+        };
+      }
+      await t.test(
+        "a manually recorded submission after approval blocks a later companion click",
+        async () => {
+          const ready = await readyFixture();
+          await database.collection("applications").insertOne({
+            ...ready.f.app,
+            _id: new ObjectId(),
+            id: "outside-submission",
+            job: {
+              ...ready.f.app.job,
+              id: "outside-job-alias",
+              company: "Different imported employer label",
+            },
+            status: "Submitted",
+            hasApplied: true,
+            submittedAt: new Date().toISOString(),
+          });
+          await assert.rejects(
+            attemptCommand(ready.a.id, ready.body),
+            /submitted elsewhere/,
+          );
+          assert.equal(
+            (await loadAttempt(ready.a.id)).submissionIntentAt,
+            undefined,
+          );
+        },
+      );
+      await t.test(
+        "concurrent different-vacancy intents cannot exceed the atomic daily budget",
+        async () => {
+          const one = await readyFixture(),
+            two = await readyFixture(),
+            counter = await database
+              .collection("assisted_daily_limits")
+              .findOne({});
+          await database.collection("assistant_settings").updateOne(
+            { key: "owner" },
+            {
+              $set: {
+                policy: { maxPerDay: Number(counter?.count || 0) + 1 },
+              },
+            },
+            { upsert: true },
+          );
+          const results = await Promise.allSettled([
+            attemptCommand(one.a.id, one.body),
+            attemptCommand(two.a.id, two.body),
+          ]);
+          assert.equal(
+            results.filter((r) => r.status === "fulfilled").length,
+            1,
+          );
+          assert.equal(
+            results.filter((r) => r.status === "rejected").length,
+            1,
+          );
+          await database
+            .collection("assistant_settings")
+            .deleteOne({ key: "owner" });
+        },
+      );
+      await t.test(
+        "provider overload leaves no accepted mappings or successful cache and respects the opt-in budget",
+        async () => {
+          const a = await approveAttempt((await fixture()).body),
+            stored = await loadAttempt(a.id);
+          stored.report = verifyForm(stored.package, {
+            url: stored.package.target.url,
+            challenge: "",
+            unsupported: "",
+            fields: [
+              ...fields(),
+              field("unmapped", "Unclear contact detail", ""),
+            ],
+          });
+          await database
+            .collection("assistant_settings")
+            .updateOne(
+              { key: "owner" },
+              { $set: { policy: { aiMaxCallsPerDay: 1 } } },
+              { upsert: true },
+            );
+          const old = [
+              process.env.AI_PROVIDER,
+              process.env.GEMINI_API_KEY,
+              process.env.GEMINI_MODEL,
+            ],
+            fetchBefore = globalThis.fetch;
+          process.env.AI_PROVIDER = "gemini";
+          process.env.GEMINI_API_KEY = "fictional-test-key";
+          process.env.GEMINI_MODEL = "fixture-model";
+          globalThis.fetch = async () => new Response("{}", { status: 503 });
+          try {
+            await assert.rejects(
+              proposeMappings(stored),
+              /503|unavailable|overloaded/,
+            );
+            assert.equal(
+              await database
+                .collection("assisted_mapping_cache")
+                .countDocuments({}),
+              0,
+            );
+            await assert.rejects(proposeMappings(stored), /limit/);
+          } finally {
+            globalThis.fetch = fetchBefore;
+            for (const [i, key] of [
+              "AI_PROVIDER",
+              "GEMINI_API_KEY",
+              "GEMINI_MODEL",
+            ].entries())
+              if (old[i] === undefined) delete process.env[key];
+              else process.env[key] = old[i];
+          }
+        },
+      );
+      await t.test(
+        "reviewed technical contact mappings can be reused without storing or reusing personal answer values",
+        async () => {
+          const first = await readyFixture(),
+            saved = await loadAttempt(first.a.id),
+            extra = field(
+              "backup_contact",
+              "Preferred contact address",
+              saved.package.facts.email!,
+            );
+          const makeReport = (pack: AssistedPackage) => ({
+            url: pack.target.url,
+            challenge: "",
+            unsupported: "",
+            fields: [
+              ...fields().map((f) =>
+                f.id === "resume"
+                  ? {
+                      ...f,
+                      files: pack.files.map((file) => ({
+                        name: file.name,
+                        size: file.size,
+                        sha256: file.sha256,
+                      })),
+                    }
+                  : f,
+              ),
+              extra,
+            ],
+          });
+          await attemptCommand(first.a.id, {
+            action: "verify",
+            leaseToken: first.body.leaseToken,
+            report: makeReport(saved.package),
+            manualReviewed: [extra.id],
+            manualConfirmed: true,
+            technicalMappings: [{ fieldId: extra.id, factKey: "email" }],
+          });
+          const next = await readyFixture(),
+            nextRecord = await loadAttempt(next.a.id);
+          nextRecord.report = verifyForm(
+            nextRecord.package,
+            makeReport(nextRecord.package),
+          );
+          const proposals = await proposeMappings(nextRecord);
+          assert.equal(proposals.cached, true);
+          assert.equal(proposals.calls, 0);
+          assert.equal(proposals.proposals[0].fieldId, extra.id);
+          assert.equal(proposals.proposals[0].factKey, "email");
+          const technical = await database
+            .collection("assisted_form_knowledge")
+            .findOne({ mappedContacts: { $exists: true } });
+          assert.equal(
+            JSON.stringify(technical).includes(saved.package.facts.email!),
+            false,
+          );
         },
       );
     } finally {
