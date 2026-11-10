@@ -63,32 +63,28 @@ try {
     discoveredAt: now,
   };
   await database.collection("profile").insertOne({ key: "owner", profile });
-  await database
-    .collection("applications")
-    .insertOne({
-      id: "fixture-app",
-      job,
-      status: "Saved",
-      createdAt: now,
-      updatedAt: now,
-      followUp: "Keep these original notes",
-    });
-  await database
-    .collection("resumes")
-    .insertOne({
-      id: "fixture-cv",
-      familyId: "fixture-family",
-      createdAt: now,
-      target,
-      content: { ...profile, summary: "Verified fixture development work" },
-      profileSnapshot: profile,
-      evidence: [],
-      warnings: [],
-      requirementsToReview: [],
-      method: "Basic",
-      manualEdits: false,
-      layoutVersion: 2,
-    });
+  await database.collection("applications").insertOne({
+    id: "fixture-app",
+    job,
+    status: "Saved",
+    createdAt: now,
+    updatedAt: now,
+    followUp: "Keep these original notes",
+  });
+  await database.collection("resumes").insertOne({
+    id: "fixture-cv",
+    familyId: "fixture-family",
+    createdAt: now,
+    target,
+    content: { ...profile, summary: "Verified fixture development work" },
+    profileSnapshot: profile,
+    evidence: [],
+    warnings: [],
+    requirementsToReview: [],
+    method: "Basic",
+    manualEdits: false,
+    layoutVersion: 2,
+  });
   server = await startProduction({
     APP_PASSWORD: password,
     MONGODB_URI: process.env.TEST_MONGODB_URI,
@@ -208,6 +204,7 @@ try {
             name: pack.files[0].name,
             size: pack.files[0].size,
             sha256: pack.files[0].sha256,
+            mime: pack.files[0].mime,
           },
         ],
       },

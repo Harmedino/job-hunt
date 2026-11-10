@@ -1,4 +1,5 @@
 /* global chrome */
+import { employerPermissions, manualReviewKey } from "./generated/policy.js";
 const el = (id) => document.getElementById(id);
 const send = async (action, data = {}) => {
   const response = await chrome.runtime.sendMessage({ action, ...data });
@@ -7,7 +8,17 @@ const send = async (action, data = {}) => {
   return response.result;
 };
 let pair;
+const manualApprovals = new Map();
 function render(value) {
+  if (
+    pair?.id !== value?.id ||
+    JSON.stringify(pair?.report?.fields.map(manualReviewKey)) !==
+      JSON.stringify(value?.report?.fields.map(manualReviewKey))
+  ) {
+    manualApprovals.clear();
+    el("confirmed").checked = false;
+    el("confirmation").value = "";
+  }
   pair = value;
   el("pairing").hidden = !!pair;
   el("workflow").hidden = !pair;
@@ -16,6 +27,7 @@ function render(value) {
   el("state").textContent = pair.state;
   el("hash").textContent = `Approved package SHA256: ${pair.packageHash}`;
   el("fields").replaceChildren();
+  el("manual-fields").replaceChildren();
   for (const field of pair.report?.fields || []) {
     const row = document.createElement("tr");
     for (const text of [
@@ -33,6 +45,31 @@ function render(value) {
       row.append(td);
     }
     el("fields").append(row);
+    if (
+      ["unresolved", "manual-reviewed"].includes(field.verification) &&
+      !["file", "unsupported"].includes(field.kind) &&
+      field.valid &&
+      !field.disabled &&
+      field.accepted !== false &&
+      field.value.trim()
+    ) {
+      const label = document.createElement("label"),
+        checkbox = document.createElement("input"),
+        fingerprint = manualReviewKey(field);
+      checkbox.type = "checkbox";
+      checkbox.checked = manualApprovals.get(field.id) === fingerprint;
+      checkbox.onchange = () => {
+        if (checkbox.checked) manualApprovals.set(field.id, fingerprint);
+        else manualApprovals.delete(field.id);
+      };
+      label.append(
+        checkbox,
+        document.createTextNode(
+          ` I reviewed ${field.label || field.id}: ${field.value}`,
+        ),
+      );
+      el("manual-fields").append(label);
+    }
   }
   el("blockers").replaceChildren();
   for (const blocker of [
@@ -88,7 +125,7 @@ el("open").onclick = () =>
   task(async () => {
     if (
       !(await chrome.permissions.request({
-        origins: [new URL(pair.target.url).origin + "/*"],
+        origins: employerPermissions(pair.target),
       }))
     )
       throw new Error("Employer host permission was not granted.");
@@ -97,7 +134,14 @@ el("open").onclick = () =>
 for (const action of ["fill", "inspect", "receipt", "disconnect"])
   el(action).onclick = () => task(() => send(action));
 el("verify").onclick = () =>
-  task(() => send("verify", { manualConfirmed: el("manual").checked }));
+  task(() =>
+    send("verify", {
+      manualApprovals: [...manualApprovals].map(([id, fingerprint]) => ({
+        id,
+        fingerprint,
+      })),
+    }),
+  );
 el("suggest").onclick = () =>
   task(async () => {
     const result = await send("suggest");
@@ -126,13 +170,15 @@ el("suggest").onclick = () =>
   });
 el("submit").onclick = () =>
   task(async () => {
-    const result = await send("submit", {
-      confirmed: el("confirmed").checked,
-      confirmation: el("confirmation").value,
-    });
-    el("confirmed").checked = false;
-    el("confirmation").value = "";
-    return result;
+    try {
+      return await send("submit", {
+        confirmed: el("confirmed").checked,
+        confirmation: el("confirmation").value,
+      });
+    } finally {
+      el("confirmed").checked = false;
+      el("confirmation").value = "";
+    }
   });
 el("download").onclick = () =>
   task(async () => {

@@ -1,5 +1,11 @@
 /* global chrome */
-import { applicationTarget, mapField, verifyForm } from "./generated/policy.js";
+import {
+  applicationTarget,
+  confirmationTarget,
+  manualReviewKey,
+  mapField,
+  verifyForm,
+} from "./generated/policy.js";
 const get = async () => (await chrome.storage.session.get("pair")).pair;
 const save = (pair) => chrome.storage.session.set({ pair });
 const sha = async (text) =>
@@ -171,9 +177,9 @@ async function run(message) {
     if (!pair.inFlight && pair.state !== "uncertain-submission")
       throw new Error("There is no submission to confirm.");
     const tab = await chrome.tabs.get(pair.tabId);
-    if (new URL(tab.url).hostname !== new URL(pair.pack.target.url).hostname)
+    if (!confirmationTarget(tab.url, pair.pack.target))
       throw new Error(
-        "Confirmation left the supported employer host. Reconcile it manually in Launchpad.",
+        "The confirmation URL does not identify the approved employer board and vacancy. Reconcile it manually in Launchpad.",
       );
     await chrome.scripting.executeScript({
       target: { tabId: pair.tabId },
@@ -271,24 +277,23 @@ async function run(message) {
   }
   if (message.action === "inspect" || message.action === "verify") {
     const snapshot = await content(pair, { action: "inspect" });
-    const manualReviewed =
-      message.manualConfirmed === true
-        ? snapshot.fields
-            .filter(
-              (f) =>
-                mapField(f, pair.pack).value === undefined &&
-                !mapField(f, pair.pack).file &&
-                (f.value || f.files?.length),
-            )
-            .map((f) => f.id)
-        : [];
+    const approvals = Array.isArray(message.manualApprovals)
+      ? message.manualApprovals
+      : [];
+    const manualReviewed = snapshot.fields
+      .filter((f) =>
+        approvals.some(
+          (a) => a.id === f.id && a.fingerprint === manualReviewKey(f),
+        ),
+      )
+      .map((f) => f.id);
     const verified = await command(pair, {
       action: "verify",
       report: snapshot,
       manualReviewed,
-      manualConfirmed: message.manualConfirmed === true,
+      manualConfirmed: manualReviewed.length > 0,
       technicalMappings:
-        message.manualConfirmed === true ? pair.pendingMappings || [] : [],
+        manualReviewed.length > 0 ? pair.pendingMappings || [] : [],
     });
     pair.report = verified.report;
     pair.reportHash = verified.reportHash;

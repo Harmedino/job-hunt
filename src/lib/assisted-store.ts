@@ -15,6 +15,8 @@ import { AiError } from "./ai";
 import {
   factKeys,
   applicationTarget,
+  confirmationTarget,
+  confirmationMessage,
   questionKey,
   verifyForm,
   type AssistedPackage,
@@ -447,13 +449,31 @@ export function parseReport(value: unknown): {
     )
       throw new AssistedError("Invalid form field readback.");
     if (
+      (f.accepted !== undefined && typeof f.accepted !== "boolean") ||
+      (f.readOnly !== undefined && typeof f.readOnly !== "boolean") ||
+      (f.errors !== undefined &&
+        (!Array.isArray(f.errors) ||
+          f.errors.some((s: unknown) => typeof s !== "string")))
+    )
+      throw new AssistedError(
+        "Invalid control acceptance or validation state.",
+      );
+    if (
+      (f.acceptedValue !== undefined && typeof f.acceptedValue !== "string") ||
+      (f.optionValues !== undefined &&
+        (!Array.isArray(f.optionValues) ||
+          f.optionValues.some((v: unknown) => typeof v !== "string")))
+    )
+      throw new AssistedError("Invalid accepted option values.");
+    if (
       f.files !== undefined &&
       (!Array.isArray(f.files) ||
         f.files.some(
           (file: Record<string, unknown>) =>
             typeof file.name !== "string" ||
             typeof file.size !== "number" ||
-            typeof file.sha256 !== "string",
+            typeof file.sha256 !== "string" ||
+            (file.mime !== undefined && typeof file.mime !== "string"),
         ))
     )
       throw new AssistedError("Invalid document readback.");
@@ -853,20 +873,11 @@ export async function attemptCommand(
         "No owner-confirmed submission intent exists.",
         409,
       );
-    const text = bounded(body.text, "Greenhouse confirmation text", 2000),
+    const text = bounded(body.text, "employer confirmation text", 2000),
       url = bounded(body.url, "confirmation URL", 2000);
-    const parsed = new URL(url);
     if (
-      parsed.protocol !== "https:" ||
-      (parsed.hostname !== new URL(a.package.target.url).hostname &&
-        !(
-          a.package.target.platform === "Greenhouse" &&
-          parsed.hostname === "boards.greenhouse.io"
-        )) ||
-      !parsed.pathname.startsWith(`/${a.package.target.board}/`) ||
-      !/thank you for applying|application (?:has been |was )?(?:successfully )?(?:submitted|received)|thank you for your (?:application|interest)/i.test(
-        text,
-      )
+      !confirmationTarget(url, a.package.target) ||
+      !confirmationMessage(text)
     )
       throw new AssistedError(
         "No recognized employer confirmation was observed. Submission remains uncertain.",

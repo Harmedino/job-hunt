@@ -86,7 +86,14 @@ const fields = () => [
   field("email", "Email", "test@example.org"),
   field("resume", "Resume/CV", "", {
     kind: "file",
-    files: [{ name: file.name, size: file.size, sha256: file.sha256 }],
+    files: [
+      {
+        name: file.name,
+        size: file.size,
+        sha256: file.sha256,
+        mime: file.mime,
+      },
+    ],
   }),
 ];
 test("Greenhouse target binding rejects lookalike domains, other jobs, embedded links and credentials", () => {
@@ -208,7 +215,14 @@ test("verification checks every value, file bytes, required fields, challenges a
         f.id === "resume"
           ? {
               ...f,
-              files: [{ name: file.name, size: 3, sha256: digest("bad") }],
+              files: [
+                {
+                  name: file.name,
+                  size: 3,
+                  sha256: digest("bad"),
+                  mime: file.mime,
+                },
+              ],
             }
           : f,
       ),
@@ -442,6 +456,7 @@ test(
                         name: y.name,
                         size: y.size,
                         sha256: y.sha256,
+                        mime: y.mime,
                       })),
                     }
                   : x,
@@ -538,6 +553,7 @@ test(
                         name: y.name,
                         size: y.size,
                         sha256: y.sha256,
+                        mime: y.mime,
                       })),
                     }
                   : x,
@@ -564,10 +580,29 @@ test(
             }),
             /remains uncertain/,
           );
+          for (const url of [
+            report.url.replace(/\d+$/, "999999"),
+            report.url.replace("fictionalfixture", "other-board"),
+            "https://unrelated.example/thanks",
+          ])
+            await assert.rejects(
+              attemptCommand(a.id, {
+                action: "receipt",
+                leaseToken: claim.leaseToken,
+                url,
+                text: "Thank you for applying! Your application has been received.",
+              }),
+              /remains uncertain/,
+            );
+          assert.equal((await loadAttempt(a.id)).state, "uncertain-submission");
           await attemptCommand(a.id, {
             action: "receipt",
             leaseToken: claim.leaseToken,
-            url: report.url,
+            url:
+              report.url.replace(
+                "job-boards.greenhouse.io",
+                "boards.greenhouse.io",
+              ) + "/confirmation",
             text: "Thank you for applying! Your application has been received.",
           });
           const app = await database
@@ -791,6 +826,7 @@ test(
                     name: y.name,
                     size: y.size,
                     sha256: y.sha256,
+                    mime: y.mime,
                   })),
                 }
               : x,
@@ -952,6 +988,7 @@ test(
                         name: file.name,
                         size: file.size,
                         sha256: file.sha256,
+                        mime: file.mime,
                       })),
                     }
                   : f,

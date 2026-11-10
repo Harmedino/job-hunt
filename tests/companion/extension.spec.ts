@@ -414,7 +414,8 @@ async function fillAndReview(h: Harness) {
   await h.popup
     .getByRole("button", { name: "Read form values", exact: true })
     .click();
-  await h.popup.locator("#manual").check();
+  await h.popup.getByRole("checkbox",{name:/I reviewed Why this role/}).check();
+  await h.popup.getByRole("checkbox",{name:/I reviewed I agree to the privacy policy/}).check();
   await h.popup
     .getByRole("button", { name: "Verify all entered values", exact: true })
     .click();

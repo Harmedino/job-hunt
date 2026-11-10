@@ -5,11 +5,22 @@
   globalThis.__launchpadCompanion = true;
   let permit = false,
     lastSubmit = false;
-  const forms = () => [
-    ...document.querySelectorAll(
-      "form#application-form, form#application_form, form.application-form, form.ashby-application-form, form[data-ashby-application-form]",
-    ),
-  ];
+  const forms = () => {
+    const known = [
+      ...document.querySelectorAll(
+        "form#application-form, form#application_form, form.application-form, form.ashby-application-form, form[data-ashby-application-form]",
+      ),
+    ];
+    if (known.length || location.hostname !== "jobs.ashbyhq.com") return known;
+    return [...document.forms].filter((f) => {
+      const inputs = [...f.querySelectorAll("input")];
+      return (
+        inputs.some((el) => idOf(el) === "_systemfield_name") &&
+        inputs.some((el) => idOf(el) === "_systemfield_email") &&
+        inputs.some((el) => idOf(el) === "_systemfield_resume")
+      );
+    });
+  };
   const form = () => forms()[0];
   const visible = (el) =>
     !!el.getClientRects().length &&
@@ -21,49 +32,120 @@
             !["hidden", "submit", "button", "reset", "password"].includes(
               el.type,
             ) &&
-            (el.type === "file" || visible(el)),
+            (el.type === "file" ||
+              (visible(el) && !el.closest('[hidden],[aria-hidden="true"]'))),
         )
       : [];
-  const idOf = (el) =>
-    el.type === "file" &&
-    (el.name === "resume" || el.id === "resume-upload-input")
+  const idOf = (el) => {
+    if (location.hostname === "jobs.ashbyhq.com") {
+      const label = rawLabel(el)
+        .replace(/\s*[*＊✱]\s*$/, "")
+        .trim()
+        .toLowerCase();
+      if (el.name?.startsWith("_systemfield_")) return el.name;
+      if (el.id?.startsWith("_systemfield_")) return el.id;
+      if (
+        ["name", "full name"].includes(label) &&
+        ["text", ""].includes(el.type)
+      )
+        return "_systemfield_name";
+      if (["email", "email address"].includes(label))
+        return "_systemfield_email";
+      if (
+        el.type === "file" &&
+        /^(?:resume\s*\/?\s*cv|resume|cv|curriculum vitae)$/.test(label)
+      )
+        return "_systemfield_resume";
+      if (el.type === "file" && /^cover[ -]letter$/.test(label))
+        return "_systemfield_cover_letter";
+    }
+    if (
+      el.type === "file" &&
+      !["resume", "resume-upload-input"].includes(el.id) &&
+      el.name !== "resume" &&
+      /^cover[ -]letter$/i.test(
+        rawLabel(el)
+          .replace(/\s*[*＊✱]\s*$/, "")
+          .trim(),
+      )
+    )
+      return "cover_letter";
+    return el.type === "file" &&
+      (el.name === "resume" || el.id === "resume-upload-input")
       ? "resume"
       : el.name?.startsWith("_systemfield_")
         ? el.name
         : ["radio", "checkbox"].includes(el.type) && el.name
           ? el.name
           : el.id || el.name || "";
+  };
   const submitControl = () =>
     [
       ...(form()?.querySelectorAll(
         'button[type="submit"],input[type="submit"],#btn-submit',
       ) || []),
     ].find(visible);
-  function labelOf(el) {
-    if (
-      el.type === "file" &&
-      ["resume", "_systemfield_resume"].includes(idOf(el))
-    )
-      return "Resume/CV";
-    if (el.type === "file" && idOf(el) === "cover_letter")
-      return "Cover letter";
+  function rawLabel(el) {
     const labelled = (el.getAttribute("aria-labelledby") || "")
       .split(/\s+/)
       .map((id) => document.getElementById(id)?.textContent || "")
       .join(" ")
       .trim();
-    return (
+    const ordinary =
       labelled ||
       el.getAttribute("aria-label") ||
       el.closest(".application-question")?.querySelector(".application-label")
         ?.textContent ||
+      (["radio", "checkbox"].includes(el.type)
+        ? el.closest("fieldset")?.querySelector("legend")?.textContent
+        : "") ||
       [...(el.labels || [])].map((l) => l.textContent).join(" ") ||
-      ""
+      el
+        .closest('[class*="ashby-application-form-field"]')
+        ?.querySelector("label")?.textContent ||
+      "";
+    if (
+      el.type === "file" &&
+      (!ordinary || /^attach\s*[*＊✱]?$/i.test(ordinary.trim()))
     )
+      return (
+        document.getElementById(`upload-label-${el.id}`)?.textContent ||
+        ordinary
+      );
+    return ordinary;
+  }
+  function labelOf(el) {
+    return rawLabel(el)
       .replace(/\s*[*＊✱]\s*$/, "")
       .replace(/\s+/g, " ")
       .trim();
   }
+  function errorsFor(el) {
+    const ids = [
+      ...(el.getAttribute("aria-errormessage") || "").split(/\s+/),
+      ...(el.getAttribute("aria-describedby") || "")
+        .split(/\s+/)
+        .filter((id) => /error/i.test(id)),
+    ];
+    return [
+      ...new Set(
+        ids
+          .map((id) => document.getElementById(id))
+          .filter((node) => node && visible(node) && node.textContent.trim())
+          .map((node) => node.textContent.trim().slice(0, 1000)),
+      ),
+    ];
+  }
+  const confirmationNodes = () =>
+    [
+      ...document.querySelectorAll(
+        '#application_confirmation,.application-confirmation,.application--confirmation,[data-testid="application-confirmation"],.application-confirmation-container,.postings-confirmation,.ashby-application-form-success,[data-testid="application-success"]',
+      ),
+    ].filter(visible);
+  const positiveConfirmation = (text) =>
+    /thank you for applying|application (?:has been |was )?(?:successfully )?(?:submitted|received)|thank you for your (?:application|interest)/i.test(
+      text,
+    );
   async function sha(bytes) {
     return [...new Uint8Array(await crypto.subtle.digest("SHA-256", bytes))]
       .map((b) => b.toString(16).padStart(2, "0"))
@@ -90,6 +172,13 @@
             .map((e) => e.textContent)
             .join(", ")
         : "";
+      const backing = selectRoot
+        ? [...selectRoot.querySelectorAll('input[type="hidden"]')].filter(
+            (n) => n.value.trim() && !n.disabled,
+          )
+        : [];
+      const acceptedCombo =
+        combo && !!selected && !el.value.trim() && backing.length === 1;
       const kind =
         group.length > 1
           ? el.type === "radio"
@@ -105,9 +194,11 @@
                   ? "textarea"
                   : el.type === "checkbox"
                     ? "checkbox"
-                    : combo || ["radio", "number"].includes(el.type)
-                      ? "unsupported"
-                      : "text";
+                    : acceptedCombo
+                      ? "select"
+                      : combo || ["radio", "number"].includes(el.type)
+                        ? "unsupported"
+                        : "text";
       const field = {
         id: idOf(el),
         label: labelOf(el),
@@ -119,7 +210,9 @@
               ? "Yes"
               : "No"
             : el.tagName === "SELECT"
-              ? el.selectedOptions[0]?.textContent?.trim() || ""
+              ? el.value && !el.selectedOptions[0]?.disabled
+                ? el.selectedOptions[0]?.textContent?.trim() || ""
+                : ""
               : combo
                 ? selected || el.value
                 : el.type === "radio"
@@ -128,10 +221,22 @@
                     : ""
                   : el.value || "",
         valid: el.validity.valid && el.getAttribute("aria-invalid") !== "true",
-        disabled: Boolean(el.disabled || el.readOnly),
+        disabled: Boolean(el.disabled),
+        readOnly: Boolean(el.readOnly),
+        accepted: combo
+          ? acceptedCombo
+          : el.tagName === "SELECT"
+            ? !!el.value && !el.selectedOptions[0]?.disabled
+            : true,
+        errors: errorsFor(el),
       };
       if (el.tagName === "SELECT")
         field.options = [...el.options].map((o) => o.textContent.trim());
+      if (el.tagName === "SELECT") {
+        field.acceptedValue = el.value;
+        field.optionValues = [...el.options].map((o) => o.value);
+      }
+      if (acceptedCombo) field.acceptedValue = backing[0].value;
       if (group.length > 1) {
         const option = (node) =>
           [...(node.labels || [])].map((l) => l.textContent.trim()).join(" ") ||
@@ -141,6 +246,11 @@
           .map(option)
           .join("\n");
         field.options = group.map(option);
+        field.acceptedValue = group
+          .filter((c) => c.checked)
+          .map((c) => c.value)
+          .join("\n");
+        field.optionValues = group.map((c) => c.value);
         field.required =
           group.some(
             (c) => c.required || c.getAttribute("aria-required") === "true",
@@ -152,15 +262,38 @@
         field.required = true;
       if (el.type === "file") {
         field.files = [];
-        for (const file of el.files || [])
+        for (const file of el.files || []) {
+          const bytes = await file.arrayBuffer();
+          const sniffed =
+            new TextDecoder().decode(bytes.slice(0, 5)) === "%PDF-"
+              ? "application/pdf"
+              : "application/octet-stream";
           field.files.push({
             name: file.name,
             size: file.size,
-            sha256: await sha(await file.arrayBuffer()),
+            sha256: await sha(bytes),
+            mime: file.type || sniffed,
           });
+        }
         field.value = "";
       }
       fields.push(field);
+    }
+    for (const el of form()?.querySelectorAll(
+      '[role="combobox"]:not(input),[role="listbox"],[role="checkbox"]:not(input),[role="radiogroup"]',
+    ) || []) {
+      if (!visible(el) || el.querySelector("input,select,textarea")) continue;
+      fields.push({
+        id: el.id || "",
+        label: labelOf(el),
+        kind: "unsupported",
+        required: el.getAttribute("aria-required") === "true",
+        value: el.getAttribute("aria-valuetext") || el.textContent.trim(),
+        valid: el.getAttribute("aria-invalid") !== "true",
+        disabled: el.getAttribute("aria-disabled") === "true",
+        accepted: false,
+        errors: errorsFor(el),
+      });
     }
     const challengeWidgets = [
       ...document.querySelectorAll(
@@ -176,6 +309,17 @@
       ...document.querySelectorAll('input[type="password"]'),
     ].some(visible);
     const submit = submitControl();
+    const employerErrors = [
+      ...(form()?.querySelectorAll(
+        '[role="alert"],.application-error,.application--error,.ashby-application-form-error,.error-message',
+      ) || []),
+    ]
+      .filter(visible)
+      .map((el) => el.textContent.trim())
+      .filter(Boolean);
+    const alreadyConfirmed = confirmationNodes().some((n) =>
+      positiveConfirmation(n.textContent),
+    );
     return {
       url: location.href,
       challenge: password
@@ -183,12 +327,15 @@
         : challengeWidgets && !solved
           ? "Human verification required. Complete the challenge yourself, then inspect again."
           : "",
-      unsupported:
-        forms().length !== 1
-          ? "No single supported application form found. Embedded, changed or unknown forms need manual completion."
-          : !submit
-            ? "This step has no final submit control. Complete intermediate steps manually and inspect again."
-            : "",
+      unsupported: alreadyConfirmed
+        ? "This page already contains an application confirmation. Check your existing submission before preparing another."
+        : employerErrors.length
+          ? `Employer validation: ${employerErrors.join("; ").slice(0, 2000)}`
+          : forms().length !== 1
+            ? "No single supported application form found. Embedded, changed or unknown forms need manual completion."
+            : !submit
+              ? "Intermediate step: no final submit control. Complete Next yourself and inspect the final form again; all identity fields and documents must be verifiable together."
+              : "",
       fields,
     };
   }
@@ -226,7 +373,11 @@
   }
   async function fill(plans) {
     const before = await snapshot();
-    if (before.challenge || before.unsupported)
+    if (
+      before.challenge ||
+      (before.unsupported &&
+        !before.unsupported.startsWith("Intermediate step:"))
+    )
       throw new Error(before.challenge || before.unsupported);
     const errors = [];
     for (const plan of plans) {
@@ -359,11 +510,7 @@
       return { clicked: true };
     }
     if (message.action === "receipt") {
-      const nodes = [
-        ...document.querySelectorAll(
-          '#application_confirmation,.application-confirmation,[data-testid="application-confirmation"],.application-confirmation-container,.postings-confirmation,.ashby-application-form-success',
-        ),
-      ];
+      const nodes = confirmationNodes();
       const text = nodes
         .filter(visible)
         .map((n) => n.textContent.trim())
@@ -371,11 +518,7 @@
         .slice(0, 2000);
       return {
         url: location.href,
-        text: /thank you for applying|application (?:has been |was )?(?:successfully )?(?:submitted|received)|thank you for your (?:application|interest)/i.test(
-          text,
-        )
-          ? text
-          : "",
+        text: positiveConfirmation(text) ? text : "",
       };
     }
     throw new Error("Unsupported companion operation");

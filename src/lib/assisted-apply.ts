@@ -87,6 +87,28 @@ export function sameGreenhousePage(value: string, target: GreenhouseTarget) {
     return false;
   }
 }
+/** Confirmation URLs must still identify the approved board AND vacancy. */
+export function confirmationTarget(value: string, target: GreenhouseTarget) {
+  try {
+    const url = new URL(value);
+    if (url.protocol !== "https:" || url.username || url.password || url.port)
+      return false;
+    const suffix = /\/(?:confirmation|thank_you|thank-you|thanks)\/?$/;
+    url.pathname = url.pathname.replace(suffix, "");
+    return applicationTarget(url.href).key === target.key;
+  } catch {
+    return false;
+  }
+}
+export function employerPermissions(target: GreenhouseTarget) {
+  return target.key.startsWith("greenhouse:")
+    ? ["https://boards.greenhouse.io/*", "https://job-boards.greenhouse.io/*"]
+    : [new URL(target.url).origin + "/*"];
+}
+export const confirmationMessage = (text: string) =>
+  /thank you for applying|application (?:has been |was )?(?:successfully )?(?:submitted|received)|thank you for your (?:application|interest)/i.test(
+    text,
+  );
 export const questionKey = (text: string) =>
   text
     .normalize("NFKC")
@@ -146,10 +168,32 @@ export type FormField = {
   value: string;
   valid: boolean;
   disabled: boolean;
+  readOnly?: boolean;
+  accepted?: boolean;
+  acceptedValue?: string;
+  optionValues?: string[];
+  errors?: string[];
   options?: string[];
-  files?: { name: string; size: number; sha256: string }[];
+  files?: { name: string; size: number; sha256: string; mime?: string }[];
 };
 export type FieldPlan = { value?: string; file?: PackageFile; source: string };
+export function manualReviewKey(field: FormField) {
+  return JSON.stringify([
+    field.id,
+    field.label,
+    field.kind,
+    field.value,
+    field.required,
+    field.valid,
+    field.disabled,
+    field.readOnly,
+    field.accepted,
+    field.acceptedValue,
+    field.options,
+    field.optionValues,
+    field.errors,
+  ]);
+}
 const contacts: Record<string, [FactKey, string[]]> = {
   first_name: ["firstName", ["first name"]],
   last_name: ["lastName", ["last name"]],
@@ -170,11 +214,17 @@ export function mapField(field: FormField, pack: AssistedPackage): FieldPlan {
   )
     return { source: "Legal agreement requires manual review and action" };
   if (field.kind === "file") {
-    const kind = ["resume", "_systemfield_resume"].includes(field.id)
-      ? "cv"
-      : field.id === "cover_letter"
-        ? "letter"
-        : undefined;
+    const label = questionKey(field.label);
+    const kind =
+      ["resume", "_systemfield_resume"].includes(field.id) &&
+      /^(?:resume\s*\/?\s*cv|resume|cv|curriculum vitae)$/.test(label)
+        ? "cv"
+        : ["cover_letter", "_systemfield_cover_letter"].includes(field.id) &&
+            /^(?:cover[ -]letter)(?:\s*\/?\s*lettre de motivation)?$/.test(
+              label,
+            )
+          ? "letter"
+          : undefined;
     const file = pack.files.find((f) => f.kind === kind);
     return {
       file,
@@ -271,7 +321,16 @@ export function verifyForm(
       ? ["_systemfield_name", "_systemfield_email", "_systemfield_resume"]
       : ["first_name", "last_name", "email", "resume"])
     if (!ids.includes(id))
-      blockers.push(`Expected Greenhouse field missing: ${id}.`);
+      blockers.push(
+        `Expected ${pack.target.platform || "Greenhouse"} field missing: ${id}.`,
+      );
+  if (
+    pack.files.some((f) => f.kind === "letter") &&
+    !input.fields.some((f) => mapField(f, pack).file?.kind === "letter")
+  )
+    blockers.push(
+      "The approved cover letter has no supported upload field. Approve a CV-only package or complete the application manually.",
+    );
   const fields = input.fields.map((field) => {
     const plan = mapField(field, pack);
     const empty =
@@ -281,18 +340,32 @@ export function verifyForm(
           ? field.value !== "Yes"
           : !field.value.trim();
     let verification = "empty";
+    let detail = "";
     if (field.disabled) verification = "unsupported";
-    else if (!field.valid) verification = "invalid";
+    else if (!field.valid || field.errors?.length) verification = "invalid";
+    else if (field.required && empty) verification = "required-missing";
+    else if (field.accepted === false && (!empty || field.required))
+      verification = "unaccepted";
+    else if (field.kind === "unsupported" && (!empty || field.required))
+      verification = "unsupported";
     else if (field.kind === "file" && plan.file) {
       const actual = field.files || [];
-      verification =
-        actual.length === 1 &&
-        actual[0].name === plan.file.name &&
-        actual[0].size === plan.file.size &&
-        actual[0].sha256 === plan.file.sha256
-          ? "matched"
-          : "mismatch";
-    } else if (plan.value !== undefined)
+      detail =
+        actual.length !== 1
+          ? "Expected one attached document."
+          : actual[0].name !== plan.file.name
+            ? "The attachment filename differs from the approved file."
+            : actual[0].size !== plan.file.size
+              ? "The attachment size differs from the approved file."
+              : actual[0].mime !== plan.file.mime
+                ? "The attachment MIME type is missing or differs from the approved PDF. Reload the updated companion and attach the approved file."
+                : actual[0].sha256 !== plan.file.sha256
+                  ? "The attachment SHA-256 differs from the approved bytes."
+                  : "";
+      verification = detail ? "mismatch" : "matched";
+    } else if (field.kind === "file" && (!empty || field.required))
+      verification = "unsupported";
+    else if (plan.value !== undefined)
       verification =
         field.value.replace(/\r\n/g, "\n") === plan.value.replace(/\r\n/g, "\n")
           ? "matched"
@@ -301,11 +374,18 @@ export function verifyForm(
       verification = "manual-reviewed";
     else if (!empty || field.required) verification = "unresolved";
     if (
-      ["mismatch", "invalid", "unresolved", "unsupported"].includes(
-        verification,
-      )
+      [
+        "mismatch",
+        "invalid",
+        "unresolved",
+        "unsupported",
+        "required-missing",
+        "unaccepted",
+      ].includes(verification)
     )
-      blockers.push(`${field.label || field.id}: ${verification}.`);
+      blockers.push(
+        `${field.label || field.id}: ${detail || (verification === "required-missing" ? "Required answer is empty or unchecked" : verification === "unaccepted" ? "No accepted option was read back; choose an actual option" : verification === "unsupported" ? "This control or document cannot be safely verified; complete it manually outside the companion" : verification === "invalid" && field.errors?.length ? field.errors.join("; ") : verification)}.`,
+      );
     return {
       ...field,
       source: plan.source,
