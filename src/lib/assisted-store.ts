@@ -404,7 +404,7 @@ export async function approveAttempt(body: Record<string, unknown>) {
   }
   return publicAttempt(attempt);
 }
-function parseReport(value: unknown): {
+export function parseReport(value: unknown): {
   url: string;
   challenge: string;
   unsupported: string;

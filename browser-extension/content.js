@@ -128,7 +128,7 @@
                     : ""
                   : el.value || "",
         valid: el.validity.valid && el.getAttribute("aria-invalid") !== "true",
-        disabled: el.disabled || el.readOnly,
+        disabled: Boolean(el.disabled || el.readOnly),
       };
       if (el.tagName === "SELECT")
         field.options = [...el.options].map((o) => o.textContent.trim());

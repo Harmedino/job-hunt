@@ -14,6 +14,7 @@ import {
   verifyForm,
   type AssistedPackage,
 } from "../../src/lib/assisted-apply";
+import { parseReport } from "../../src/lib/assisted-store";
 const sha = (value: string | Buffer) =>
   createHash("sha256").update(value).digest("hex");
 const fixtureUrl =
@@ -165,15 +166,24 @@ async function harness(
     }
     actions.push(body.action);
     if (body.action === "verify") {
-      const report = verifyForm(pack, body.report, body.manualReviewed);
-      state = report.ready ? "verified-ready" : "awaiting-user";
-      res.end(
-        JSON.stringify({
-          state,
-          report,
-          reportHash: sha(JSON.stringify(report)),
-        }),
-      );
+      try {
+        const report = verifyForm(
+          pack,
+          parseReport(body.report),
+          body.manualReviewed,
+        );
+        state = report.ready ? "verified-ready" : "awaiting-user";
+        res.end(
+          JSON.stringify({
+            state,
+            report,
+            reportHash: sha(JSON.stringify(report)),
+          }),
+        );
+      } catch (error) {
+        res.statusCode = 400;
+        res.end(JSON.stringify({ error: (error as Error).message }));
+      }
       return;
     }
     if (body.action === "submit-intent") state = "uncertain-submission";

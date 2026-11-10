@@ -6,7 +6,7 @@ The implementation reuses the existing private owner account, CV Builder and Mon
 | --- | --- |
 | Full unit/database regression suite | 181 passed; 0 failed or skipped. Includes immutable packages, duplicate/concurrent claims, exact answer mapping, file hashes, handoff scope/expiry, profile invalidation, uncertain recovery, concurrent daily limits, provider failure and contact-rule caching without personal answers. |
 | Existing plus new desktop/mobile browser suite | 90 passed. Includes CV/application history regressions and integrated Assistant approval, handoff, reconciliation and My Profile answer controls. |
-| Companion fixture suite | 6 passed. Executes shipped background/popup/content scripts with a test-only Chrome API transport and real DOM controls/files: Greenhouse workflow, changed-value refusal, upload failure, login/CAPTCHA/password privacy, and limited Lever/Ashby fixtures. |
+| Companion fixture suite | 6 passed. Executes shipped background/popup/content scripts with a test-only Chrome API transport, production report validation and real DOM controls/files: Greenhouse workflow, changed-value refusal, upload failure, login/CAPTCHA/password privacy, and limited Lever/Ashby fixtures. |
 | TypeScript and ESLint | Passed. |
 | Production build | Passed with `npm run build -- --webpack` in this cloud environment. Default CI/Vercel build remains `npm run build`. |
 | Production authentication smoke | Passed, including private Assistant routes and token-only companion boundary. |
