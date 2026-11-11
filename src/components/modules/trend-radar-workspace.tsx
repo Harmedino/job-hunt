@@ -56,7 +56,7 @@ export default function TrendRadarWorkspace() {
   const [captions, setCaptions] = useState<Record<string, string>>({});
   const [status, setStatus] = useState<RadarStatus>("Discovered");
   const [notes, setNotes] = useState("");
-  const [publishedUrl, setPublishedUrl] = useState("");
+  const [publishedUrls, setPublishedUrls] = useState("");
   const [savedId, setSavedId] = useState("");
   const [manualUrl, setManualUrl] = useState("");
   const [manualHeadline, setManualHeadline] = useState("");
@@ -95,7 +95,7 @@ export default function TrendRadarWorkspace() {
     setClips([]); setClip(undefined); setClipReport("");
     setAssignments(initialAssignments.map((a) => ({ ...a })));
     setCaptions(captionDrafts(story));
-    setStatus("Discovered"); setNotes(""); setPublishedUrl("");
+    setStatus("Discovered"); setNotes(""); setPublishedUrls("");
     setSavedId(""); setEnvironmentTag(""); setPreviewId("");
     setLocalVideo(""); setLocalVideoName(""); setLocalVideoFile(undefined); setLocalImages({}); setStoredAssets([]); setLocalDuration(undefined); setMediaError("");
   }
@@ -107,7 +107,7 @@ export default function TrendRadarWorkspace() {
     setCaptions(project.captions);
     setStatus(project.status);
     setNotes(project.notes);
-    setPublishedUrl(project.publishedUrls[0] || "");
+    setPublishedUrls(project.publishedUrls.join("\n"));
     setSavedId(project.id);
     setManualUrl(project.manualVideoUrl || "");
     try {
@@ -171,6 +171,7 @@ export default function TrendRadarWorkspace() {
               <div className="radar-story-meta"><span>{story.category}</span><span>{shortDate(story.publishedAt)}</span></div>
               <h3>{story.title}</h3>
               {story.summary && <p>{story.summary}</p>}
+              {!!story.people?.length && <small>Headline name mentions (not independently identified): {story.people.join(", ")}</small>}
               <small>{story.why}</small>
               <div className="radar-sources">{story.sources.map((source) => (
                 <a href={source.url} target="_blank" rel="noopener noreferrer" key={source.url}>{source.publisher} ↗</a>
@@ -319,6 +320,11 @@ export default function TrendRadarWorkspace() {
               }}>Add character or background dancer</button>
               <label className="radar-inline-label">Environment image tag (optional, separate from character tags)
                 <input placeholder="@Image3" value={environmentTag} maxLength={20} onChange={(e) => setEnvironmentTag(e.target.value)} />
+                {environmentTag && <input aria-label="Select optional environment image" type="file" accept="image/png,image/jpeg,image/webp,image/gif" onChange={(e) => {
+                  const file = e.currentTarget.files?.[0]; if (!file) return;
+                  setLocalImages((old) => ({ ...old, [environmentTag]: file }));
+                }} />}
+                {environmentTag && storedAssets.includes(environmentTag) && !localImages[environmentTag] && <small>Environment reference stored in this browser</small>}
               </label>
               <h3>5. Kling character replacement prompt</h3>
               <div className="radar-prompt"><pre>{prompt}</pre><Copy value={prompt} /></div>
@@ -338,8 +344,8 @@ export default function TrendRadarWorkspace() {
                     {radarStatuses.map((s) => <option key={s}>{s}</option>)}
                   </select>
                 </label>
-                <label>Published video URL
-                  <input type="url" placeholder="https://youtube.com/shorts/..." value={publishedUrl} onChange={(e) => setPublishedUrl(e.target.value)} />
+                <label>Published video links (one per line)
+                  <textarea rows={3} placeholder="https://youtube.com/shorts/...\nhttps://tiktok.com/..." value={publishedUrls} onChange={(e) => setPublishedUrls(e.target.value)} />
                 </label>
               </div>
               <label className="radar-inline-label">Production notes / performance
@@ -350,7 +356,7 @@ export default function TrendRadarWorkspace() {
                 const saved = await request<RadarProject>({
                   action: "save", id: savedId || undefined, story: selected, clip: clip || null,
                   manualVideoUrl: "", assignments, environmentTag, captions, status, notes,
-                  publishedUrls: publishedUrl.trim() ? [publishedUrl.trim()] : [],
+                  publishedUrls: publishedUrls.split("\n").map((v) => v.trim()).filter(Boolean),
                   mediaNote: localVideoName ? "Browser-local source: " + localVideoName + ". File not uploaded or synced." : "",
                 });
                 setSavedId(saved.id);
