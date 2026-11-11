@@ -17,7 +17,7 @@ export function inspectMp4Tracks(bytes: ArrayBuffer): TrackInspection {
   const view = new DataView(bytes);
   if (view.byteLength < 32)
     return { audioTrack: "unknown", reason: "File too small to inspect." };
-  let moovFound = false, audioFound = false, malformed = false;
+  let moovFound = false, handlerFound = false, audioFound = false, malformed = false;
   function walk(start: number, end: number, depth: number) {
     if (depth > 8) { malformed = true; return; }
     let offset = start;
@@ -37,8 +37,10 @@ export function inspectMp4Tracks(bytes: ArrayBuffer): TrackInspection {
       const contentStart = offset + header;
       const boxEnd = offset + size;
       if (name === "moov") moovFound = true;
-      if (name === "hdlr" && boxEnd >= contentStart + 12 &&
-        boxType(view, contentStart + 8) === "soun") audioFound = true;
+      if (name === "hdlr" && boxEnd >= contentStart + 12) {
+        handlerFound = true;
+        if (boxType(view, contentStart + 8) === "soun") audioFound = true;
+      }
       if (["moov", "trak", "mdia"].includes(name))
         walk(contentStart, boxEnd, depth + 1);
       offset = boxEnd;
@@ -46,7 +48,7 @@ export function inspectMp4Tracks(bytes: ArrayBuffer): TrackInspection {
     if (offset !== end) malformed = true;
   }
   walk(0, view.byteLength, 0);
-  if (malformed || !moovFound)
+  if (malformed || !moovFound || !handlerFound)
     return { audioTrack: "unknown", reason: "MP4 track metadata incomplete, changed or inaccessible." };
   return audioFound
     ? { audioTrack: "present", reason: "An MP4 audio stream entry was found. Audible speech or sound is NOT verified." }
