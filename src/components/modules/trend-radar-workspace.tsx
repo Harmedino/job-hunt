@@ -167,7 +167,14 @@ export default function TrendRadarWorkspace() {
   })();
   const filtered = (dashboard?.stories || []).filter((story) =>
     category === "All" || story.category === category
-  );
+  ).slice(0, 8);
+  const approvedCount = assignments.filter((a) => approvedImages.some((p) => p.imageTag === a.imageTag && p.characterId === (a.characterId || a.imageTag))).length;
+  const readiness = status === "Published" ? "Published" :
+    localDuration !== undefined && approvedCount === assignments.length && assignments.length > 0
+      ? "Ready for Kling (check local image files before export)" :
+      localDuration !== undefined && assignments.length > 0 ? "Ready for character images" :
+      localDuration !== undefined ? "Video verified (duration)" :
+      clip ? "Video found (rights unverified)" : "Story discovered";
   return (
     <div className="module-workspace radar">
       <Feedback busy={busy} message={error} />
@@ -279,6 +286,7 @@ export default function TrendRadarWorkspace() {
         <Section title="Produce a 9:16 parody · 15 seconds maximum">
           <div className="radar-editor">
             <div className="radar-studio-main">
+              <p className="module-notice"><strong>Production readiness:</strong> {readiness} · {approvedCount}/{assignments.length} images approved</p>
               <h3>1. Selected story</h3>
               <p><strong>{selected.title}</strong></p>
               <p className="module-note">Source reference: {selected.sources.map((s) => s.publisher).join(", ")}. Parody actions are fictional, not factual footage. Manual sources remain unverified.</p>
