@@ -9,9 +9,9 @@ Trend Radar is a separate Launchpad workspace using the existing owner-only logi
 - Accepts manually supplied X/news links WITHOUT claiming to have fetched or verified the post.
 - Reuses the existing official YouTube Data API search and video-details integration. Its broad short search is only a preliminary query; every shown result must pass the strict ISO 8601 1–15-second check. No longer videos are displayed as candidates. Search is deliberate/on-demand to preserve quota.
 - Shows original YouTube previews and source links, without downloading third-party video files. Rights, spoken dialogue, visible people, audio content, aspect ratio and suitability are UNKNOWN from public metadata.
-- Supports browser-local previews of owned/licensed uploaded video (not transmitted to the server); duration is inspected by the browser and anything outside 1–15 seconds is rejected for the default workflow. Browser metadata alone does not verify speech, ownership or character suitability.
+- Supports browser-local previews of owned/licensed video; duration is inspected in the browser and clips outside 1–15 seconds are rejected. On explicit Save, selected eligible videos and character images are stored locally using IndexedDB, not uploaded or synchronized. Browser metadata cannot verify speech, ownership, or suitability.
 - Provides @Video1 / @Image1… mappings, separate optional environment reference, constrained character-replacement prompt, five editable caption drafts with fictional/AI disclosure, and production statuses.
-- Saves story evidence, chosen YouTube reference metadata, replacement assignments, prompt, captions, publication URL, notes and status in the trend_radar_projects collection. This first release does not save uploaded video or character image bytes: use the local files again in Kling. Only filenames (notes) are stored.
+- Saves story evidence, YouTube reference metadata, character assignments, prompt, captions, publication URL, notes and status in the trend_radar_projects MongoDB collection. Selected owner-provided video and image blobs are optionally saved in the browser's private IndexedDB under a project ID. They are not on MongoDB or another device; clearing browser site data can permanently remove them. Export separate backups for Kling.
 
 ## Sources and API keys
 
@@ -23,7 +23,7 @@ Source evidence is the feed provider's original public URL and reported publicat
 
 1. Confirm actual feed access and relevance in production; RSS publishers can block hosting providers or change formats. Replace an inaccessible feed only with another authorized public source and source attribution.
 2. Native media inspection beyond browser duration (actual speech/music/laughter, person count, original audio, transitions and 9:16 crop) requires authorized media bytes and additional tooling; do not mark these verified from thumbnails or metadata.
-3. User-selected local video and character images are not stored in a durable media library. Persist a private owned-media library or browser-local indexed files only with explicit user action, storage limits and local-only labeling.
+3. Browser-local IndexedDB media is not cloud-synced or backed up; this prototype cannot guarantee persistence after browser site-data clearing. Add a private, consent-based owned-media upload and storage option for cross-device work in a later phase.
 4. YouTube results are references; rights to edit, reuse, or replace people in a clip must be assessed separately.
 5. Clips are matched through a manually selected scene search, not automated footage analysis. Concept suggestions are editorial, not evidence of specific characters in the video.
 6. No external publishing automation, social account connection, engagement tracking or live X read access is implemented in this first release.
