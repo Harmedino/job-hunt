@@ -252,6 +252,7 @@ export async function saveRadarProject(body: Record<string, unknown>): Promise<R
   })) : current?.approvedImages || [];
   const project: RadarProject = {
     id, story, clip, manualVideoUrl, assignments, approvedImages,
+    sceneDescription: text(body.sceneDescription || current?.sceneDescription || "", 500, "scene description"),
     environmentTag: text(body.environmentTag || "", 20, "environment tag"),
     prompt, captions, status, publishedUrls,
     notes: text(body.notes || current?.notes || "", 4000, "notes"),
