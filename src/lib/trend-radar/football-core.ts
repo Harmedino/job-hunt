@@ -53,8 +53,8 @@ export function classifyHumiliation(fixture: unknown, now = Date.now()): Humilia
   const id = Number(info?.id);
   if (!Number.isInteger(id) || id <= 0 || !Number.isFinite(date) || date > now ||
       !["FT", "AET"].includes(String(code)) ||
-      !Number.isInteger(h) || !Number.isInteger(a) ||
-      !Number.isInteger(home?.id) || !Number.isInteger(away?.id)) return null;
+      !Number.isInteger(Number(h)) || !Number.isInteger(Number(a)) ||
+      !Number.isInteger(Number(home?.id)) || !Number.isInteger(Number(away?.id))) return null;
   const diff = Math.abs(Number(h) - Number(a));
   // A 3-goal margin is meaningful evidence; never label a close defeat embarrassing.
   if (diff < 3) return null;
