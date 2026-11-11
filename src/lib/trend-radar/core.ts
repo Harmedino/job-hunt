@@ -96,6 +96,16 @@ export function storyScore(story: RadarStory, now = Date.now()): number {
   const corroboration = Math.min(18, (new Set(story.sources.map((s) => s.publisher)).size - 1) * 9);
   return Math.max(0, Math.round(freshness + importance + corroboration));
 }
+/** Literal proper-name phrases found in the published headline. Not identity verification. */
+export function headlineNameMentions(headline: string): string[] {
+  const excluded = new Set([
+    "Manchester United", "Manchester City", "Real Madrid", "New York",
+    "The Guardian", "BBC Sport", "Champions League", "Premier League",
+    "United States", "World Cup", "Europa League", "Saudi Arabia",
+  ]);
+  const phrases = headline.match(/\\b[A-Z][a-z]+(?:['’-][A-Z]?[a-z]+)?\\s+[A-Z][a-z]+(?:['’-][A-Z]?[a-z]+)?\\b/g) || [];
+  return [...new Set(phrases)].filter((p) => !excluded.has(p)).slice(0, 5);
+}
 export function opportunityReason(story: RadarStory): string {
   const idea = story.category === "Football"
     ? "A fictional dressing-room reaction or coach-and-player exchange might fit."
@@ -124,7 +134,8 @@ export function mergeStories(rows: RadarStory[], now = Date.now()): RadarStory[]
       existing.publishedAt = item.publishedAt;
   }
   return groups.map((g) => ({
-    ...g, score: storyScore(g, now), why: opportunityReason(g),
+    ...g, people: headlineNameMentions(g.title),
+    score: storyScore(g, now), why: opportunityReason(g),
   })).sort((a, b) => b.score - a.score || b.publishedAt.localeCompare(a.publishedAt));
 }
 export function visibleStories(stories: RadarStory[], hours: number, now = Date.now()) {
