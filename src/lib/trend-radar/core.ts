@@ -38,6 +38,10 @@ export type RadarAssignment = {
   role: string;
   imageTag: string;
   imageFilename: string;
+  characterId?: string;
+  identity?: string;
+  description?: string;
+  outfit?: string;
 };
 export type RadarProject = {
   id: string;
