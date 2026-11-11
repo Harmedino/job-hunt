@@ -4,6 +4,7 @@ import type { RadarStory, RadarClip, RadarProject, RadarAssignment, RadarStatus 
 import { klingReplacementPrompt, captionDrafts, radarStatuses } from "@/lib/trend-radar/core";
 import { Copy, Empty, Feedback, Section } from "./shared";
 import { readLocalAssets, saveLocalAssets } from "@/lib/trend-radar/local-media";
+import { inspectOwnedAudioTrack, type TrackInspection } from "@/lib/trend-radar/media-inspect";
 type Dashboard = {
   stories: RadarStory[]; projects: RadarProject[]; checkedAt: string | null;
   attemptedAt: string | null; failures: string[];
@@ -67,6 +68,8 @@ export default function TrendRadarWorkspace() {
   const [localImages, setLocalImages] = useState<Record<string, File>>({});
   const [storedAssets, setStoredAssets] = useState<string[]>([]);
   const [localDuration, setLocalDuration] = useState<number>();
+  const [localDimensions, setLocalDimensions] = useState("");
+  const [audioInspection, setAudioInspection] = useState<TrackInspection>({ audioTrack: "unknown", reason: "Media not inspected." });
   const [mediaError, setMediaError] = useState("");
   const [previewId, setPreviewId] = useState("");
   const load = useCallback(async (range: number, refresh = false) => {
@@ -97,7 +100,7 @@ export default function TrendRadarWorkspace() {
     setCaptions(captionDrafts(story));
     setStatus("Discovered"); setNotes(""); setPublishedUrls("");
     setSavedId(""); setEnvironmentTag(""); setPreviewId("");
-    setLocalVideo(""); setLocalVideoName(""); setLocalVideoFile(undefined); setLocalImages({}); setStoredAssets([]); setLocalDuration(undefined); setMediaError("");
+    setLocalVideo(""); setLocalVideoName(""); setLocalVideoFile(undefined); setLocalImages({}); setStoredAssets([]); setLocalDuration(undefined); setLocalDimensions(""); setAudioInspection({ audioTrack: "unknown", reason: "Media not inspected." }); setMediaError("");
   }
   async function resume(project: RadarProject) {
     chooseStory(project.story);
@@ -272,10 +275,11 @@ export default function TrendRadarWorkspace() {
               <p className="module-note">Select a video you own or may legally edit. You can save it on this browser using private IndexedDB storage; it is never uploaded to Launchpad, is not synced between devices, and can be cleared with browser site data. Duration can be checked; speech, people and licensing remain unverified.</p>
               <input aria-label="Owned or licensed local video" type="file" accept="video/mp4,video/webm,video/quicktime" onChange={(e) => {
                 const file = e.currentTarget.files?.[0];
-                setLocalVideo(""); setLocalVideoName(""); setLocalVideoFile(undefined); setLocalDuration(undefined); setMediaError("");
+                setLocalVideo(""); setLocalVideoName(""); setLocalVideoFile(undefined); setLocalDuration(undefined); setLocalDimensions(""); setAudioInspection({ audioTrack: "unknown", reason: "Media not inspected." }); setMediaError("");
                 if (!file) return;
                 if (file.size > 120 * 1024 * 1024) { setMediaError("Local preview file exceeds 120 MB."); return; }
                 setLocalVideo(URL.createObjectURL(file)); setLocalVideoName(file.name); setLocalVideoFile(file);
+                void inspectOwnedAudioTrack(file).then(setAudioInspection);
               }} />
               {localVideo && <div className="radar-local-media">
                 <video controls playsInline src={localVideo} onLoadedMetadata={(e) => {
@@ -288,9 +292,11 @@ export default function TrendRadarWorkspace() {
                   }
                   setMediaError("");
                   setLocalDuration(seconds);
+                  setLocalDimensions(media.videoWidth + "×" + media.videoHeight + " · " + (media.videoHeight > media.videoWidth ? "portrait" : media.videoWidth > media.videoHeight ? "landscape" : "square"));
                   setNotice("Local video metadata checked. Audible speech and character suitability remain unverified.");
                 }} />
-                <p>{localVideoName} · {localDuration !== undefined ? localDuration.toFixed(2) + "s verified from browser metadata" : "Duration unverified"} · Local preview only</p>
+                <p>{localVideoName} · {localDuration !== undefined ? localDuration.toFixed(2) + "s verified from browser metadata" : "Duration unverified"} · {localDimensions || "Dimensions unknown"}</p>
+                <p>Audio track: <strong>{audioInspection.audioTrack === "unknown" ? "UNKNOWN" : audioInspection.audioTrack === "present" ? "VERIFIED PRESENT (container)" : "VERIFIED ABSENT (container)"}</strong>. {audioInspection.reason} Dialogue/laughter/music remain UNKNOWN until listened to.</p>
               </div>}
               {mediaError && <p role="alert" className="module-error">{mediaError}</p>}
               <p><strong>Chosen @Video1:</strong> {clip ? clip.title + " (" + clip.seconds + "s)" : localDuration !== undefined ? localVideoName + " (local file; not persisted)" : "None yet"}</p>
