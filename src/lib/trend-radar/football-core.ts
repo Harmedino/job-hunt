@@ -1,4 +1,3 @@
-import { ModuleError } from "../modules/validation";
 export type FixtureTeam = { id: number; name: string };
 export type HumiliationFixture = {
   id: number;
@@ -59,7 +58,7 @@ export function classifyHumiliation(fixture: unknown, now = Date.now()): Humilia
   const diff = Math.abs(Number(h) - Number(a));
   // A 3-goal margin is meaningful evidence; never label a close defeat embarrassing.
   if (diff < 3) return null;
-  const loser = Number(h) < Number(a) ? away === undefined ? null : home : away;
+  const loser = Number(h) < Number(a) ? home : away;
   const winner = Number(h) > Number(a) ? home : away;
   if (!loser || !winner) return null;
   const loserTeam = { id: Number(loser.id), name: String(loser.name || "Unknown team") };
@@ -123,7 +122,7 @@ export function playerEvidence(response: unknown, losingTeamId: number): PlayedP
       });
     }
   }
-  return persons.sort((a, b) => a.teamId - b.teamId || a.rating === null ? 1 : b.rating === null ? -1 : a.rating - b.rating);
+  return persons.sort((a, b) => a.teamId - b.teamId || (a.rating ?? 99) - (b.rating ?? 99));
 }
 export function scoringForOpportunity(input: {
   storyFreshness: number;
