@@ -114,7 +114,7 @@ async function fetchRefresh(force: boolean) {
         $set: { ...story, hidden: existing?.hidden === true, owner: OWNER },
       }, { upsert: true });
     }
-    await col.deleteMany(ownerFilter({ publishedAt: { $lt: new Date(Date.now() - 7 * 86400000).toISOString() } }));
+    await col.deleteMany(ownerFilter({ id: { $not: /^manual:/ }, publishedAt: { $lt: new Date(Date.now() - 7 * 86400000).toISOString() } }));
   }
   const checkedAt = rows.length ? now : (state?.checkedAt as string || "");
   await collection.updateOne(ownerFilter({ key: "news" }), {
@@ -136,11 +136,12 @@ export async function radarDashboard(hours: unknown = 24, refresh = false) {
       .find(ownerFilter(), { projection: { _id: 0, owner: 0 } })
       .sort({ updatedAt: -1 }).limit(100).toArray(),
   ]);
-  const merged = mergeStories(stories);
+  const merged = mergeStories(stories.filter((story) => !story.id.startsWith("manual:")));
+  const manualReferences = stories.filter((story) => story.id.startsWith("manual:") && !story.hidden).slice(0, 20);
   const hidden = new Set(stories.filter((s) => s.hidden).flatMap((s) => s.sources.map((x) => x.url)));
   const filtered = merged.filter((s) => !s.sources.some((src) => hidden.has(src.url)));
   return {
-    stories: visibleStories(filtered, windowHours),
+    stories: visibleStories(filtered, windowHours), manualReferences,
     checkedAt: meta?.checkedAt || null, attemptedAt: meta?.attemptedAt || null,
     failures: (meta?.failures || []) as string[], projects,
     connected: { rss: true, youtube: !!process.env.YOUTUBE_API_KEY, ai: !!(process.env.GEMINI_API_KEY || process.env.OPENAI_API_KEY), x: false },
@@ -184,9 +185,9 @@ function validateStory(input: unknown): RadarStory {
   const sources = row.sources.map((s) => ({
     publisher: text(s.publisher, 100, "publisher"),
     url: checkedUrl(s.url),
-    publishedAt: Number.isFinite(Date.parse(s.publishedAt)) ? s.publishedAt : new Date().toISOString(),
+    publishedAt: Number.isFinite(Date.parse(s.publishedAt)) ? s.publishedAt : "",
   }));
-  const publishedAt = Number.isFinite(Date.parse(row.publishedAt)) ? row.publishedAt : sources[0].publishedAt;
+  const publishedAt = Number.isFinite(Date.parse(row.publishedAt)) ? row.publishedAt : "";
   const story: RadarStory = {
     id: text(row.id, 2048, "story ID") || "manual:" + randomUUID(),
     title, category: row.category, summary: text(row.summary || "", 800, "summary"),
@@ -259,8 +260,8 @@ export async function manualStory(body: Record<string, unknown>): Promise<RadarS
   const now = new Date().toISOString();
   const story = validateStory({
     title, id: "manual:" + randomUUID(), category,
-    publishedAt: now, summary: "Manually supplied reference; contents and publication time not independently checked.",
-    sources: [{ publisher: new URL(url).hostname, url, publishedAt: now }],
+    publishedAt: "", summary: "Manually supplied reference; contents and publication time not independently checked.",
+    sources: [{ publisher: new URL(url).hostname, url, publishedAt: "" }],
   });
   await indexes();
   await (await db()).collection("trend_radar_stories").insertOne({ ...story, owner: OWNER });
