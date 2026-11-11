@@ -8,7 +8,7 @@ import { ModuleError } from "@/lib/modules/validation";
 import {
   radarDashboard, hideStory, manualStory, saveRadarProject, creativeSuggestions,
 } from "@/lib/trend-radar/server";
-export const maxDuration = 30;
+export const maxDuration = 60;
 export async function GET(request: Request) {
   try {
     const url = new URL(request.url);
@@ -33,7 +33,7 @@ export async function POST(request: Request) {
     switch (body.action) {
       case "refresh": return json(await radarDashboard(body.hours || 24, true));
       case "clips": return json(await searchRadarClips({ query: String(body.query || ""), maxSeconds: Number(body.maxSeconds || 15), pages: Number(body.pages || 2), order: body.order === "date" ? "date" : "relevance" }));
-      case "story-clips": return json(await searchRadarClips({ query: sceneSearchFor(String(body.kind || "defeat")), maxSeconds: 15, pages: 1, order: "relevance" }));
+      case "story-clips": return json(await searchRadarClips({ query: sceneSearchFor(String(body.kind || "defeat")), maxSeconds: 15, pages: 2, order: "relevance" }));
       case "football-refresh": return json(await recentHeavyDefeats(Number(body.hours || 24), true));
       case "football-cast": return json(await fixtureCastReport(Number(body.fixtureId), Number(body.loserTeamId)));
       case "x-search": return json(await searchXPosts(body.query));
