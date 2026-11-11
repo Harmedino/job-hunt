@@ -52,6 +52,7 @@ export type RadarProject = {
   mediaNote?: string;
   assignments: RadarAssignment[];
   approvedImages?: ImageApproval[];
+  sceneDescription?: string;
   environmentTag?: string;
   prompt: string;
   captions: Record<string, string>;
