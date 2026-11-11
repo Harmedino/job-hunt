@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { db } from "../db";
 import { ownerFilter, OWNER, lease } from "../modules/store";
 import { ModuleError } from "../modules/validation";
@@ -53,7 +54,7 @@ export async function searchRadarClips(input: {
   const previous = await col.findOne(ownerFilter({ key }));
   if (!input.skipCache && previous && Date.parse(String(previous.queriedAt)) > Date.now() - 8 * 3600000)
     return { ...(previous.report as ShortClipReport), cached: true };
-  if (!(await lease("trend-radar-clip-search", 15))) {
+  if (!(await lease("trend-radar-clip-search:" + createHash("sha256").update(key).digest("hex").slice(0, 20), 15))) {
     if (previous) return { ...(previous.report as ShortClipReport), cached: true,
       note: "Another search is active. Older source-backed results shown." };
     throw new ModuleError("A video search is already running. Try again shortly.", 429);
