@@ -148,6 +148,9 @@ export default function TrendRadarWorkspace() {
   function chooseVideoStory(story: RadarStory, candidate: RadarClip) {
     chooseStory(story); setClip(candidate); setStatus("Clip Review");
   }
+  function chooseStoryTemplate(story: RadarStory, template: ComedyTemplate, file: File) {
+    chooseStory(story); chooseComedyTemplate(template, file);
+  }
   function chooseComedyTemplate(template: ComedyTemplate, file: File) {
     setClip(undefined); setPreviewId("");
     setLocalVideoFile(file); setLocalVideo(URL.createObjectURL(file));
@@ -197,7 +200,7 @@ export default function TrendRadarWorkspace() {
       {dashboard?.failures?.length ? (
         <p className="module-notice" role="status">Feed warnings: {dashboard.failures.join(" · ")}</p>
       ) : null}
-      <FootballHumiliationPanel hours={hours} youtubeEnabled={!!dashboard?.connected.youtube} onVideoPick={chooseVideoStory} onPick={(story, cast) => {
+      <FootballHumiliationPanel hours={hours} youtubeEnabled={true} onVideoPick={chooseVideoStory} onLocalVideoPick={chooseStoryTemplate} onPick={(story, cast) => {
         chooseStory(story);
         if (cast.length) setAssignments(cast.map((person, i) => ({
           role: person.role, identity: person.identity, characterId: person.characterId,
@@ -227,7 +230,7 @@ export default function TrendRadarWorkspace() {
                   await load(hours);
                 })}>Not relevant</button>
               </div>
-              <StoryVideoOptions story={story} active={storyIndex < 3 && !!dashboard?.connected.youtube} onSelect={chooseVideoStory} />
+              <StoryVideoOptions story={story} active={storyIndex < 3} onSelect={chooseVideoStory} onLocalSelect={chooseStoryTemplate} />
             </article>
           ))}
         </div>
