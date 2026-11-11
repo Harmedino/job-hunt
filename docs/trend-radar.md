@@ -1,75 +1,113 @@
-# Trend Radar — first release (personal creator workflow)
+# Trend Radar: setup, workflow and verified limits
 
-Trend Radar is a separate Launchpad workspace using the existing owner-only login, MongoDB and YouTube research API. It does not replace existing YouTube Research or Kling prompt generation.
+This update extends the merged PR #13 implementation and PR #14 changes already on master (`71aee1d`). It keeps the existing personal workspace, authentication, YouTube integration and MongoDB data. Job Finder, YouTube Research, Coding Bounties, CV Builder and Application Assistant implementations are unchanged by this update.
 
-## What the initial implementation actually does
+## Creator workflow
 
-- Fetches bounded recent public RSS items from BBC/Guardian section feeds, removes high-overlap duplicate headlines, preserves original publisher links, ranks by freshness/editorial fit/corroboration, and offers a 6/12/24/48-hour view with maximum 12 cards. This is NOT a measured social-media virality score.
-- Refreshes on demand or when the news cache is more than 20 minutes old. Provider failures appear in the dashboard and old source-backed results may remain. Publishers can restrict RSS endpoints; check live diagnostics before treating a source as operational.
-- Accepts manually supplied X/news links WITHOUT claiming to have fetched or verified the post. Manually supplied links are stored in a separate unverified references list; unknown publication times are not treated as fresh news.
-- Reuses the existing official YouTube Data API search and video-details integration. Its broad short search is only a preliminary query; every shown result must pass the strict ISO 8601 1–15-second check. No longer videos are displayed as candidates. Search is deliberate/on-demand to preserve quota.
-- Shows original YouTube previews and source links, without downloading third-party video files. Rights, spoken dialogue, visible people, audio content, aspect ratio and suitability are UNKNOWN from public metadata.
-- Supports browser-local previews of owned/licensed video; duration and dimensions are inspected in the browser and clips outside 1–15 seconds are rejected. A conservative local MP4 parser may verify the presence/absence of an audio track, but cannot verify whether it contains audible speech, laughter, music or silence. On explicit Save, selected eligible videos and character images are stored locally using IndexedDB, not uploaded or synchronized.
-- Provides @Video1 / @Image1… mappings, separate optional environment image reference, constrained character-replacement prompt, five editable caption drafts with fictional/AI disclosure, and production statuses. Optional opt-in brainstorming reuses the existing Gemini/OpenAI provider for up to three fictional comedy concepts and platform captions; this is not evidence of matching media.
-- Saves story evidence, YouTube reference metadata, character assignments, prompt, captions, publication URL, notes and status in the trend_radar_projects MongoDB collection. Selected owner-provided video and image blobs are optionally saved in the browser's private IndexedDB under a project ID. They are not on MongoDB or another device; clearing browser site data can permanently remove them. Export separate backups for Kling.
+1. Open **Trend Radar** and choose a recent story or verified completed match. Use 6/12/24/48-hour windows. Publisher reporting, public community discussion and manually supplied references have different evidence labels.
+2. Preview an approved, authorized comedy-library video or a strict 1–15 second YouTube reference. YouTube previews carry no automatic permission to download or edit. Supply an authorized local file for production/export.
+3. Inspect the match's actual participants before selecting the Comedy Cast. A manager and up to ten players fit eleven separate performer mappings. Appearance in a losing team alone is not evidence of poor performance.
+4. Assign original performers, replacement identities and scene clothing. Each performer has a stable ID, independent of screen position. Optional timestamped role intervals record crossings without changing IDs.
+5. For each character, review the detailed image prompt and optionally select an authentic identity photo. Click **Generate Image**, preview the actual image, and **Approve & Save**. Uploaded replacement images can also be previewed and approved. Regeneration creates a draft and leaves approved images intact until a new approval.
+6. Review the short Kling prompt and editable platform captions. Add an optional environment image with its own unused `@Image` tag. Click **Prepare for Kling · Download ZIP**. This saves the selected local video/environment before checking the export.
 
-## Sources and API keys
+Approved images are saved immediately to this browser's IndexedDB, with approval metadata in MongoDB. Save the project to retain other edits. Source videos, generated images and uploaded replacement images are **not synced to other devices**. Keep the ZIP as a backup; clearing browser site data removes local media. A saved approval whose local file is missing cannot produce a ready export.
 
-Existing MONGODB_URI and production APP_PASSWORD are required for durable owner-only project storage. Existing YOUTUBE_API_KEY is needed for live public clip discovery. AI_PROVIDER and an existing GEMINI_API_KEY or OPENAI_API_KEY are OPTIONAL for enhanced fictional scene suggestions and caption rewrites; deterministic captions and replacement prompts do not require an AI key. No X API, JEV API, additional paid subscription or downloader is needed.
+## Character Image Generator
 
-Source evidence is the feed provider's original public URL and reported publication date. Headline people[] contains only literal likely proper-name pairs extracted from published headline text and is labeled UNVERIFIED; it does not verify any person's identity, involvement or popularity. A high rank measures editorial opportunity, not measured audience engagement or viral certainty.
+The existing image API now has an exclusive generation lock covering the complete provider request, a bounded hourly budget, bounded request/response bodies, compatible reference-photo uploads, and explicit model/access/quota/network failures. It never retries a billable image request automatically.
 
-## Limitations and recommended next improvements
+Prompts specify one individual person, recognizable reference-derived facial traits and hairstyle, natural proportions, scene-specific clothing, a neutral pose, simple environment, lighting, camera framing and visible footwear. Prompts are editable. Photorealistic is the default; 3D cartoon, cinematic, sports photography and custom styles remain available. The model's depiction, identity, current football kit and full-body framing need visual review. No face match or current kit is independently verified by Launchpad.
 
-1. Confirm actual feed access and relevance in production; RSS publishers can block hosting providers or change formats. Replace an inaccessible feed only with another authorized public source and source attribution.
-2. Media inspection beyond browser duration/resolution and optional owned-MP4 audio track detection (actual audible speech/music/laughter, person count, quality, transitions and editing suitability) needs additional authorized-media analysis; do not mark these verified from thumbnails or YouTube metadata.
-3. Browser-local IndexedDB media is not cloud-synced or backed up; this prototype cannot guarantee persistence after browser site-data clearing. Add a private, consent-based owned-media upload and storage option for cross-device work in a later phase.
-4. YouTube results are references; rights to edit, reuse, or replace people in a clip must be assessed separately.
-5. Clips are matched through a manually selected scene search, not automated footage analysis. Concept suggestions are editorial, not evidence of specific characters in the video.
-6. No external publishing automation, social account connection, engagement tracking or live X read access is implemented in this first release.
-7. Existing cron is unchanged; news refresh occurs when the Trend Radar page is loaded (cache age exceeds 20 minutes) or on demand. No always-on scheduled monitoring is enabled.
-8. The module does not download videos or remove watermarks.
+Gemini uses `generateContent` with image response modalities and optional inline identity-photo data. The Gemini 2.5 image model receives its compatible aspect-ratio options without the newer image-size option. OpenAI uses the Images generation endpoint or multipart Images edits when an identity photo is supplied. Existing API keys remain server-only. Only the selected photo and prompt go to the provider after the explicit Generate action.
 
-## Safety and copyright
+A text response is never stored as a generated image. The server checks recognized image bytes; the browser decodes the image before showing success. If a provider returns a native aspect ratio other than 9:16, the browser fits the complete image onto a 9:16 canvas with plain margins, without cropping the head or feet. The image's actual hash is recorded after this framing operation.
 
-Use original/owned/licensed material or authorized references. A YouTube clip's public viewability is not evidence of reuse rights. Do not portray AI parody reactions as actual statements or interactions of real people. Keep disclosure on generated media.
+Approvals bind the exact performer ID, role, identity, scene, appearance, outfit, image tag, filename, MIME and SHA-256. Changing the character or scene requires review and reapproval. The export rehashes the stored files and rejects stale, missing, swapped or replaced assets. Existing legacy approvals remain stored but need reapproval to obtain this stronger verification.
 
-## Quality checks
+## Local video analysis
 
-Run npm run typecheck, npm run lint, npm test, npm run build and npm run test:e2e.
+The optional **Analyze authorized video locally** action operates entirely in the browser. No video is sent to an AI provider or uploaded to a Vercel function.
 
-tests/trend-radar.test.ts covers strict ISO duration, unknown media qualities, headline merging, freshness, unique character tags and caption disclosure. Existing auth middleware protects /api/trend-radar; POST requires same-origin requests. No articles, YouTube files or real publishing operations are used in tests.
+- Browser metadata checks actual duration and resolution. Export checks the actual file again and rejects unreadable videos or durations outside 1–15 seconds.
+- The conservative MP4 parser identifies container audio-track presence where supported.
+- Web Audio attempts to decode actual audio samples and reports overall RMS energy in dBFS. An audio track, detected energy and audible dialogue are different findings. Failed decoding remains UNKNOWN.
+- The browser samples up to twenty frames, 0.75 seconds apart, and reports possible scene changes from pixel differences. These are heuristic cut hints; motion can trigger them and short cuts can be missed.
+- Automatic speech/laughter classification, person counts, named-person recognition and performer tracking models are unavailable in this inspector and stay UNKNOWN. The editable timestamped performer-role map is manual evidence, not an automatic identity claim.
 
-Status: feature branch pending CI and browser review. Do not claim production acceptance before deploying and checking live feeds/search.
+The reusable library preserves original media/audio bytes, records owner-confirmed rights and manually reviewed attributes, and clears prior speech/person annotations when a different file is imported. A file with a verified absent audio track cannot be saved as containing dialogue/laughter.
 
-## Football Humiliation Radar and real video studio (PR #14)
+## Discovery and ranking
 
-The module now prioritizes source-backed heavy defeats and actual previewable comedy videos, not just news cards.
+### Football
 
-- Optional fixture provider: API-Football. Set `API_FOOTBALL_KEY` (or `APISPORTS_KEY`) to enable completed-match 6/12/24/48-hour results. The server fetches at most three UTC dates per window, uses a 45-minute cache, and checks only finished fixtures. Heavy defeat = **3+ goal margin**; surprising narrow defeats are not inferred without opponent-quality evidence.
-- For each match the owner can fetch provider lineups, coach, player appearances/ratings and major recorded events. A player is suggested only if they **played** and a supplied rating <= 6.0 or an explicitly recorded match event supports it. An excellent player on a losing side is not automatically blamed. The absence of big-chance, error-to-goal, duel or opposition-strength data is explicitly unavailable. Some competitions have no lineup or rating coverage.
-- Official API docs: https://www.api-football.com/documentation_v3 . Existing API access may be suspended. No credentials means football data is **not available**, and source-backed RSS headline coverage remains.
-- Video previews: YouTube Data API video details are checked against exact ISO 8601 duration, **1–15 seconds**. Bounded one-to-three page searches (50 search results per page) with date/relevance sorting and rejection counts. At most a few top stories auto-request actual preview candidates, avoiding unlimited quota usage. Video findings are cached. Each YouTube search request costs quota and does **not** establish reuse rights or audible dialogue.
-- Personal owned-media library: local IndexedDB stores approved source video **bytes** and preserves original audio. Rights, manually listened-to speech/laughter, and performer count are **creator-confirmed**, not independently licensed or visually verified. Meta is stored separately in MongoDB. Browser site-data removal can delete the video bytes; back up originals.
-- Optional official X API recent post search: set `X_BEARER_TOKEN` with permission for v2 recent search. Returns provider-supplied timestamps and public metrics; no broad "trending" claim. With no API key, public X URLs can be recorded manually without claiming their content was read.
-- Character image generation: set existing `OPENAI_API_KEY` or `GEMINI_API_KEY`, optionally `TREND_RADAR_IMAGE_PROVIDER=openai|gemini` and `TREND_RADAR_IMAGE_MODEL` to a compatible image-capable model. Image requests really use the provider API and **verify image bytes**. A text-only model is not treated as an image. Supports an optional owner-supplied identity reference photo (max 4MB) and separate image per role. Provider quota, billing, permissions, policy and costs depend on the account; no connected API keys are accessible for live testing here.
-- Approved images are retained as **browser-local media** in IndexedDB; MongoDB stores exact image prompt and approval metadata. Regenerating a single character produces a draft until separately approved and does not overwrite others. Multiple independent image references map to stable character IDs even when people switch screen positions.
-- "Prepare for Kling" downloads a ZIP containing the owner's authorized original video, individually approved character images, manifest mapping, prompts, captions and AI-parody disclosure. A YouTube reference alone is **not** downloadable; the ZIP requires an authorized local source video. This tool does not generate videos on Kling.
-- The original concise Kling prompt structure remains unchanged and existing YouTube Research, Job Finder, Coding Bounties, CV Builder and Application Assistant features are not modified.
-- Video dialogue recognition, human tracking through complex crossings, automatic verified performer identification, universal player-error attribution, and direct Kling generation remain **not implemented**. Manual role and action entry remains available.
+API-Football supplies completed results, lineup/coach information, participant minutes, provider ratings and supported explicit match events. Only completed defeats with at least a three-goal margin qualify automatically. The selected losing team is checked against the actual fixture before generating its cast report, and the cache is scoped to both fixture and losing team.
 
-### Acceptance and checks
+Malformed, null or negative goals are rejected. Unused players are excluded. Good players are not marked poor simply for losing; low provider ratings or supported events are shown with their reasons. Unknown starting/substitute status stays unknown. Managers are lineup-sourced **for that match**, not assumed to still hold the job today. No unavailable current-squad, current-kit or individual-error evidence is invented.
 
-Run `npm run typecheck`, `npm run lint`, `npm test`, `npm run build`, `npm run test:e2e`. Review the PR checks and smoke test the app in a browser. Production API keys and uploaded-file rights are not available in repository code; live provider success must be verified in the user's deployment. Do not claim that an image was generated or a real video was inspected when none has been provided.
+Trusted publisher headlines with explicit heavy-defeat scorelines can appear as **Reported heavy defeats · Match statistics unverified**. This fallback retains the original source and does not invent lineup/player ratings. Unexpected narrow defeats, losing streaks, opposition strength, big-chance counts, goalkeeper-error attribution and manager pressure are not automatically inferred when the necessary statistics are unavailable.
 
+### Clips
 
-### Additional discovery and operating settings
+Trend Radar reuses the existing `youtubeData` and video normalizer, without changing YouTube Research. A search checks at most three pages of fifty IDs, requests exact ISO 8601 durations, and stops once twelve eligible references are found, the provider ends pagination or the bounded budget is reached. Sort by relevance/date and select a 1–3 page budget. The strict 15-second ceiling applies independently of YouTube's broad `short` query filter.
 
-- Optional official public X recent-search: `X_BEARER_TOKEN`, with account permission for `GET /2/tweets/search/recent`. Without that permission the UI explicitly reports unavailable; no scraping or invented social metrics is used.
-- Football RSS includes BBC, Guardian, Sky Sports and The Athletic. RSS endpoints can change, redirect or block requests; the dashboard reports individual feed failures and keeps known source links instead of making up stories. Football scores never come from RSS alone when the optional fixtures provider is available.
-- `TREND_RADAR_SCHEDULED_REFRESH=true` opts into Trend Radar refresh using the **existing** protected daily `/api/cron` route. It does not add cron invocations or provide minute-by-minute monitoring. Set nothing to leave the integration off.
-- MongoDB `trend_radar_notifications` stores deduplicated **in-app** new-opportunity notices for recently published source-backed headlines. It does not send emails or push notifications.
-- `TREND_RADAR_IMAGE_PROVIDER=auto|openai|gemini` and `TREND_RADAR_IMAGE_MODEL` select a supported image-capable model. The existing text AI model setting does NOT guarantee image capabilities. Image generation can require provider billing/verification and returns explicit quota/access/model errors.
-- Where a story has a reusable browser-local authorized comedy template, its preview is shown before external YouTube references. A discovered YouTube video is a reference and not automatically a legally editable file.
-- The latest feature changes are intentionally on `feat/trend-radar-complete-studio` pending PR review and CI, not automatically deployed to master.
+The report counts attempted detail checks, rejected duration/missing metadata, duplicates and pages. A later-page outage/quota error preserves earlier checked clips and shows a partial-search warning. Successful searches are cached for eight hours; partial searches have a five-minute freshness limit. Each search page consumes the existing shared YouTube quota budget.
 
+Approved comedy-library templates with files present in the current browser receive production priority when their scene category fits. Templates appear before external reference searches. No playable local file, successful download, reuse permission, performer count, original speech or orientation is fabricated from a YouTube thumbnail.
+
+### News and social references
+
+Public feeds include BBC, Guardian, Sky Sports, The Athletic and the public Atom feeds for `r/soccer` and `r/popculturechat`. RSS/Atom parsing is bounded, rejects unsafe URLs/unsupported XML declarations, and excludes undated, future and stale entries. Community posts remain unverified discussion; their contents do not establish the truth of a claim or a measured social trend.
+
+Official X API recent search remains optional. API-supplied counts are displayed only when present. Without access, manual X links remain uninspected references. Reimporting the same manual URL reuses its saved reference rather than creating another suggestion. No X scraping or video downloading is added.
+
+Source clusters reuse existing story identity across refreshes, preserving hidden stories and avoiding repeated new-opportunity notifications when a different publisher becomes the lead source. The optional existing daily cron stores deduplicated **in-app** notices; it sends no email/push messages. Freshness, reporting evidence and available production assets affect ranking. Social virality is not measured or promised.
+
+## Configuration
+
+Keep the existing local setup (`npm ci`, local MongoDB, `npm run dev`) and production owner login. Add only integrations you want:
+
+| Variable | Required value / purpose |
+| --- | --- |
+| `MONGODB_URI`, optional `MONGODB_DB` | Existing MongoDB connection/database. No destructive migration or reseeding. |
+| `APP_PASSWORD` | Existing production workspace password; HTTPS required. |
+| `GEMINI_API_KEY` | Existing Gemini API key with access/quota for the selected image model. |
+| `OPENAI_API_KEY` | Alternative existing OpenAI key with Images API access. |
+| `TREND_RADAR_IMAGE_PROVIDER` | `auto`, `gemini` or `openai`. Auto follows a configured explicit `AI_PROVIDER` where possible, then available keys. |
+| `TREND_RADAR_IMAGE_MODEL` | Optional image model override. Defaults: `gemini-3.1-flash-image` or `gpt-image-1.5`. Supported IDs are listed in `image-service.ts`. `GEMINI_MODEL` / `OPENAI_MODEL` remain the text-AI settings. |
+| `TREND_RADAR_IMAGE_HOURLY_LIMIT` | Optional local UTC-hour request cap, default `20`, bounded to 1–60. Failed generation attempts also count. |
+| `YOUTUBE_API_KEY` | Existing YouTube Data API v3 key for official reference searches. |
+| `YOUTUBE_DAILY_QUOTA_BUDGET` | Existing shared search quota budget, default `2000` units/day. |
+| `API_FOOTBALL_KEY` or `APISPORTS_KEY` | Optional API-Football/API-Sports direct API key. Coverage/quotas depend on the account. |
+| `X_BEARER_TOKEN` | Optional official X token with recent-search permission. No subscription is required to use the remaining module. |
+| `TREND_RADAR_SCHEDULED_REFRESH` | Set `true` to reuse the existing daily cron; disabled otherwise. |
+| `CRON_SECRET` | Existing protected cron credential. No new Vercel schedules are installed. |
+
+Set credentials in deployment/environment settings, never in source or chat. Redeploy Vercel after changing production variables. Cloud workspace credentials and Vercel credentials are separate.
+
+For restricted cloud networking, the app needs the selected provider/API/feed hosts. A network-only draft preserving the existing host list was saved for review; saving a draft alone does not enable those hosts. See the verification report for what was actually reachable.
+
+## Verification
+
+See [Trend Radar verification report](trend-radar-verification.md) for reproduced bugs, real provider observations and regression results.
+
+```bash
+npm run typecheck
+npm run lint
+TEST_MONGODB_URI=mongodb://127.0.0.1:27017 npm test
+npm run build
+PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/usr/bin/chromium npm run test:auth
+TEST_MONGODB_URI=mongodb://127.0.0.1:27017 npm run test:radar
+PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/usr/bin/chromium npm run test:e2e -- --workers=2
+```
+
+Cloud checkouts with external dependency links use `npm run build -- --webpack` and a manually started `npm run dev -- --webpack --hostname 127.0.0.1` for Playwright. CI and Vercel retain the default build. Stop dev before building.
+
+An explicitly requested live image smoke check makes **one real provider request**, may consume provider quota, writes its result under `/tmp`, and uses a disposable local database:
+
+```bash
+TEST_MONGODB_URI=mongodb://127.0.0.1:27017 \
+  node --import tsx scripts/verify-radar-image.ts --generate
+```
+
+Synthetic fixtures in `tests/fixtures/radar` are test patterns, not discovered clips, public figures, generated celebrity images or production-library content.
