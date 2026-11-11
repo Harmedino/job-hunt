@@ -19,7 +19,6 @@ const feeds: { name: string; category: RadarCategory; url: string }[] = [
   { name: "BBC World", category: "World", url: "https://feeds.bbci.co.uk/news/world/rss.xml" },
 ];
 const parser = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: "@_", trimValues: true, processEntities: false });
-const clipSearches = ["funny reaction two people comedy", "short awkward interview funny", "dancing celebrating group short", "funny argument comedy reaction"];
 const strip = (value: unknown, limit = 500) => String(value ?? "")
   .replace(/<[^>]*>/g, " ").replace(/&(?:amp|lt|gt|quot|apos);/g, " ")
   .replace(/\s+/g, " ").trim().slice(0, limit);
