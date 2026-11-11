@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { templateCategories, matchingTemplates, type ComedyTemplate } from "@/lib/trend-radar/comedy-library";
+import { templateCategories, matchingTemplates, type ComedyTemplate } from "@/lib/trend-radar/comedy-core";
 import { saveLocalAssets, readLocalAssets } from "@/lib/trend-radar/local-media";
 import { inspectOwnedAudioTrack, type TrackInspection } from "@/lib/trend-radar/media-inspect";
 type Props = {
