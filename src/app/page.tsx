@@ -43,6 +43,7 @@ import {
 } from "@/lib/job-intelligence";
 import BountyWorkspace from "@/components/modules/bounty-workspace";
 import YoutubeWorkspace from "@/components/modules/youtube-workspace";
+import TrendRadarWorkspace from "@/components/modules/trend-radar-workspace";
 import WorkspaceOverview from "@/components/modules/workspace-overview";
 import { recentPosting, activeBoardPosting } from "@/lib/job-freshness";
 import SocialIntake from "@/components/social-intake";
@@ -61,6 +62,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Code2,
   Clapperboard,
+  Radar,
   ArrowUpRight,
   Bell,
   Bookmark,
@@ -701,6 +703,7 @@ export default function Home() {
             { name: "My Profile", icon: UserRound },
             { name: "Coding Bounties", icon: Code2 },
             { name: "YouTube Research", icon: Clapperboard },
+            { name: "Trend Radar", icon: Radar },
           ].map(({ name, icon: Icon }) => (
             <button
               key={name}
@@ -794,6 +797,8 @@ export default function Home() {
                         ? "Turn your skills into paid contributions."
                         : tab === "YouTube Research"
                           ? "Research. Create. Plan your next video."
+                          : tab === "Trend Radar"
+                            ? "Spot the story. Find the scene. Make the parody."
                           : tab === "CV Builder"
                             ? "Your experience. Tailored to the role."
                             : "Let your experience shine."}
@@ -809,6 +814,8 @@ export default function Home() {
                         ? "Find real tasks, verify funding and track your work and receipts."
                         : tab === "YouTube Research"
                           ? "Original concepts and content planning, supported by official YouTube data."
+                          : tab === "Trend Radar"
+                            ? "Short, evidence-backed stories and 1–15 second reference clips, prepared for Kling."
                           : tab === "CV Builder"
                             ? "Build, edit and download a CV for any job description."
                             : "Your real skills and experience power every match and application."}
@@ -854,6 +861,7 @@ export default function Home() {
             <BountyWorkspace openProfile={() => setTab("My Profile")} />
           )}
           {tab === "YouTube Research" && <YoutubeWorkspace />}
+          {tab === "Trend Radar" && <TrendRadarWorkspace />}
           {tab === "Job Finder" && (
             <>
               <section className="stats-grid">

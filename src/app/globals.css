@@ -3404,3 +3404,63 @@ footer > span {
 .assistant-table td, .assistant-table th { text-align: left; padding: 10px; border: 1px solid var(--border, #344038); vertical-align: top; min-width: 130px; }
 .assistant-counts { display: flex; flex-wrap: wrap; gap: 8px 24px; }
 @media (max-width: 600px) { .assistant-workspace .panel, .assistant-answer-bank { padding: 16px; } }
+
+
+/* Trend Radar — isolated creative workspace */
+.radar .radar-intro { display:flex;justify-content:space-between;align-items:center;gap:20px;background:#fff;border:1px solid var(--border);border-radius:14px;padding:22px;margin-bottom:18px; }
+.radar .radar-intro strong {font-size:19px;letter-spacing:-.5px;color:#263d32}
+.radar .radar-intro p {margin:7px 0;font-size:13px;line-height:1.65;color:#59675d}
+.radar .radar-intro small,.radar .radar-story small,.radar .radar-clip small {color:#7b897f;line-height:1.5}
+.radar .radar-toolbar {display:flex;flex-wrap:wrap;align-items:center;gap:12px;margin:0 0 20px;font-size:12px;color:#667467}
+.radar .radar-toolbar label,.radar .radar-clip-form label,.radar .radar-save-controls label {display:flex;align-items:center;gap:8px}
+.radar input,.radar select,.radar textarea {border:1px solid #dce6dc;border-radius:8px;background:#fff;padding:9px 11px;max-width:100%;font-size:13px;color:#26372b}
+.radar .radar-story-grid {display:grid;grid-template-columns:repeat(auto-fit,minmax(270px,1fr));gap:13px}
+.radar .radar-story,.radar .radar-clip {background:#fff;border:1px solid var(--border);border-radius:12px;padding:16px;display:flex;flex-direction:column;gap:8px;min-width:0}
+.radar .radar-story.chosen,.radar .radar-clip.chosen {border-color:#629d7a;box-shadow:0 0 0 2px #d7e9db}
+.radar .radar-story h3 {margin:3px 0;font-size:15px;line-height:1.5}
+.radar .radar-story p,.radar .radar-clip p {font-size:12px;line-height:1.65;margin:0;color:#6e7b70}
+.radar .radar-story-meta {display:flex;justify-content:space-between;gap:8px;color:#608168;font-size:11px}
+.radar .radar-sources {display:flex;flex-wrap:wrap;gap:9px;font-size:11px;margin-top:auto}
+.radar .radar-sources a,.radar .radar-clip a {text-decoration:underline;color:var(--green)}
+.radar .module-actions {display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.radar .radar-manual,.radar .radar-clip-form {display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.radar .radar-manual input:first-child {flex:2 1 220px}
+.radar .radar-manual input:nth-child(2) {flex:2 1 220px}
+.radar .radar-clip-form input {flex:3 1 220px}
+.radar .radar-projects {display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:8px}
+.radar .radar-project {text-align:left;display:flex;flex-direction:column;align-items:flex-start;gap:5px;white-space:normal}
+.radar .radar-project span {font-size:11px;color:#6a796d}
+.radar .radar-clip-grid {display:grid;grid-template-columns:repeat(auto-fit,minmax(235px,1fr));gap:12px;margin:14px 0 26px}
+.radar .radar-clip iframe,.radar .radar-thumb {aspect-ratio:16/9;width:100%;border:0;border-radius:9px;overflow:hidden;background:#17241a;display:block}
+.radar .radar-thumb {position:relative;padding:0}
+.radar .radar-thumb img {width:100%;height:100%;object-fit:cover}
+.radar .radar-thumb span {position:absolute;bottom:6px;left:6px;background:#132b20dd;color:white;padding:5px 8px;border-radius:5px;font-size:11px}
+.radar .radar-studio-main {max-width:1000px}
+.radar .radar-studio-main h3 {font-size:15px;margin:27px 0 11px;color:#2f5b42}
+.radar .radar-assignment {display:grid;grid-template-columns:minmax(180px,2fr) 115px minmax(150px,2fr) auto;gap:8px;align-items:center;margin-bottom:8px}
+.radar .radar-inline-label {display:flex;flex-direction:column;gap:6px;margin:12px 0}
+.radar .radar-prompt {background:#eef4ed;border:1px solid #d7e7d5;border-radius:10px;padding:16px;display:flex;flex-direction:column;align-items:flex-start;gap:12px}
+.radar .radar-prompt pre {font-family:inherit;font-size:13px;white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.7;margin:0}
+.radar .radar-caption {display:flex;gap:12px;align-items:flex-end;margin-bottom:12px}
+.radar .radar-caption label {display:flex;flex:1;flex-direction:column;gap:6px}
+.radar .radar-caption textarea {width:100%;resize:vertical}
+.radar .radar-save-controls {display:flex;gap:10px;flex-wrap:wrap;margin:10px 0}
+.radar .radar-save-controls label {flex-wrap:wrap}
+.radar .radar-local-media video {max-width:360px;width:100%;max-height:360px;background:#111;border-radius:12px}
+.radar .radar-local-media p {font-size:12px;color:#748177}
+@media(max-width:700px) {
+ .radar .radar-intro {align-items:flex-start;flex-direction:column}
+ .radar .radar-assignment {grid-template-columns:minmax(0,1fr) 90px}
+ .radar .radar-assignment input:nth-of-type(2) {grid-column:1}
+ .radar .radar-clip-form>* {width:100%}
+ .radar .radar-caption {align-items:stretch;flex-direction:column}
+ .radar .radar-story-grid,.radar .radar-clip-grid {grid-template-columns:minmax(0,1fr)}
+}
+
+.radar .radar-idea-grid {display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:11px;margin:13px 0}
+.radar .radar-idea {background:#f7faf6;border:1px solid #dce8dd;border-radius:10px;padding:13px;display:flex;flex-direction:column;gap:9px}
+.radar .radar-idea p {color:#647365;font-size:12px;line-height:1.6;margin:0}
+.radar .radar-idea button {white-space:normal;text-align:left}
+.radar .radar-image-field {display:flex;flex-direction:column;gap:5px;min-width:0}
+.radar .radar-image-field input {width:100%}
+.radar .radar-manual-references {padding-top:15px;margin-top:14px;border-top:1px solid var(--border)}
