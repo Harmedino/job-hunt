@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import type { HumiliationFixture, MatchCastReport, PlayedPerson } from "@/lib/trend-radar/football-core";
 import type { RadarStory, RadarClip } from "@/lib/trend-radar/core";
 import StoryVideoOptions from "./trend-radar-story-videos";
+import type { ComedyTemplate } from "@/lib/trend-radar/comedy-core";
 import { Section } from "./shared";
 type Result = { fixtures: HumiliationFixture[]; checkedAt: string | null; errors: string[]; connected: boolean };
 async function api<T>(body: Record<string, unknown> | null, hours = 24): Promise<T> {
@@ -27,11 +28,12 @@ export function fixtureAsStory(fixture: HumiliationFixture): RadarStory {
   };
 }
 export default function FootballHumiliationPanel({
-  hours, onPick, onVideoPick, youtubeEnabled,
+  hours, onPick, onVideoPick, onLocalVideoPick, youtubeEnabled,
 }: {
   hours: number;
   onPick: (story: RadarStory, cast: { role: string; identity: string; characterId: string }[]) => void;
   onVideoPick: (story: RadarStory, clip: RadarClip) => void;
+  onLocalVideoPick: (story: RadarStory, template: ComedyTemplate, file: File) => void;
   youtubeEnabled: boolean;
 }) {
   const [data, setData] = useState<Result>();
@@ -92,7 +94,7 @@ export default function FootballHumiliationPanel({
             <p>{match.loser.name} lost by {match.margin} goals. Verified completed result.</p>
             <small>Fixture #{match.id} · <a target="_blank" rel="noopener noreferrer" href="https://www.api-football.com/">API-Football source</a></small>
             <button className="primary" type="button" disabled={!!busy} onClick={() => void pick(match)}>Inspect players / Comedy Cast</button>
-            <StoryVideoOptions story={fixtureAsStory(match)} active={index < 3 && youtubeEnabled} onSelect={onVideoPick} />
+            <StoryVideoOptions story={fixtureAsStory(match)} active={index < 3 && youtubeEnabled} onSelect={onVideoPick} onLocalSelect={onLocalVideoPick} />
           </article>
         ))}
       </div>
