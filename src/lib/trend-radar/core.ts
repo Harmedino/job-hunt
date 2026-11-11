@@ -1,4 +1,5 @@
 import type { YoutubeVideo } from "../modules/types";
+import type { ImageApproval } from "./image-policy";
 
 export type RadarCategory = "Football" | "Entertainment" | "Technology" | "World";
 export type RadarSource = { publisher: string; url: string; publishedAt: string };
@@ -50,6 +51,7 @@ export type RadarProject = {
   manualVideoUrl?: string;
   mediaNote?: string;
   assignments: RadarAssignment[];
+  approvedImages?: ImageApproval[];
   environmentTag?: string;
   prompt: string;
   captions: Record<string, string>;
