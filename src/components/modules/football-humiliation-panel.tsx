@@ -70,7 +70,7 @@ export default function FootballHumiliationPanel({
     for (const person of report?.played || []) if (castIds.includes(person.id)) {
       people.push({ role: "the player " + person.name, identity: person.name, characterId: "player-" + person.id });
     }
-    onPick(fixtureAsStory(selected), people.slice(0, 10));
+    onPick(fixtureAsStory(selected), people.slice(0, 11));
   };
   return (
     <Section title="Football Humiliation Radar · Verified results">
@@ -112,7 +112,7 @@ export default function FootballHumiliationPanel({
                 {report.played.filter((p) => p.teamId === selected.loser.id).map((p: PlayedPerson) => (
                   <label className="radar-cast-person" key={p.id}>
                     <input type="checkbox" checked={castIds.includes(p.id)} disabled={!castIds.includes(p.id) && castIds.length >= 10} onChange={(e) => toggle(p.id, e.target.checked)} />
-                    <span><strong>{p.name}</strong> · {p.position} · {p.minutes} min · {p.started ? "starter" : "substitute"} · Rating {p.rating === null ? "UNKNOWN" : p.rating.toFixed(1) + "/10"}<small>{p.findings.length ? p.findings.join("; ") : "No individual underperformance evidence reported"} · API-Football</small></span>
+                    <span><strong>{p.name}</strong> · {p.position} · {p.minutes} min · {p.started === true ? "starter" : p.started === false ? "substitute" : "lineup role UNKNOWN"} · Rating {p.rating === null ? "UNKNOWN" : p.rating.toFixed(1) + "/10"}<small>{p.findings.length ? p.findings.join("; ") : "No individual underperformance evidence reported"} · API-Football</small></span>
                   </label>
                 ))}
               </div>
@@ -120,7 +120,7 @@ export default function FootballHumiliationPanel({
             </>
           )}
           <button className="primary" onClick={confirm} type="button">
-            Create fictional comedy with {Math.min(10, castIds.length + Number(!!report?.managers.some((m) => m.team === selected.loser.name)))} cast member(s)
+            Create fictional comedy with {Math.min(11, castIds.length + Number(!!report?.managers.some((m) => m.team === selected.loser.name)))} cast member(s)
           </button>
         </div>
       )}

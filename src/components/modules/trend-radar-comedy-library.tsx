@@ -67,6 +67,7 @@ export default function ComedyTemplateLibrary({ kind, onSelect, onLoaded }: Prop
       try { await saveLocalAssets((item as ComedyTemplate).id, [{ role: "video", file }]); }
       catch { throw new Error("Metadata saved, but the original video could not be stored in this browser. Check available device storage; template is not ready for reuse."); }
       await reload();
+      window.dispatchEvent(new Event("launchpad-radar-library-updated"));
       setTitle(""); setFile(undefined); setSourceUrl(""); setSeconds(undefined);
       setPerformers(""); setDescription("");
     } catch (e) { setError(e instanceof Error ? e.message : "Template could not be saved."); }
@@ -99,6 +100,7 @@ export default function ComedyTemplateLibrary({ kind, onSelect, onLoaded }: Prop
           </select></label>
           <label>Original video file <input type="file" accept="video/mp4,video/webm,video/quicktime" onChange={(e) => {
             const selected = e.target.files?.[0]; setFile(selected); setSeconds(undefined);
+            setPerformers(""); setSpeech("unknown"); setDescription(""); setWidth(0); setHeight(0);
             setAudio({ audioTrack: "unknown", reason: "Not inspected" });
             if (sourceUrl) URL.revokeObjectURL(sourceUrl);
             setSourceUrl(selected ? URL.createObjectURL(selected) : "");

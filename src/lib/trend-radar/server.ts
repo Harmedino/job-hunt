@@ -1,11 +1,13 @@
-import { randomUUID } from "node:crypto";
+import { boundedRadarText } from "./http";
+import { validateRoleTimeline } from "./browser-analysis";
+import { randomUUID, createHash } from "node:crypto";
 import { imageStyles, type CharacterImageStyle } from "./image-policy";
 import { aiJson, aiConnection } from "../ai";
-import { XMLParser } from "fast-xml-parser";
+import { parseRadarFeed } from "./feed-parser";
 import { db } from "../db";
 import { lease, OWNER, ownerFilter } from "../modules/store";
 import { ModuleError } from "../modules/validation";
-import { discoverVideos } from "../modules/youtube";
+import { discoverVideos, fetchVideo } from "../modules/youtube";
 import {
   type RadarStory,
   type RadarSource,
@@ -18,11 +20,30 @@ import {
   opportunityReason,
   mergeStories,
   visibleStories,
+  sameStory,
+  exactYouTubeSeconds,
   videoCandidate,
   klingReplacementPrompt,
   captionDrafts,
 } from "./core";
-const feeds: { name: string; category: RadarCategory; url: string }[] = [
+const feeds: {
+  name: string;
+  category: RadarCategory;
+  url: string;
+  community?: boolean;
+}[] = [
+  {
+    name: "r/soccer public Atom",
+    category: "Football",
+    url: "https://www.reddit.com/r/soccer/.rss",
+    community: true,
+  },
+  {
+    name: "r/popculturechat public Atom",
+    category: "Entertainment",
+    url: "https://www.reddit.com/r/popculturechat/.rss",
+    community: true,
+  },
   {
     name: "BBC Sport",
     category: "Football",
@@ -69,19 +90,6 @@ const feeds: { name: string; category: RadarCategory; url: string }[] = [
     url: "https://feeds.bbci.co.uk/news/world/rss.xml",
   },
 ];
-const parser = new XMLParser({
-  ignoreAttributes: false,
-  attributeNamePrefix: "@_",
-  trimValues: true,
-  processEntities: false,
-});
-const strip = (value: unknown, limit = 500) =>
-  String(value ?? "")
-    .replace(/<[^>]*>/g, " ")
-    .replace(/&(?:amp|lt|gt|quot|apos);/g, " ")
-    .replace(/\s+/g, " ")
-    .trim()
-    .slice(0, limit);
 function checkedUrl(value: unknown, allowed?: string[]): string {
   if (typeof value !== "string" || value.length > 2048)
     throw new ModuleError("Invalid source URL.");
@@ -136,49 +144,6 @@ async function indexes() {
       .createIndex({ owner: 1, id: 1 }, { unique: true }),
   ]);
 }
-function newsItem(
-  item: Record<string, unknown>,
-  category: RadarCategory,
-  feed: string,
-  now: string,
-): RadarStory | null {
-  const title = strip(item.title, 240);
-  const raw = typeof item.link === "string" ? item.link : "";
-  if (!title || !raw) return null;
-  let url: string;
-  try {
-    url = checkedUrl(raw);
-  } catch {
-    return null;
-  }
-  const date = new Date(String(item.pubDate || item.published || ""));
-  if (
-    !Number.isFinite(date.getTime()) ||
-    date.getTime() > Date.now() + 300000 ||
-    date.getTime() < Date.now() - 3 * 86400000
-  )
-    return null;
-  const source: RadarSource = {
-    publisher: feed,
-    url,
-    publishedAt: date.toISOString(),
-  };
-  const story: RadarStory = {
-    id: "feed:" + url,
-    title,
-    summary: strip(item.description, 800),
-    category,
-    sources: [source],
-    publishedAt: source.publishedAt,
-    checkedAt: now,
-    score: 0,
-    why: "",
-    people: [],
-  };
-  story.score = storyScore(story);
-  story.why = opportunityReason(story);
-  return story;
-}
 async function feedStories(
   feed: (typeof feeds)[number],
   now: string,
@@ -201,28 +166,18 @@ async function feedStories(
     throw new Error(feed.name + " returned HTTP " + res.status + ".");
   const contentLength = Number(res.headers.get("content-length") || 0);
   if (contentLength > 500000) throw new Error(feed.name + " feed too large.");
-  const xml = await res.text();
+  const xml = await boundedRadarText(res, 500000);
   if (xml.length > 500000) throw new Error(feed.name + " feed too large.");
-  let parsed: unknown;
-  try {
-    parsed = parser.parse(xml);
-  } catch {
-    throw new Error(feed.name + " RSS malformed.");
-  }
-  const root = parsed as {
-    rss?: { channel?: { item?: unknown } };
-    feed?: { entry?: unknown };
-  };
-  const items = root?.rss?.channel?.item;
-  return (Array.isArray(items) ? items : items ? [items] : [])
-    .slice(0, 35)
-    .map((entry) => newsItem(entry, feed.category, feed.name, now))
-    .filter((v): v is RadarStory => v !== null);
+  return parseRadarFeed(xml, feed, Date.parse(now));
 }
+
 async function fetchRefresh(force: boolean) {
   await indexes();
   const database = await db();
   const collection = database.collection("trend_radar_refresh");
+  await database
+    .collection("workspace_ephemeral")
+    .createIndex({ owner: 1, key: 1 }, { unique: true });
   const state = await collection.findOne(ownerFilter({ key: "news" }));
   if (
     !force &&
@@ -262,8 +217,31 @@ async function fetchRefresh(force: boolean) {
     const clustered = mergeStories(rows);
     const col = database.collection("trend_radar_stories");
     const notifications = database.collection("trend_radar_notifications");
+    const prior = await col
+      .find(ownerFilter(), { projection: { _id: 0 } })
+      .limit(300)
+      .toArray();
     for (const story of clustered.slice(0, 160)) {
-      const existing = await col.findOne(ownerFilter({ id: story.id }));
+      const existing = prior.find(
+        (old) =>
+          old.id === story.id ||
+          (Array.isArray(old.sources)
+            ? (old.sources as RadarSource[])
+            : []
+          ).some((src) => story.sources.some((s) => s.url === src.url)) ||
+          sameStory(String(old.title), story.title),
+      );
+      if (existing) {
+        story.id = String(existing.id);
+        for (const src of Array.isArray(existing.sources)
+          ? (existing.sources as RadarSource[])
+          : [])
+          if (
+            !story.sources.some((s) => s.url === src.url) &&
+            story.sources.length < 8
+          )
+            story.sources.push(src);
+      }
       if (
         !existing &&
         story.score >= 55 &&
@@ -434,7 +412,7 @@ function validateStory(input: unknown): RadarStory {
     row.sources.length > 8
   )
     throw new ModuleError("An evidence link is required.");
-  const sources = row.sources.map((s) => ({
+  const sources: RadarSource[] = row.sources.map((s) => ({
     publisher: text(s.publisher, 100, "publisher"),
     url: checkedUrl(s.url),
     publishedAt: Number.isFinite(Date.parse(s.publishedAt))
@@ -461,7 +439,10 @@ function validateStory(input: unknown): RadarStory {
   story.why = opportunityReason(story);
   return story;
 }
-function validatedClip(value: unknown): RadarClip | undefined {
+async function validatedClip(
+  value: unknown,
+  previous?: RadarClip,
+): Promise<RadarClip | undefined> {
   if (!value) return undefined;
   if (typeof value !== "object")
     throw new ModuleError("Invalid video reference.");
@@ -469,15 +450,37 @@ function validatedClip(value: unknown): RadarClip | undefined {
   if (
     clip.source !== "YouTube" ||
     !/^[\w-]{11}$/.test(clip.id) ||
-    !clip.url.startsWith("https://www.youtube.com/watch?v=") ||
+    clip.url !== "https://www.youtube.com/watch?v=" + clip.id ||
+    exactYouTubeSeconds(clip.duration) !== clip.seconds ||
     typeof clip.seconds !== "number" ||
     clip.seconds < 1 ||
     clip.seconds > 15
   )
     throw new ModuleError("Choose a verified-duration YouTube reference.");
+  const cached = await (await db())
+    .collection("trend_radar_video_search")
+    .findOne(
+      ownerFilter({
+        "report.clips.id": clip.id,
+        expiresAt: { $gt: new Date() },
+      }),
+    );
+  const verified =
+    (cached?.report as { clips?: RadarClip[] } | undefined)?.clips?.find(
+      (v) => v.id === clip.id,
+    ) ||
+    (previous?.id === clip.id ? previous : undefined) ||
+    videoCandidate(await fetchVideo(clip.id));
+  if (
+    !verified ||
+    exactYouTubeSeconds(verified.duration) !== verified.seconds ||
+    verified.seconds > 15
+  )
+    throw new ModuleError(
+      "Source metadata does not confirm an eligible 1–15 second video.",
+    );
   return {
-    ...clip,
-    title: text(clip.title, 500, "video title"),
+    ...verified,
     rights: "unknown",
     speech: "unknown",
     peopleCount: "unknown",
@@ -509,8 +512,8 @@ export async function saveRadarProject(
         outfit: text(a.outfit || "", 300, "character outfit"),
       }))
     : current?.assignments || [];
-  if (assignments.length > 10)
-    throw new ModuleError("Use up to ten character assignments.");
+  if (assignments.length > 11)
+    throw new ModuleError("Use up to eleven character assignments.");
   let prompt = "";
   if (assignments.length) {
     try {
@@ -550,7 +553,7 @@ export async function saveRadarProject(
     body.clip === null
       ? undefined
       : body.clip
-        ? validatedClip(body.clip)
+        ? await validatedClip(body.clip, current?.clip)
         : current?.clip;
   const manualVideoUrl = text(
     body.manualVideoUrl || current?.manualVideoUrl || "",
@@ -562,7 +565,7 @@ export async function saveRadarProject(
     ? body.publishedUrls.slice(0, 12).map((u: unknown) => checkedUrl(u))
     : current?.publishedUrls || [];
   const approvedImages = Array.isArray(body.approvedImages)
-    ? body.approvedImages.slice(0, 10).map((a: Record<string, unknown>) => ({
+    ? body.approvedImages.slice(0, 11).map((a: Record<string, unknown>) => ({
         characterId: text(a.characterId, 80, "approved character"),
         imageTag: text(a.imageTag, 20, "approved image tag"),
         filename: text(a.filename, 200, "approved image filename"),
@@ -585,6 +588,17 @@ export async function saveRadarProject(
         ),
       }))
     : current?.approvedImages || [];
+  let roleTimeline;
+  try {
+    roleTimeline = validateRoleTimeline(
+      body.roleTimeline ?? current?.roleTimeline ?? [],
+      assignments.map((a) => a.characterId || a.imageTag),
+    );
+  } catch (e) {
+    throw new ModuleError(
+      e instanceof Error ? e.message : "Invalid performer timeline.",
+    );
+  }
   const project: RadarProject = {
     id,
     story,
@@ -592,6 +606,7 @@ export async function saveRadarProject(
     manualVideoUrl,
     assignments,
     approvedImages,
+    roleTimeline,
     sceneDescription: text(
       body.sceneDescription ?? current?.sceneDescription ?? "",
       500,
@@ -643,7 +658,7 @@ export async function manualStory(
     : "World";
   const story = validateStory({
     title,
-    id: "manual:" + randomUUID(),
+    id: "manual:" + createHash("sha256").update(url).digest("hex"),
     category,
     publishedAt: "",
     summary:
@@ -651,9 +666,17 @@ export async function manualStory(
     sources: [{ publisher: new URL(url).hostname, url, publishedAt: "" }],
   });
   await indexes();
-  await (await db())
-    .collection("trend_radar_stories")
-    .insertOne({ ...story, owner: OWNER });
+  const col = (await db()).collection("trend_radar_stories");
+  const existing = await col.findOne(
+    ownerFilter({ id: /^manual:/, "sources.url": url }),
+    { projection: { _id: 0, owner: 0 } },
+  );
+  if (existing) return existing as unknown as RadarStory;
+  await col.updateOne(
+    ownerFilter({ id: story.id }),
+    { $setOnInsert: { ...story, owner: OWNER } },
+    { upsert: true },
+  );
   return story;
 }
 

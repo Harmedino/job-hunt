@@ -1,4 +1,5 @@
 "use client";
+import { portraitImage } from "@/lib/trend-radar/browser-image";
 import { useEffect, useMemo, useState } from "react";
 import type { RadarAssignment, RadarStory } from "@/lib/trend-radar/core";
 import {
@@ -23,6 +24,7 @@ type Output = {
   tag: string;
   assignmentKey: string;
   style: CharacterImageStyle;
+  framingNote?: string;
 };
 const validTag = /^@Image[1-9]\d*$/;
 async function toBase64(file: File): Promise<string> {
@@ -173,10 +175,10 @@ export default function CharacterImageGenerator({
       if (
         photo &&
         (!["image/png", "image/jpeg", "image/webp"].includes(photo.type) ||
-          photo.size > 4 * 1024 * 1024)
+          photo.size > 3 * 1024 * 1024)
       )
         throw new Error(
-          "Reference photos must be PNG/JPEG/WebP and under 4MB.",
+          "Reference photos must be PNG/JPEG/WebP and under 3MB.",
         );
       const body = {
         imageTag: a.imageTag,
@@ -195,10 +197,12 @@ export default function CharacterImageGenerator({
         throw new Error(value.error || "Image provider failed.");
       if (typeof value.base64 !== "string" || !value.mime?.startsWith("image/"))
         throw new Error("Image provider returned no actual image bytes.");
+      const framed = await portraitImage(value.base64, value.mime);
       setPending((old) => ({
         ...old,
         [a.imageTag]: {
           ...value,
+          ...framed,
           assignmentKey: assignmentKey(a, scene),
           style,
         } as Output,
@@ -277,6 +281,11 @@ export default function CharacterImageGenerator({
   return (
     <section className="radar-image-generator">
       <h3>Character Image Generator · One image per person</h3>
+      <p className="module-note">
+        Only the selected reference photo and prompt are sent to the image
+        provider when you click Generate. Generated faces are not
+        identity-verified.
+      </p>
       <p className="module-note">
         Generate actual images using a configured image-capable OpenAI or Gemini
         model. You approve each result separately. Existing approved character
@@ -465,7 +474,8 @@ export default function CharacterImageGenerator({
                   />
                   <p>
                     {image.provider} · {image.model} · Image draft — review
-                    identity, framing and outfit before approving.
+                    identity, framing and outfit before approving.{" "}
+                    {image.framingNote}
                   </p>
                 </div>
               )}
@@ -518,7 +528,11 @@ export default function CharacterImageGenerator({
                       void outputBlob(image).then((blob) =>
                         download(
                           blob,
-                          a.imageTag.replace("@", "") + "-draft.png",
+                          a.imageTag.replace("@", "") +
+                            "-draft." +
+                            (image.mime === "image/jpeg"
+                              ? "jpg"
+                              : image.mime.split("/")[1]),
                         ),
                       )
                     }
@@ -526,9 +540,16 @@ export default function CharacterImageGenerator({
                     Download draft
                   </button>
                 )}
+                {approved && !previews[a.imageTag] && (
+                  <p>
+                    The approved file is not loaded in this browser. Restore
+                    your backup or regenerate before exporting.
+                  </p>
+                )}
                 {approved && (
                   <button
                     className="secondary"
+                    disabled={!previews[a.imageTag]}
                     type="button"
                     onClick={() =>
                       void readLocalAssets(projectId).then((rows) => {

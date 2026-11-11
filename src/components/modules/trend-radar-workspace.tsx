@@ -25,13 +25,19 @@ import FootballHumiliationPanel from "./football-humiliation-panel";
 import ComedyTemplateLibrary from "./trend-radar-comedy-library";
 import StoryVideoOptions from "./trend-radar-story-videos";
 import TrendXResearch from "./trend-radar-x-research";
+import { reportedHeavyDefeats } from "@/lib/trend-radar/feed-parser";
+import RadarMediaAnalysis from "./trend-radar-media-analysis";
+import type { RoleMoment } from "@/lib/trend-radar/browser-analysis";
 import CharacterImageGenerator from "./trend-radar-image-generator";
 import { downloadKlingPackage } from "@/lib/trend-radar/export";
 import {
   imageApprovalMatches,
   type ImageApproval,
 } from "@/lib/trend-radar/image-policy";
-import type { ComedyTemplate } from "@/lib/trend-radar/comedy-core";
+import {
+  productionPriority,
+  type ComedyTemplate,
+} from "@/lib/trend-radar/comedy-core";
 type Dashboard = {
   stories: RadarStory[];
   manualReferences: RadarStory[];
@@ -94,6 +100,22 @@ function storyUrl(story: RadarStory) {
   return story.sources[0]?.url || "";
 }
 export default function TrendRadarWorkspace() {
+  const [availableTemplates, setAvailableTemplates] = useState<
+    ComedyTemplate[]
+  >([]);
+  const rememberTemplates = useCallback((templates: ComedyTemplate[]) => {
+    void Promise.all(
+      templates.map(async (t) => ({ t, assets: await readLocalAssets(t.id) })),
+    )
+      .then((rows) =>
+        setAvailableTemplates(
+          rows
+            .filter((r) => r.assets.some((a) => a.role === "video"))
+            .map((r) => r.t),
+        ),
+      )
+      .catch(() => setAvailableTemplates([]));
+  }, []);
   const [dashboard, setDashboard] = useState<Dashboard>();
   const [hours, setHours] = useState(24);
   const [category, setCategory] = useState("All");
@@ -112,6 +134,7 @@ export default function TrendRadarWorkspace() {
   const [videoSearchPages, setVideoSearchPages] = useState(2);
   const [videoSort, setVideoSort] = useState<"relevance" | "date">("relevance");
   const [approvedImages, setApprovedImages] = useState<ImageApproval[]>([]);
+  const [roleTimeline, setRoleTimeline] = useState<RoleMoment[]>([]);
   const [sceneDescription, setSceneDescription] = useState(
     "Funny group dancing with natural gestures and original audio",
   );
@@ -184,6 +207,7 @@ export default function TrendRadarWorkspace() {
   }
   function chooseStory(story: RadarStory) {
     setSelected(story);
+    setRoleTimeline([]);
     setSearch(storySearch(story));
     setClips([]);
     setIdeas([]);
@@ -221,6 +245,7 @@ export default function TrendRadarWorkspace() {
   async function resume(project: RadarProject) {
     chooseStory(project.story);
     setClip(project.clip);
+    setRoleTimeline(project.roleTimeline || []);
     setAssignments(
       project.assignments.length ? project.assignments : initialAssignments,
     );
@@ -239,6 +264,9 @@ export default function TrendRadarWorkspace() {
       setStoredAssets(assets.map((a) => a.role));
       const video = assets.find((a) => a.role === "video");
       if (video) {
+        setLocalVideoFile(
+          new File([video.blob], video.filename, { type: video.mime }),
+        );
         setLocalVideo(URL.createObjectURL(video.blob));
         setLocalVideoName(video.filename);
         setNotice(
@@ -256,7 +284,7 @@ export default function TrendRadarWorkspace() {
     }
   }
   function chooseVideoStory(story: RadarStory, candidate: RadarClip) {
-    chooseStory(story);
+    if (selected?.id !== story.id) chooseStory(story);
     setClip(candidate);
     setStatus("Clip Review");
   }
@@ -265,7 +293,7 @@ export default function TrendRadarWorkspace() {
     template: ComedyTemplate,
     file: File,
   ) {
-    chooseStory(story);
+    if (selected?.id !== story.id) chooseStory(story);
     chooseComedyTemplate(template, file);
   }
   function chooseComedyTemplate(template: ComedyTemplate, file: File) {
@@ -295,11 +323,25 @@ export default function TrendRadarWorkspace() {
         : "Please review your character assignments.";
     }
   })();
-  const filtered = (dashboard?.stories || [])
-    .filter((story) => category === "All" || story.category === category)
+  const reportedIds = new Set(
+    reportedHeavyDefeats(dashboard?.stories || []).map((r) => r.story.id),
+  );
+  const filtered = [...(dashboard?.stories || [])]
+    .sort(
+      (a, b) =>
+        productionPriority(b, availableTemplates).score -
+        productionPriority(a, availableTemplates).score,
+    )
+    .filter(
+      (story) =>
+        !reportedIds.has(story.id) &&
+        (category === "All" || story.category === category),
+    )
     .slice(0, 8);
-  const approvedCount = assignments.filter((a) =>
-    approvedImages.some((p) => imageApprovalMatches(a, p, sceneDescription)),
+  const approvedCount = assignments.filter(
+    (a) =>
+      storedAssets.includes(a.imageTag) &&
+      approvedImages.some((p) => imageApprovalMatches(a, p, sceneDescription)),
   ).length;
   const readiness =
     status === "Published"
@@ -327,7 +369,7 @@ export default function TrendRadarWorkspace() {
         <div>
           <strong>Trend Radar · Viral Video Studio</strong>
           <p>
-            Fresh verified-source headlines → clips under 15 seconds → fictional
+            Fresh source-linked stories → clips under 15 seconds → fictional
             Kling character replacement → ready-to-edit captions.
           </p>
           <small>
@@ -426,6 +468,31 @@ export default function TrendRadarWorkspace() {
             );
         }}
       />
+      {!!reportedHeavyDefeats(dashboard?.stories || []).length && (
+        <Section title="Reported heavy defeats · Match statistics unverified">
+          {reportedHeavyDefeats(dashboard?.stories || []).map(
+            ({ story, note }) => (
+              <article className="module-panel" key={story.id}>
+                <h3>{story.title}</h3>
+                <p>{note}</p>
+                <a
+                  href={story.sources[0]?.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  Original match report ↗
+                </a>
+                <StoryVideoOptions
+                  story={story}
+                  active
+                  onSelect={chooseVideoStory}
+                  onLocalSelect={chooseStoryTemplate}
+                />
+              </article>
+            ),
+          )}
+        </Section>
+      )}
       <Section title="Promising stories">
         <p className="module-note">
           A small, freshness-ranked selection from public news feeds. People and
@@ -463,6 +530,9 @@ export default function TrendRadarWorkspace() {
                 </small>
               )}
               <small>{story.why}</small>
+              <small>
+                {productionPriority(story, availableTemplates).reason}
+              </small>
               <div className="radar-sources">
                 {story.sources.map((source) => (
                   <a
@@ -586,6 +656,7 @@ export default function TrendRadarWorkspace() {
       <ComedyTemplateLibrary
         kind={selected?.category === "Football" ? "defeat" : "entertainment"}
         onSelect={chooseComedyTemplate}
+        onLoaded={rememberTemplates}
       />
       <Section title="Your saved video projects">
         {!dashboard?.projects?.length ? (
@@ -716,6 +787,7 @@ export default function TrendRadarWorkspace() {
                       rejectedByDuration: number;
                       rejectedMissingMetadata: number;
                       rejectedDuplicates: number;
+                      error?: string;
                       note: string;
                     }>({
                       action: "clips",
@@ -726,7 +798,10 @@ export default function TrendRadarWorkspace() {
                     });
                     setClips(result.clips);
                     setClipReport(
-                      result.note +
+                      (result.error
+                        ? "Partial search: " + result.error + ". "
+                        : "") +
+                        result.note +
                         " " +
                         result.checked +
                         " YouTube video details checked across " +
@@ -975,9 +1050,16 @@ export default function TrendRadarWorkspace() {
                 {clip
                   ? clip.title + " (" + clip.seconds + "s)"
                   : localDuration !== undefined
-                    ? localVideoName + " (local file; not persisted)"
+                    ? localVideoName + " (authorized browser-local file)"
                     : "None yet"}
               </p>
+              <RadarMediaAnalysis
+                key={"analysis:" + savedId + localVideo}
+                file={localVideoFile}
+                assignments={assignments}
+                timeline={roleTimeline}
+                onTimeline={setRoleTimeline}
+              />
               <h3>4. Character replacement assignments</h3>
               <p className="module-note">
                 Assign each original person a distinct reference image. Optional
@@ -1071,7 +1153,7 @@ export default function TrendRadarWorkspace() {
               <button
                 type="button"
                 className="secondary"
-                disabled={assignments.length >= 10}
+                disabled={assignments.length >= 11}
                 onClick={() => {
                   const unused = Array.from(
                     { length: 12 },
@@ -1133,7 +1215,7 @@ export default function TrendRadarWorkspace() {
                 story={selected}
                 assignments={assignments}
                 onAssignments={setAssignments}
-                key={savedId}
+                key={"images:" + savedId}
                 projectId={savedId}
                 approvals={approvedImages}
                 onApprovals={async (rows) => {
@@ -1144,6 +1226,7 @@ export default function TrendRadarWorkspace() {
                     assignments,
                     approvedImages: rows,
                     sceneDescription,
+                    roleTimeline,
                     environmentTag,
                     captions,
                     clip: clip || null,
@@ -1156,6 +1239,9 @@ export default function TrendRadarWorkspace() {
                       .filter(Boolean),
                   });
                   setApprovedImages(rows);
+                  setStoredAssets(
+                    (await readLocalAssets(savedId)).map((a) => a.role),
+                  );
                   await load(hours);
                 }}
                 scene={sceneDescription}
@@ -1239,6 +1325,14 @@ export default function TrendRadarWorkspace() {
                       throw new Error(
                         "The uploaded video must be between 1 and 15 seconds before saving.",
                       );
+                    if (
+                      Object.keys(localImages).some((tag) =>
+                        approvedImages.some((a) => a.imageTag === tag),
+                      )
+                    )
+                      throw new Error(
+                        "Use Upload a replacement image and Approve & Save to replace an already approved character image.",
+                      );
                     const saved = await request<RadarProject>({
                       action: "save",
                       id: savedId || undefined,
@@ -1247,6 +1341,7 @@ export default function TrendRadarWorkspace() {
                       archived,
                       approvedImages,
                       sceneDescription,
+                      roleTimeline,
                       manualVideoUrl: "",
                       assignments,
                       environmentTag,
@@ -1305,6 +1400,17 @@ export default function TrendRadarWorkspace() {
                   void run("Preparing Kling export", async () => {
                     if (!savedId)
                       throw new Error("Choose and save a project first.");
+                    if (localVideoFile)
+                      await saveLocalAssets(savedId, [
+                        { role: "video", file: localVideoFile },
+                      ]);
+                    if (environmentTag && localImages[environmentTag])
+                      await saveLocalAssets(savedId, [
+                        {
+                          role: environmentTag,
+                          file: localImages[environmentTag],
+                        },
+                      ]);
                     await downloadKlingPackage({
                       projectId: savedId,
                       story: selected,
@@ -1314,6 +1420,7 @@ export default function TrendRadarWorkspace() {
                       environmentTag,
                       captions,
                       sceneDescription,
+                      roleTimeline,
                     });
                     setNotice(
                       "Kling package downloaded. This does not generate or publish the video.",

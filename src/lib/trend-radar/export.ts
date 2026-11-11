@@ -1,3 +1,4 @@
+import { validateRoleTimeline, type RoleMoment } from "./browser-analysis";
 import JSZip from "jszip";
 import { readLocalAssets, type LocalAsset } from "./local-media";
 import {
@@ -16,6 +17,7 @@ export type KlingExportInput = {
   environmentTag: string;
   captions: Record<string, string>;
   sceneDescription: string;
+  roleTimeline?: RoleMoment[];
 };
 export async function buildKlingArchive(
   args: KlingExportInput,
@@ -139,6 +141,10 @@ export async function buildKlingArchive(
             }[assets.find((a) => a.role === environmentTag)!.mime] || "bin")
           : null,
         sceneDescription: args.sceneDescription,
+        roleTimeline: validateRoleTimeline(
+          args.roleTimeline || [],
+          assignments.map((a) => a.characterId || a.imageTag),
+        ),
         note: "These are fictional AI-parody replacement references, not actual footage of public figures. Kling production is not performed by Launchpad.",
       },
       null,
@@ -195,7 +201,22 @@ export async function downloadKlingPackage(
               "The actual source video must be 1–15 seconds with a readable video track.",
             ),
           );
-        else finish();
+        else {
+          try {
+            validateRoleTimeline(
+              args.roleTimeline || [],
+              args.assignments.map((a) => a.characterId || a.imageTag),
+              media.duration,
+            );
+            finish();
+          } catch (e) {
+            finish(
+              e instanceof Error
+                ? e
+                : new Error("Role intervals exceed the actual video."),
+            );
+          }
+        }
       };
       media.onerror = () =>
         finish(new Error("The local source video cannot be decoded."));

@@ -4,7 +4,7 @@ import { db } from "../db";
 import { randomUUID } from "node:crypto";
 const OPENAI_URL = "https://api.openai.com/v1/images/";
 const GEMINI_ROOT = "https://generativelanguage.googleapis.com/v1beta/models/";
-const IMAGE_BYTES_LIMIT = 12 * 1024 * 1024;
+const IMAGE_BYTES_LIMIT = 3 * 1024 * 1024;
 const referenceTypes = ["image/png", "image/jpeg", "image/webp"];
 const supportedOpenAI = [
   "gpt-image-2.5-flare",
@@ -28,13 +28,18 @@ export function imageProviderConfiguration() {
   const preferred = (
     process.env.TREND_RADAR_IMAGE_PROVIDER || "auto"
   ).toLowerCase();
+  const inherited = process.env.AI_PROVIDER?.trim().toLowerCase();
   const chosen =
     preferred === "auto"
-      ? process.env.OPENAI_API_KEY
-        ? "openai"
-        : process.env.GEMINI_API_KEY
-          ? "gemini"
-          : "none"
+      ? inherited === "gemini" && process.env.GEMINI_API_KEY?.trim()
+        ? "gemini"
+        : inherited === "openai" && process.env.OPENAI_API_KEY?.trim()
+          ? "openai"
+          : process.env.OPENAI_API_KEY?.trim()
+            ? "openai"
+            : process.env.GEMINI_API_KEY?.trim()
+              ? "gemini"
+              : "none"
       : preferred;
   const supported = ["openai", "gemini"].includes(chosen);
   const available =
@@ -117,14 +122,14 @@ function imageRef(value: unknown): { mime: string; data: string } | undefined {
     throw new ModuleError("Reference photo must be PNG, JPEG or WebP.");
   if (
     typeof o.base64 !== "string" ||
-    o.base64.length > 5.7e6 ||
+    o.base64.length > 4.2e6 ||
     !/^[a-zA-Z0-9+/]+={0,2}$/.test(o.base64)
   )
-    throw new ModuleError("Reference photo must be less than 4 MB.");
+    throw new ModuleError("Reference photo must be less than 3 MB.");
   const bytes = Buffer.from(o.base64, "base64");
   if (
     bytes.length < 100 ||
-    bytes.length > 4 * 1024 * 1024 ||
+    bytes.length > 3 * 1024 * 1024 ||
     bytes.toString("base64") !== o.base64
   )
     throw new ModuleError("Invalid reference photo bytes.");
@@ -238,6 +243,31 @@ export async function generateRadarImage(input: unknown) {
   const deadline = AbortSignal.timeout(105000);
   let response: Response;
   try {
+    const usage = (await db()).collection("trend_radar_image_usage");
+    await usage.createIndex({ key: 1 }, { unique: true });
+    await usage.createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 });
+    const windowKey = "owner:" + new Date().toISOString().slice(0, 13);
+    const limit = Math.max(
+      1,
+      Math.min(60, Number(process.env.TREND_RADAR_IMAGE_HOURLY_LIMIT) || 20),
+    );
+    try {
+      await usage.findOneAndUpdate(
+        { key: windowKey, count: { $lt: limit } },
+        {
+          $inc: { count: 1 },
+          $setOnInsert: { expiresAt: new Date(Date.now() + 2 * 3600000) },
+        },
+        { upsert: true },
+      );
+    } catch (e) {
+      if (e && typeof e === "object" && "code" in e && e.code === 11000)
+        throw new ModuleError(
+          "Local image-generation hourly budget reached. Try next hour or adjust TREND_RADAR_IMAGE_HOURLY_LIMIT.",
+          429,
+        );
+      throw e;
+    }
     if (config.provider === "openai") {
       const body = {
         model: config.model,
