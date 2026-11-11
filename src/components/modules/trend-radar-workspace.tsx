@@ -6,7 +6,7 @@ import { Copy, Empty, Feedback, Section } from "./shared";
 import { readLocalAssets, saveLocalAssets } from "@/lib/trend-radar/local-media";
 import { inspectOwnedAudioTrack, type TrackInspection } from "@/lib/trend-radar/media-inspect";
 type Dashboard = {
-  stories: RadarStory[]; projects: RadarProject[]; checkedAt: string | null;
+  stories: RadarStory[]; manualReferences: RadarStory[]; projects: RadarProject[]; checkedAt: string | null;
   attemptedAt: string | null; failures: string[];
   connected: { rss: boolean; youtube: boolean; ai: boolean; x: boolean };
   ranking: string;
@@ -56,6 +56,7 @@ export default function TrendRadarWorkspace() {
   const [environmentTag, setEnvironmentTag] = useState("");
   const [captions, setCaptions] = useState<Record<string, string>>({});
   const [status, setStatus] = useState<RadarStatus>("Discovered");
+  const [archived, setArchived] = useState(false);
   const [notes, setNotes] = useState("");
   const [publishedUrls, setPublishedUrls] = useState("");
   const [savedId, setSavedId] = useState("");
@@ -98,7 +99,7 @@ export default function TrendRadarWorkspace() {
     setClips([]); setClip(undefined); setClipReport("");
     setAssignments(initialAssignments.map((a) => ({ ...a })));
     setCaptions(captionDrafts(story));
-    setStatus("Discovered"); setNotes(""); setPublishedUrls("");
+    setStatus("Discovered"); setArchived(false); setNotes(""); setPublishedUrls("");
     setSavedId(""); setEnvironmentTag(""); setPreviewId("");
     setLocalVideo(""); setLocalVideoName(""); setLocalVideoFile(undefined); setLocalImages({}); setStoredAssets([]); setLocalDuration(undefined); setLocalDimensions(""); setAudioInspection({ audioTrack: "unknown", reason: "Media not inspected." }); setMediaError("");
   }
@@ -108,7 +109,7 @@ export default function TrendRadarWorkspace() {
     setAssignments(project.assignments.length ? project.assignments : initialAssignments);
     setEnvironmentTag(project.environmentTag || "");
     setCaptions(project.captions);
-    setStatus(project.status);
+    setStatus(project.status); setArchived(project.archived);
     setNotes(project.notes);
     setPublishedUrls(project.publishedUrls.join("\n"));
     setSavedId(project.id);
@@ -206,6 +207,16 @@ export default function TrendRadarWorkspace() {
           </select>
           <button className="secondary" type="submit" disabled={!!busy}>Add source</button>
         </form>
+        {!!dashboard?.manualReferences?.length && (
+          <div className="radar-manual-references">
+            <h3>Manually added references · publication date unverified</h3>
+            <div className="radar-projects">{dashboard.manualReferences.map((story) => (
+              <button key={story.id} type="button" className="secondary radar-project" onClick={() => chooseStory(story)}>
+                <strong>{story.title}</strong><span>Source not checked · {story.sources[0]?.publisher}</span>
+              </button>
+            ))}</div>
+          </div>
+        )}
       </Section>
       <Section title="Your saved video projects">
         {!dashboard?.projects?.length ? <Empty>No saved projects yet.</Empty> : (
@@ -277,7 +288,7 @@ export default function TrendRadarWorkspace() {
                 const file = e.currentTarget.files?.[0];
                 setLocalVideo(""); setLocalVideoName(""); setLocalVideoFile(undefined); setLocalDuration(undefined); setLocalDimensions(""); setAudioInspection({ audioTrack: "unknown", reason: "Media not inspected." }); setMediaError("");
                 if (!file) return;
-                if (file.size > 120 * 1024 * 1024) { setMediaError("Local preview file exceeds 120 MB."); return; }
+                if (file.size > 80 * 1024 * 1024) { setMediaError("Local preview file exceeds the 80 MB local-storage limit."); return; }
                 setLocalVideo(URL.createObjectURL(file)); setLocalVideoName(file.name); setLocalVideoFile(file);
                 void inspectOwnedAudioTrack(file).then(setAudioInspection);
               }} />
@@ -357,10 +368,13 @@ export default function TrendRadarWorkspace() {
               <label className="radar-inline-label">Production notes / performance
                 <textarea value={notes} maxLength={4000} rows={3} onChange={(e) => setNotes(e.target.value)} placeholder="What happened, what worked, and what to improve" />
               </label>
+              <label className="radar-inline-label">
+                <span><input aria-label="Archive this project" type="checkbox" checked={archived} onChange={(e) => setArchived(e.target.checked)} /> Archive this project (keep history)</span>
+              </label>
               <button type="button" className="primary" disabled={!!busy} onClick={() => void run("Saving project", async () => {
                 if (localVideoFile && localDuration === undefined) throw new Error("The uploaded video must be between 1 and 15 seconds before saving.");
                 const saved = await request<RadarProject>({
-                  action: "save", id: savedId || undefined, story: selected, clip: clip || null,
+                  action: "save", id: savedId || undefined, story: selected, clip: clip || null, archived,
                   manualVideoUrl: "", assignments, environmentTag, captions, status, notes,
                   publishedUrls: publishedUrls.split("\n").map((v) => v.trim()).filter(Boolean),
                   mediaNote: localVideoName ? "Browser-local source: " + localVideoName + ". File not uploaded or synced." : "",
