@@ -75,7 +75,7 @@ test("character replacement assigns unique image tags without altering scene sem
     { role: "person 1", imageTag: "@Image1", imageFilename: "" },
     { role: "person 2", imageTag: "@Image1", imageFilename: "" },
   ]), /distinct role/);
-  assert.throws(() => klingReplacementPrompt([], ""), /1–10/);
+  assert.throws(() => klingReplacementPrompt([], ""), /1–11/);
   assert.throws(() => klingReplacementPrompt([
     { role: "person 1", imageTag: "@Image1", imageFilename: "" },
   ], "@Image1"), /separate/);

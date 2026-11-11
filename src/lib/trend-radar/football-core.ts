@@ -21,7 +21,7 @@ export type PlayedPerson = {
   teamName: string;
   position: string;
   minutes: number;
-  started: boolean;
+  started: boolean | null;
   rating: number | null;
   findings: string[];
   qualifies: boolean;
@@ -30,7 +30,10 @@ export type PlayedPerson = {
 export type MatchCastReport = {
   fixtureId: number;
   checkedAt: string;
-  startingXI: { team: string; people: { id: number; name: string; position: string }[] }[];
+  startingXI: {
+    team: string;
+    people: { id: number; name: string; position: string }[];
+  }[];
   managers: { team: string; id: number; name: string }[];
   substitutions: PlayedPerson[];
   played: PlayedPerson[];
@@ -38,7 +41,10 @@ export type MatchCastReport = {
   unavailable: string[];
   source: string;
 };
-export function classifyHumiliation(fixture: unknown, now = Date.now()): HumiliationFixture | null {
+export function classifyHumiliation(
+  fixture: unknown,
+  now = Date.now(),
+): HumiliationFixture | null {
   if (!fixture || typeof fixture !== "object") return null;
   const x = fixture as Record<string, unknown>;
   const info = x.fixture as Record<string, unknown> | undefined;
@@ -48,38 +54,82 @@ export function classifyHumiliation(fixture: unknown, now = Date.now()): Humilia
   const kickoff = typeof info?.date === "string" ? info.date : "";
   const date = Date.parse(kickoff);
   const code = (info?.status as Record<string, unknown> | undefined)?.short;
-  const home = teams?.home, away = teams?.away;
-  const h = goals?.home, a = goals?.away;
+  const home = teams?.home,
+    away = teams?.away;
+  const h = goals?.home,
+    a = goals?.away;
   const id = Number(info?.id);
-  if (!Number.isInteger(id) || id <= 0 || !Number.isFinite(date) || date > now ||
-      !["FT", "AET"].includes(String(code)) ||
-      !Number.isInteger(Number(h)) || !Number.isInteger(Number(a)) ||
-      !Number.isInteger(Number(home?.id)) || !Number.isInteger(Number(away?.id))) return null;
+  if (
+    !Number.isInteger(id) ||
+    id <= 0 ||
+    !Number.isFinite(date) ||
+    date > now ||
+    !["FT", "AET"].includes(String(code)) ||
+    typeof h !== "number" ||
+    typeof a !== "number" ||
+    h < 0 ||
+    a < 0 ||
+    h > 30 ||
+    a > 30 ||
+    !Number.isInteger(h) ||
+    !Number.isInteger(a) ||
+    !Number.isInteger(home?.id) ||
+    Number(home?.id) <= 0 ||
+    !Number.isInteger(away?.id) ||
+    Number(away?.id) <= 0 ||
+    home?.id === away?.id
+  )
+    return null;
   const diff = Math.abs(Number(h) - Number(a));
   // A 3-goal margin is meaningful evidence; never label a close defeat embarrassing.
   if (diff < 3) return null;
   const loser = Number(h) < Number(a) ? home : away;
   const winner = Number(h) > Number(a) ? home : away;
   if (!loser || !winner) return null;
-  const loserTeam = { id: Number(loser.id), name: String(loser.name || "Unknown team") };
-  const winnerTeam = { id: Number(winner.id), name: String(winner.name || "Unknown team") };
+  const loserTeam = {
+    id: Number(loser.id),
+    name: String(loser.name || "Unknown team"),
+  };
+  const winnerTeam = {
+    id: Number(winner.id),
+    name: String(winner.name || "Unknown team"),
+  };
   return {
-    id, kickoff, league: String(league?.name || "Competition"),
+    id,
+    kickoff,
+    league: String(league?.name || "Competition"),
     home: { id: Number(home!.id), name: String(home!.name || "Home") },
     away: { id: Number(away!.id), name: String(away!.name || "Away") },
-    homeGoals: Number(h), awayGoals: Number(a), loser: loserTeam, winner: winnerTeam,
-    margin: diff, reason: loserTeam.name + " lost " + h + "–" + a +
-      " (home–away) to " + winnerTeam.name + ". Goal margin: " + diff +
+    homeGoals: Number(h),
+    awayGoals: Number(a),
+    loser: loserTeam,
+    winner: winnerTeam,
+    margin: diff,
+    reason:
+      loserTeam.name +
+      " lost " +
+      h +
+      "–" +
+      a +
+      " (home–away) to " +
+      winnerTeam.name +
+      ". Goal margin: " +
+      diff +
       ". Match score alone does NOT show individual poor performances.",
-    level: "heavy defeat", source: "API-Football",
+    level: "heavy defeat",
+    source: "API-Football",
   };
 }
 function statsNumber(v: unknown): number | null {
   if (typeof v === "number" && Number.isFinite(v)) return v;
-  if (typeof v === "string" && v.trim() && Number.isFinite(Number(v))) return Number(v);
+  if (typeof v === "string" && v.trim() && Number.isFinite(Number(v)))
+    return Number(v);
   return null;
 }
-export function playerEvidence(response: unknown, losingTeamId: number): PlayedPerson[] {
+export function playerEvidence(
+  response: unknown,
+  losingTeamId: number,
+): PlayedPerson[] {
   if (!Array.isArray(response)) return [];
   const persons: PlayedPerson[] = [];
   for (const team of response.slice(0, 2)) {
@@ -92,12 +142,24 @@ export function playerEvidence(response: unknown, losingTeamId: number): PlayedP
       if (!entry || typeof entry !== "object") continue;
       const row = entry as Record<string, unknown>;
       const player = row.player as Record<string, unknown> | undefined;
-      const block = Array.isArray(row.statistics) ? row.statistics[0] as Record<string, unknown> | undefined : undefined;
+      const block = Array.isArray(row.statistics)
+        ? (row.statistics[0] as Record<string, unknown> | undefined)
+        : undefined;
       const games = block?.games as Record<string, unknown> | undefined;
       const minutes = statsNumber(games?.minutes) || 0;
       const playerId = statsNumber(player?.id);
-      if (!playerId || minutes <= 0) continue; // never recommend bench players who did not enter
-      const rating = statsNumber(games?.rating);
+      if (
+        !playerId ||
+        !Number.isInteger(playerId) ||
+        minutes <= 0 ||
+        minutes > 150
+      )
+        continue; // never recommend bench players who did not enter
+      const rawRating = statsNumber(games?.rating);
+      const rating =
+        rawRating !== null && rawRating >= 0 && rawRating <= 10
+          ? rawRating
+          : null;
       const cards = block?.cards as Record<string, unknown> | undefined;
       const penalty = block?.penalty as Record<string, unknown> | undefined;
       const goals = block?.goals as Record<string, unknown> | undefined;
@@ -110,19 +172,28 @@ export function playerEvidence(response: unknown, losingTeamId: number): PlayedP
         const missed = statsNumber(penalty?.missed) || 0;
         if (missed > 0) findings.push("Penalty missed: " + missed);
         const ownGoals = statsNumber(goals?.own);
-        if (ownGoals !== null && ownGoals > 0) findings.push("Own goal: " + ownGoals);
+        if (ownGoals !== null && ownGoals > 0)
+          findings.push("Own goal: " + ownGoals);
       }
       persons.push({
-        id: playerId, name: String(player?.name || "Unknown player"),
-        teamId, teamName: String(teamInfo?.name || "Team"),
-        position: String(games?.position || "Unknown"), minutes,
-        started: games?.substitute === false,
-        rating, findings, qualifies: teamId === losingTeamId && findings.length > 0,
+        id: playerId,
+        name: String(player?.name || "Unknown player"),
+        teamId,
+        teamName: String(teamInfo?.name || "Team"),
+        position: String(games?.position || "Unknown"),
+        minutes,
+        started:
+          typeof games?.substitute === "boolean" ? !games.substitute : null,
+        rating,
+        findings,
+        qualifies: teamId === losingTeamId && findings.length > 0,
         source: "API-Football players statistics",
       });
     }
   }
-  return persons.sort((a, b) => a.teamId - b.teamId || (a.rating ?? 99) - (b.rating ?? 99));
+  return persons.sort(
+    (a, b) => a.teamId - b.teamId || (a.rating ?? 99) - (b.rating ?? 99),
+  );
 }
 export function scoringForOpportunity(input: {
   storyFreshness: number;
@@ -133,9 +204,21 @@ export function scoringForOpportunity(input: {
 }): { score: number; reasons: string[] } {
   const reasons: string[] = [];
   let score = Math.max(0, Math.min(30, input.storyFreshness));
-  if (input.verifiedMatch) { score += 25; reasons.push("Scoreline verified by football data provider"); }
-  if (input.clipVerified) { score += 20; reasons.push("1–15s comedy template duration verified"); }
-  if (input.rightsApproved) { score += 20; reasons.push("Owner-confirmed authorized reuse"); }
-  if (input.eligibleCast > 0) { score += 5; reasons.push("Played characters with documented performance evidence"); }
+  if (input.verifiedMatch) {
+    score += 25;
+    reasons.push("Scoreline verified by football data provider");
+  }
+  if (input.clipVerified) {
+    score += 20;
+    reasons.push("1–15s comedy template duration verified");
+  }
+  if (input.rightsApproved) {
+    score += 20;
+    reasons.push("Owner-confirmed authorized reuse");
+  }
+  if (input.eligibleCast > 0) {
+    score += 5;
+    reasons.push("Played characters with documented performance evidence");
+  }
   return { score, reasons };
 }
