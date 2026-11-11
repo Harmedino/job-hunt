@@ -8,6 +8,7 @@ import { inspectOwnedAudioTrack, type TrackInspection } from "@/lib/trend-radar/
 import FootballHumiliationPanel from "./football-humiliation-panel";
 import ComedyTemplateLibrary from "./trend-radar-comedy-library";
 import StoryVideoOptions from "./trend-radar-story-videos";
+import TrendXResearch from "./trend-radar-x-research";
 import CharacterImageGenerator from "./trend-radar-image-generator";
 import { downloadKlingPackage } from "@/lib/trend-radar/export";
 import type { ImageApproval } from "@/lib/trend-radar/image-policy";
@@ -228,6 +229,7 @@ export default function TrendRadarWorkspace() {
           ))}
         </div>
       </Section>
+      <TrendXResearch onPick={chooseStory} />
       <Section title="Add a story from X or another source">
         <p className="module-note">Paste a source link and supply its headline. The link is saved as an unverified manual reference; Trend Radar does not claim to have read X posts.</p>
         <form className="radar-manual" onSubmit={(e) => { e.preventDefault(); void run("Adding source", async () => {
