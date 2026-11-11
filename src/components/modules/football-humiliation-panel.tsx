@@ -1,7 +1,8 @@
 "use client";
 import { useEffect, useState } from "react";
 import type { HumiliationFixture, MatchCastReport, PlayedPerson } from "@/lib/trend-radar/football-core";
-import type { RadarStory } from "@/lib/trend-radar/core";
+import type { RadarStory, RadarClip } from "@/lib/trend-radar/core";
+import StoryVideoOptions from "./trend-radar-story-videos";
 import { Section } from "./shared";
 type Result = { fixtures: HumiliationFixture[]; checkedAt: string | null; errors: string[]; connected: boolean };
 async function api<T>(body: Record<string, unknown> | null, hours = 24): Promise<T> {
@@ -26,10 +27,12 @@ export function fixtureAsStory(fixture: HumiliationFixture): RadarStory {
   };
 }
 export default function FootballHumiliationPanel({
-  hours, onPick,
+  hours, onPick, onVideoPick, youtubeEnabled,
 }: {
   hours: number;
   onPick: (story: RadarStory, cast: { role: string; identity: string; characterId: string }[]) => void;
+  onVideoPick: (story: RadarStory, clip: RadarClip) => void;
+  youtubeEnabled: boolean;
 }) {
   const [data, setData] = useState<Result>();
   const [error, setError] = useState("");
@@ -82,13 +85,14 @@ export default function FootballHumiliationPanel({
       {busy && <p role="status" className="module-note">{busy}…</p>}
       {data?.connected && !data.fixtures.length && <p className="module-note">No verified heavy defeats found in this window. This is common during an international break, or when the provider does not cover the matches. No scorelines will be invented.</p>}
       <div className="radar-results">
-        {(data?.fixtures || []).slice(0, 10).map((match) => (
+        {(data?.fixtures || []).slice(0, 10).map((match, index) => (
           <article className={"radar-match-card " + (selected?.id === match.id ? "chosen" : "")} key={match.id}>
             <p className="radar-match-label">{match.league} · {new Date(match.kickoff).toLocaleString()}</p>
             <strong>{match.home.name} {match.homeGoals}–{match.awayGoals} {match.away.name}</strong>
             <p>{match.loser.name} lost by {match.margin} goals. Verified completed result.</p>
             <small>Fixture #{match.id} · <a target="_blank" rel="noopener noreferrer" href="https://www.api-football.com/">API-Football source</a></small>
             <button className="primary" type="button" disabled={!!busy} onClick={() => void pick(match)}>Inspect players / Comedy Cast</button>
+            <StoryVideoOptions story={fixtureAsStory(match)} active={index < 3 && youtubeEnabled} onSelect={onVideoPick} />
           </article>
         ))}
       </div>
