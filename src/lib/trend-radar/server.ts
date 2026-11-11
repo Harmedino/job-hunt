@@ -222,6 +222,10 @@ export async function saveRadarProject(body: Record<string, unknown>): Promise<R
     role: text(a.role, 80, "character role"),
     imageTag: text(a.imageTag, 20, "image tag"),
     imageFilename: text(a.imageFilename || "", 200, "image filename"),
+    characterId: text(a.characterId || a.imageTag, 80, "character ID"),
+    identity: text(a.identity || "", 120, "character identity"),
+    description: text(a.description || "", 500, "character description"),
+    outfit: text(a.outfit || "", 300, "character outfit"),
   })) : current?.assignments || [];
   if (assignments.length > 10) throw new ModuleError("Use up to ten character assignments.");
   let prompt = "";
@@ -239,8 +243,15 @@ export async function saveRadarProject(body: Record<string, unknown>): Promise<R
   if (manualVideoUrl) checkedUrl(manualVideoUrl);
   const publishedUrls = Array.isArray(body.publishedUrls) ?
     body.publishedUrls.slice(0, 12).map((u: unknown) => checkedUrl(u)) : current?.publishedUrls || [];
+  const approvedImages = Array.isArray(body.approvedImages) ? body.approvedImages.slice(0, 10).map((a: Record<string, unknown>) => ({
+    characterId: text(a.characterId, 80, "approved character"), imageTag: text(a.imageTag, 20, "approved image tag"),
+    filename: text(a.filename, 200, "approved image filename"), mime: text(a.mime, 50, "image mime"),
+    prompt: text(a.prompt, 6000, "image prompt"), style: text(a.style, 80, "image style"),
+    provider: text(a.provider, 40, "image provider"), model: text(a.model, 100, "image model"),
+    approvedAt: text(a.approvedAt, 40, "approval time"),
+  })) : current?.approvedImages || [];
   const project: RadarProject = {
-    id, story, clip, manualVideoUrl, assignments,
+    id, story, clip, manualVideoUrl, assignments, approvedImages,
     environmentTag: text(body.environmentTag || "", 20, "environment tag"),
     prompt, captions, status, publishedUrls,
     notes: text(body.notes || current?.notes || "", 4000, "notes"),
