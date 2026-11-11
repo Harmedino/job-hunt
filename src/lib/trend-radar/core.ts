@@ -89,7 +89,9 @@ export function sameStory(a: string, b: string): boolean {
   return overlap >= 4 && overlap / union >= 0.72;
 }
 export function storyScore(story: RadarStory, now = Date.now()): number {
-  const ageHours = Math.max(0, (now - Date.parse(story.publishedAt)) / 3600000);
+  const published = Date.parse(story.publishedAt);
+  if (!Number.isFinite(published)) return 0;
+  const ageHours = Math.max(0, (now - published) / 3600000);
   const freshness = Math.max(0, 60 - ageHours * 2.1);
   const importance = story.category === "Football" ? 22 :
     story.category === "Entertainment" ? 19 : story.category === "Technology" ? 15 : 10;
@@ -107,6 +109,7 @@ export function headlineNameMentions(headline: string): string[] {
   return [...new Set(phrases)].filter((p) => !excluded.has(p)).slice(0, 5);
 }
 export function opportunityReason(story: RadarStory): string {
+  if (story.id.startsWith("manual:")) return "Manually supplied reference. Publication time, content, identities and popularity have not been independently verified. Consider an entirely fictional reaction scene.";
   const idea = story.category === "Football"
     ? "A fictional dressing-room reaction or coach-and-player exchange might fit."
     : story.category === "Entertainment"
