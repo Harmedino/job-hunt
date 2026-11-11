@@ -48,6 +48,7 @@ export default function TrendRadarWorkspace() {
   const [notice, setNotice] = useState("");
   const [selected, setSelected] = useState<RadarStory>();
   const [clips, setClips] = useState<RadarClip[]>([]);
+  const [ideas, setIdeas] = useState<{ concept: string; sceneSearch: string; reason: string }[]>([]);
   const [search, setSearch] = useState("");
   const [clip, setClip] = useState<RadarClip>();
   const [clipReport, setClipReport] = useState("");
@@ -96,7 +97,7 @@ export default function TrendRadarWorkspace() {
   function chooseStory(story: RadarStory) {
     setSelected(story);
     setSearch(storySearch(story));
-    setClips([]); setClip(undefined); setClipReport("");
+    setClips([]); setIdeas([]); setClip(undefined); setClipReport("");
     setAssignments(initialAssignments.map((a) => ({ ...a })));
     setCaptions(captionDrafts(story));
     setStatus("Discovered"); setArchived(false); setNotes(""); setPublishedUrls("");
@@ -236,7 +237,19 @@ export default function TrendRadarWorkspace() {
             <div className="radar-studio-main">
               <h3>1. Selected story</h3>
               <p><strong>{selected.title}</strong></p>
-              <p className="module-note">Confirmed source: {selected.sources.map((s) => s.publisher).join(", ")}. Parody actions are fictional, not factual footage.</p>
+              <p className="module-note">Source reference: {selected.sources.map((s) => s.publisher).join(", ")}. Parody actions are fictional, not factual footage. Manual sources remain unverified.</p>
+              <div className="module-actions">
+                <button className="secondary" type="button" disabled={!!busy || !dashboard?.connected.ai} onClick={() => void run("Generating fictional comedy concepts", async () => {
+                  const output = await request<{ ideas: { concept: string; sceneSearch: string; reason: string }[]; captions: Record<string, string>; provenance: string }>({ action: "creative", story: selected });
+                  setIdeas(output.ideas); setCaptions(output.captions); setNotice(output.provenance);
+                })}>AI: suggest 3 comedy scenes + fresh captions</button>
+                {!dashboard?.connected.ai && <small>Optional: configure your existing Gemini/OpenAI key for AI brainstorming. Manual workflow works without it.</small>}
+              </div>
+              {!!ideas.length && <div className="radar-idea-grid">{ideas.map((idea, i) => (
+                <div key={i} className="radar-idea"><b>{idea.concept}</b><p>{idea.reason}</p>
+                  <button className="secondary" type="button" onClick={() => setSearch(idea.sceneSearch)}>Search clips for: {idea.sceneSearch}</button>
+                </div>
+              ))}</div>}
               <h3>2. Find a suitable 1–15 second clip</h3>
               <p className="module-note">Reuse the existing official YouTube search integration. Duration is verified using ISO 8601 metadata; dialogue, visible people, portrait aspect and reuse rights are UNKNOWN until independently checked.</p>
               <div className="module-actions" aria-label="Suggested scene searches">
