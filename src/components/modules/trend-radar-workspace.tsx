@@ -11,7 +11,7 @@ import StoryVideoOptions from "./trend-radar-story-videos";
 import CharacterImageGenerator from "./trend-radar-image-generator";
 import { downloadKlingPackage } from "@/lib/trend-radar/export";
 import type { ImageApproval } from "@/lib/trend-radar/image-policy";
-import type { ComedyTemplate } from "@/lib/trend-radar/comedy-library";
+import type { ComedyTemplate } from "@/lib/trend-radar/comedy-core";
 type Dashboard = {
   stories: RadarStory[]; manualReferences: RadarStory[]; projects: RadarProject[]; checkedAt: string | null;
   attemptedAt: string | null; failures: string[];
