@@ -14,7 +14,9 @@ import { downloadKlingPackage } from "@/lib/trend-radar/export";
 import type { ImageApproval } from "@/lib/trend-radar/image-policy";
 import type { ComedyTemplate } from "@/lib/trend-radar/comedy-core";
 type Dashboard = {
-  stories: RadarStory[]; manualReferences: RadarStory[]; projects: RadarProject[]; checkedAt: string | null;
+  stories: RadarStory[]; manualReferences: RadarStory[]; projects: RadarProject[];
+  notifications?: { id: string; title: string; category: string; sourceUrl: string; notifiedAt: string }[];
+  checkedAt: string | null;
   attemptedAt: string | null; failures: string[];
   connected: { rss: boolean; youtube: boolean; ai: boolean; x: boolean };
   ranking: string;
@@ -191,6 +193,7 @@ export default function TrendRadarWorkspace() {
         <span>Last successful news check: {dashboard?.checkedAt ? shortDate(dashboard.checkedAt) : "Not yet"}</span>
         <span>YouTube API: {dashboard?.connected.youtube ? "configured" : "not configured"}</span>
       </div>
+      {!!dashboard?.notifications?.length && <details className="module-notice"><summary>New source-backed opportunities · {dashboard.notifications.length} in the past 48 hours</summary><div className="radar-projects">{dashboard.notifications.map((item) => <a key={item.id} href={item.sourceUrl} target="_blank" rel="noopener noreferrer">{item.title} · {new Date(item.notifiedAt).toLocaleString()} ↗</a>)}</div></details>}
       {dashboard?.failures?.length ? (
         <p className="module-notice" role="status">Feed warnings: {dashboard.failures.join(" · ")}</p>
       ) : null}
