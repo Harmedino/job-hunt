@@ -103,7 +103,7 @@ export function headlineNameMentions(headline: string): string[] {
     "The Guardian", "BBC Sport", "Champions League", "Premier League",
     "United States", "World Cup", "Europa League", "Saudi Arabia",
   ]);
-  const phrases = headline.match(/\\b[A-Z][a-z]+(?:['’-][A-Z]?[a-z]+)?\\s+[A-Z][a-z]+(?:['’-][A-Z]?[a-z]+)?\\b/g) || [];
+  const phrases = headline.match(/\b[A-Z][a-z]+(?:['’-][A-Z]?[a-z]+)?\s+[A-Z][a-z]+(?:['’-][A-Z]?[a-z]+)?\b/g) || [];
   return [...new Set(phrases)].filter((p) => !excluded.has(p)).slice(0, 5);
 }
 export function opportunityReason(story: RadarStory): string {
