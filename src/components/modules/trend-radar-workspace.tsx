@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from "react";
 import type { RadarStory, RadarClip, RadarProject, RadarAssignment, RadarStatus } from "@/lib/trend-radar/core";
 import { klingReplacementPrompt, captionDrafts, radarStatuses } from "@/lib/trend-radar/core";
 import { Copy, Empty, Feedback, Section } from "./shared";
+import { readLocalAssets, saveLocalAssets } from "@/lib/trend-radar/local-media";
 type Dashboard = {
   stories: RadarStory[]; projects: RadarProject[]; checkedAt: string | null;
   attemptedAt: string | null; failures: string[];
@@ -25,8 +26,12 @@ const shortDate = (value: string) => value && Number.isFinite(Date.parse(value))
   ? new Date(value).toLocaleString() : "Unknown";
 function storySearch(story: RadarStory) {
   return story.category === "Football"
-    ? story.title.split(/\s+/).slice(0, 5).join(" ") + " funny reaction comedy"
-    : story.title.split(/\s+/).slice(0, 5).join(" ") + " funny reaction";
+    ? "football coach funny celebration reaction 10 seconds"
+    : story.category === "Entertainment"
+      ? "two people funny awkward argument 10 seconds"
+      : story.category === "Technology"
+        ? "funny surprised office meeting reaction 10 seconds"
+        : "three people funny conversation reaction 10 seconds";
 }
 const initialAssignments: RadarAssignment[] = [
   { role: "the main character", imageTag: "@Image1", imageFilename: "" },
@@ -58,6 +63,9 @@ export default function TrendRadarWorkspace() {
   const [manualCategory, setManualCategory] = useState("Football");
   const [localVideo, setLocalVideo] = useState("");
   const [localVideoName, setLocalVideoName] = useState("");
+  const [localVideoFile, setLocalVideoFile] = useState<File>();
+  const [localImages, setLocalImages] = useState<Record<string, File>>({});
+  const [storedAssets, setStoredAssets] = useState<string[]>([]);
   const [localDuration, setLocalDuration] = useState<number>();
   const [mediaError, setMediaError] = useState("");
   const [previewId, setPreviewId] = useState("");
@@ -85,9 +93,9 @@ export default function TrendRadarWorkspace() {
     setCaptions(captionDrafts(story));
     setStatus("Discovered"); setNotes(""); setPublishedUrl("");
     setSavedId(""); setEnvironmentTag(""); setPreviewId("");
-    setLocalVideo(""); setLocalVideoName(""); setLocalDuration(undefined); setMediaError("");
+    setLocalVideo(""); setLocalVideoName(""); setLocalVideoFile(undefined); setLocalImages({}); setStoredAssets([]); setLocalDuration(undefined); setMediaError("");
   }
-  function resume(project: RadarProject) {
+  async function resume(project: RadarProject) {
     chooseStory(project.story);
     setClip(project.clip);
     setAssignments(project.assignments.length ? project.assignments : initialAssignments);
@@ -98,6 +106,18 @@ export default function TrendRadarWorkspace() {
     setPublishedUrl(project.publishedUrls[0] || "");
     setSavedId(project.id);
     setManualUrl(project.manualVideoUrl || "");
+    try {
+      const assets = await readLocalAssets(project.id);
+      setStoredAssets(assets.map((a) => a.role));
+      const video = assets.find((a) => a.role === "video");
+      if (video) {
+        setLocalVideo(URL.createObjectURL(video.blob));
+        setLocalVideoName(video.filename);
+        setNotice("Local media restored from this browser. Other devices do not have these files.");
+      } else if (project.mediaNote) {
+        setNotice("This project has media notes but no video stored in this browser; supply the original owned file again.");
+      }
+    } catch { setNotice("Local media could not be loaded; saved research and captions remain available."); }
   }
   const prompt = (() => {
     try { return klingReplacementPrompt(assignments, environmentTag); }
@@ -183,7 +203,7 @@ export default function TrendRadarWorkspace() {
         {!dashboard?.projects?.length ? <Empty>No saved projects yet.</Empty> : (
           <div className="radar-projects">
             {dashboard.projects.map((project) => (
-              <button key={project.id} type="button" className="secondary radar-project" onClick={() => resume(project)}>
+              <button key={project.id} type="button" className="secondary radar-project" onClick={() => void resume(project)}>
                 <strong>{project.story.title}</strong>
                 <span>{project.status} · {shortDate(project.updatedAt)} {project.archived ? "· Archived" : ""}</span>
               </button>
@@ -200,6 +220,11 @@ export default function TrendRadarWorkspace() {
               <p className="module-note">Confirmed source: {selected.sources.map((s) => s.publisher).join(", ")}. Parody actions are fictional, not factual footage.</p>
               <h3>2. Find a suitable 1–15 second clip</h3>
               <p className="module-note">Reuse the existing official YouTube search integration. Duration is verified using ISO 8601 metadata; dialogue, visible people, portrait aspect and reuse rights are UNKNOWN until independently checked.</p>
+              <div className="module-actions" aria-label="Suggested scene searches">
+                {["two people arguing funny 10 seconds", "three people dancing celebration 10 seconds", "awkward funny interview 10 seconds"].map((query) => (
+                  <button key={query} type="button" className="secondary" onClick={() => setSearch(query)}>{query}</button>
+                ))}
+              </div>
               <form className="radar-clip-form" onSubmit={(e) => { e.preventDefault(); void run("Searching short videos", async () => {
                 const result = await request<{ clips: RadarClip[]; searched: number; rejectedByDuration: number; note: string }>({
                   action: "clips", query: search, maxSeconds,
@@ -239,13 +264,13 @@ export default function TrendRadarWorkspace() {
                 ))}
               </div>
               <h3>3. Optional authorized local video preview</h3>
-              <p className="module-note">Select a video you own or may legally edit. This local-only preview is not uploaded or saved. Duration and dimensions can be checked through the browser; audio, speech, people count and licensing are not automatically certified.</p>
+              <p className="module-note">Select a video you own or may legally edit. You can save it on this browser using private IndexedDB storage; it is never uploaded to Launchpad, is not synced between devices, and can be cleared with browser site data. Duration can be checked; speech, people and licensing remain unverified.</p>
               <input aria-label="Owned or licensed local video" type="file" accept="video/mp4,video/webm,video/quicktime" onChange={(e) => {
                 const file = e.currentTarget.files?.[0];
-                setLocalVideo(""); setLocalVideoName(""); setLocalDuration(undefined); setMediaError("");
+                setLocalVideo(""); setLocalVideoName(""); setLocalVideoFile(undefined); setLocalDuration(undefined); setMediaError("");
                 if (!file) return;
                 if (file.size > 120 * 1024 * 1024) { setMediaError("Local preview file exceeds 120 MB."); return; }
-                setLocalVideo(URL.createObjectURL(file)); setLocalVideoName(file.name);
+                setLocalVideo(URL.createObjectURL(file)); setLocalVideoName(file.name); setLocalVideoFile(file);
               }} />
               {localVideo && <div className="radar-local-media">
                 <video controls playsInline src={localVideo} onLoadedMetadata={(e) => {
@@ -265,14 +290,22 @@ export default function TrendRadarWorkspace() {
               {mediaError && <p role="alert" className="module-error">{mediaError}</p>}
               <p><strong>Chosen @Video1:</strong> {clip ? clip.title + " (" + clip.seconds + "s)" : localDuration !== undefined ? localVideoName + " (local file; not persisted)" : "None yet"}</p>
               <h3>4. Character replacement assignments</h3>
-              <p className="module-note">Assign every original person to a distinct image reference. Image filenames are remembered as notes; add actual images to Kling when you generate the video.</p>
+              <p className="module-note">Assign each original person a distinct reference image. Optional selected image files are saved privately in this browser when you save the project, not uploaded or sent to Kling.</p>
               {assignments.map((a, i) => (
                 <div className="radar-assignment" key={i}>
                   <input aria-label={"Original role " + (i + 1)} value={a.role} maxLength={80} onChange={(e) => setAssignments((prev) => prev.map((v, j) => j === i ? { ...v, role: e.target.value } : v))} />
                   <select aria-label={"Image tag " + (i + 1)} value={a.imageTag} onChange={(e) => setAssignments((prev) => prev.map((v, j) => j === i ? { ...v, imageTag: e.target.value } : v))}>
                     {Array.from({ length: 12 }, (_, j) => "@Image" + (j + 1)).map((v) => <option key={v}>{v}</option>)}
                   </select>
-                  <input aria-label={"Image filename " + (i + 1)} placeholder="Reference image filename" value={a.imageFilename} maxLength={200} onChange={(e) => setAssignments((prev) => prev.map((v, j) => j === i ? { ...v, imageFilename: e.target.value } : v))} />
+                  <div className="radar-image-field">
+                    <input aria-label={"Image filename " + (i + 1)} placeholder="Reference image filename" value={a.imageFilename} maxLength={200} onChange={(e) => setAssignments((prev) => prev.map((v, j) => j === i ? { ...v, imageFilename: e.target.value } : v))} />
+                    <input aria-label={"Select character image " + (i + 1)} type="file" accept="image/png,image/jpeg,image/webp,image/gif" onChange={(e) => {
+                      const file = e.currentTarget.files?.[0]; if (!file) return;
+                      setLocalImages((old) => ({ ...old, [a.imageTag]: file }));
+                      setAssignments((old) => old.map((v, j) => j === i ? { ...v, imageFilename: file.name } : v));
+                    }} />
+                    {storedAssets.includes(a.imageTag) && !localImages[a.imageTag] && <small>Saved in this browser</small>}
+                  </div>
                   {assignments.length > 1 && <button className="secondary" type="button" onClick={() => setAssignments((v) => v.filter((_, j) => j !== i))}>Remove</button>}
                 </div>
               ))}
@@ -309,15 +342,24 @@ export default function TrendRadarWorkspace() {
                 <textarea value={notes} maxLength={4000} rows={3} onChange={(e) => setNotes(e.target.value)} placeholder="What happened, what worked, and what to improve" />
               </label>
               <button type="button" className="primary" disabled={!!busy} onClick={() => void run("Saving project", async () => {
+                if (localVideoFile && localDuration === undefined) throw new Error("The uploaded video must be between 1 and 15 seconds before saving.");
                 const saved = await request<RadarProject>({
                   action: "save", id: savedId || undefined, story: selected, clip: clip || null,
                   manualVideoUrl: "", assignments, environmentTag, captions, status, notes,
                   publishedUrls: publishedUrl.trim() ? [publishedUrl.trim()] : [],
-                  mediaNote: localVideoName ? "Local source preview: " + localVideoName + ". File not uploaded or saved." : "",
+                  mediaNote: localVideoName ? "Browser-local source: " + localVideoName + ". File not uploaded or synced." : "",
                 });
                 setSavedId(saved.id);
+                const assets = Object.entries(localImages).map(([role, file]) => ({ role, file }));
+                if (localVideoFile) assets.push({ role: "video", file: localVideoFile });
+                let mediaSaved = false;
+                try {
+                  await saveLocalAssets(saved.id, assets);
+                  mediaSaved = true;
+                  if (assets.length) setStoredAssets((prior) => [...new Set([...prior, ...assets.map((a) => a.role)])]);
+                } catch (e) { setNotice("Project metadata saved, but media was NOT saved locally: " + (e instanceof Error ? e.message : "Storage unavailable.")); }
                 await load(hours);
-                setNotice("Project saved. Original local media must be supplied again when returning; only your research, metadata and prompt are stored.");
+                if (mediaSaved) setNotice(assets.length ? "Project and selected media saved on this browser only. Keep separate backups for Kling." : "Project saved. Existing browser-local media is unchanged.");
               })}>Save Trend Radar project</button>
             </div>
           </div>
