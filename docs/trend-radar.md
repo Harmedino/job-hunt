@@ -62,3 +62,14 @@ The module now prioritizes source-backed heavy defeats and actual previewable co
 
 Run `npm run typecheck`, `npm run lint`, `npm test`, `npm run build`, `npm run test:e2e`. Review the PR checks and smoke test the app in a browser. Production API keys and uploaded-file rights are not available in repository code; live provider success must be verified in the user's deployment. Do not claim that an image was generated or a real video was inspected when none has been provided.
 
+
+### Additional discovery and operating settings
+
+- Optional official public X recent-search: `X_BEARER_TOKEN`, with account permission for `GET /2/tweets/search/recent`. Without that permission the UI explicitly reports unavailable; no scraping or invented social metrics is used.
+- Football RSS includes BBC, Guardian, Sky Sports and The Athletic. RSS endpoints can change, redirect or block requests; the dashboard reports individual feed failures and keeps known source links instead of making up stories. Football scores never come from RSS alone when the optional fixtures provider is available.
+- `TREND_RADAR_SCHEDULED_REFRESH=true` opts into Trend Radar refresh using the **existing** protected daily `/api/cron` route. It does not add cron invocations or provide minute-by-minute monitoring. Set nothing to leave the integration off.
+- MongoDB `trend_radar_notifications` stores deduplicated **in-app** new-opportunity notices for recently published source-backed headlines. It does not send emails or push notifications.
+- `TREND_RADAR_IMAGE_PROVIDER=auto|openai|gemini` and `TREND_RADAR_IMAGE_MODEL` select a supported image-capable model. The existing text AI model setting does NOT guarantee image capabilities. Image generation can require provider billing/verification and returns explicit quota/access/model errors.
+- Where a story has a reusable browser-local authorized comedy template, its preview is shown before external YouTube references. A discovered YouTube video is a reference and not automatically a legally editable file.
+- The latest feature changes are intentionally on `feat/trend-radar-complete-studio` pending PR review and CI, not automatically deployed to master.
+
