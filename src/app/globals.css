@@ -3456,3 +3456,11 @@ footer > span {
  .radar .radar-caption {align-items:stretch;flex-direction:column}
  .radar .radar-story-grid,.radar .radar-clip-grid {grid-template-columns:minmax(0,1fr)}
 }
+
+.radar .radar-idea-grid {display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:11px;margin:13px 0}
+.radar .radar-idea {background:#f7faf6;border:1px solid #dce8dd;border-radius:10px;padding:13px;display:flex;flex-direction:column;gap:9px}
+.radar .radar-idea p {color:#647365;font-size:12px;line-height:1.6;margin:0}
+.radar .radar-idea button {white-space:normal;text-align:left}
+.radar .radar-image-field {display:flex;flex-direction:column;gap:5px;min-width:0}
+.radar .radar-image-field input {width:100%}
+.radar .radar-manual-references {padding-top:15px;margin-top:14px;border-top:1px solid var(--border)}
