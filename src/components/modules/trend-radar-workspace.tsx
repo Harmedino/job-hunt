@@ -194,7 +194,7 @@ export default function TrendRadarWorkspace() {
       {dashboard?.failures?.length ? (
         <p className="module-notice" role="status">Feed warnings: {dashboard.failures.join(" · ")}</p>
       ) : null}
-      <FootballHumiliationPanel hours={hours} onPick={(story, cast) => {
+      <FootballHumiliationPanel hours={hours} youtubeEnabled={!!dashboard?.connected.youtube} onVideoPick={chooseVideoStory} onPick={(story, cast) => {
         chooseStory(story);
         if (cast.length) setAssignments(cast.map((person, i) => ({
           role: person.role, identity: person.identity, characterId: person.characterId,
