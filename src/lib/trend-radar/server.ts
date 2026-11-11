@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { imageStyles, type CharacterImageStyle } from "./image-policy";
 import { aiJson, aiConnection } from "../ai";
 import { XMLParser } from "fast-xml-parser";
 import { db } from "../db";
@@ -12,6 +13,8 @@ import {
 } from "./core";
 const feeds: { name: string; category: RadarCategory; url: string }[] = [
   { name: "BBC Sport", category: "Football", url: "https://feeds.bbci.co.uk/sport/football/rss.xml" },
+  { name: "Sky Sports Football", category: "Football", url: "https://www.skysports.com/rss/11095" },
+  { name: "The Athletic Football", category: "Football", url: "https://www.nytimes.com/athletic/rss/football/" },
   { name: "The Guardian Football", category: "Football", url: "https://www.theguardian.com/football/rss" },
   { name: "BBC Entertainment", category: "Entertainment", url: "https://feeds.bbci.co.uk/news/entertainment_and_arts/rss.xml" },
   { name: "The Guardian Culture", category: "Entertainment", url: "https://www.theguardian.com/culture/rss" },
@@ -49,6 +52,7 @@ async function indexes() {
     database.collection("trend_radar_projects").createIndex({ owner: 1, id: 1 }, { unique: true }),
     database.collection("trend_radar_projects").createIndex({ owner: 1, updatedAt: -1 }),
     database.collection("trend_radar_refresh").createIndex({ owner: 1, key: 1 }, { unique: true }),
+    database.collection("trend_radar_notifications").createIndex({ owner: 1, id: 1 }, { unique: true }),
   ]);
 }
 function newsItem(item: Record<string, unknown>, category: RadarCategory, feed: string, now: string): RadarStory | null {
@@ -109,8 +113,16 @@ async function fetchRefresh(force: boolean) {
   if (rows.length) {
     const clustered = mergeStories(rows);
     const col = database.collection("trend_radar_stories");
+    const notifications = database.collection("trend_radar_notifications");
     for (const story of clustered.slice(0, 160)) {
       const existing = await col.findOne(ownerFilter({ id: story.id }));
+      if (!existing && story.score >= 55 && Date.parse(story.publishedAt) > Date.now() - 24 * 3600000) {
+        await notifications.updateOne(ownerFilter({ id: story.id }), {
+          $setOnInsert: { owner: OWNER, id: story.id, title: story.title,
+            category: story.category, publishedAt: story.publishedAt,
+            sourceUrl: story.sources[0]?.url || "", notifiedAt: now },
+        }, { upsert: true });
+      }
       await col.updateOne(ownerFilter({ id: story.id }), {
         $set: { ...story, hidden: existing?.hidden === true, owner: OWNER },
       }, { upsert: true });
@@ -128,7 +140,7 @@ export async function radarDashboard(hours: unknown = 24, refresh = false) {
   if (refresh) await fetchRefresh(true);
   else await fetchRefresh(false);
   const database = await db();
-  const [stories, meta, projects] = await Promise.all([
+  const [stories, meta, projects, notifications] = await Promise.all([
     database.collection<RadarStory>("trend_radar_stories")
       .find(ownerFilter(), { projection: { _id: 0, owner: 0 } })
       .sort({ publishedAt: -1 }).limit(220).toArray(),
@@ -136,6 +148,9 @@ export async function radarDashboard(hours: unknown = 24, refresh = false) {
     database.collection<RadarProject>("trend_radar_projects")
       .find(ownerFilter(), { projection: { _id: 0, owner: 0 } })
       .sort({ updatedAt: -1 }).limit(100).toArray(),
+    database.collection("trend_radar_notifications")
+      .find(ownerFilter({ notifiedAt: { $gte: new Date(Date.now() - 48 * 3600000).toISOString() } }), { projection: { _id: 0, owner: 0 } })
+      .sort({ notifiedAt: -1 }).limit(12).toArray(),
   ]);
   const merged = mergeStories(stories.filter((story) => !story.id.startsWith("manual:")));
   const manualReferences = stories.filter((story) => story.id.startsWith("manual:") && !story.hidden).slice(0, 20);
@@ -144,7 +159,7 @@ export async function radarDashboard(hours: unknown = 24, refresh = false) {
   return {
     stories: visibleStories(filtered, windowHours), manualReferences,
     checkedAt: meta?.checkedAt || null, attemptedAt: meta?.attemptedAt || null,
-    failures: (meta?.failures || []) as string[], projects,
+    failures: (meta?.failures || []) as string[], projects, notifications,
     connected: { rss: true, youtube: !!process.env.YOUTUBE_API_KEY, ai: !!(process.env.GEMINI_API_KEY || process.env.OPENAI_API_KEY), x: false },
     ranking: "Editorial relevance, freshness and independently sourced reports; not measured social popularity.",
   };
@@ -222,6 +237,10 @@ export async function saveRadarProject(body: Record<string, unknown>): Promise<R
     role: text(a.role, 80, "character role"),
     imageTag: text(a.imageTag, 20, "image tag"),
     imageFilename: text(a.imageFilename || "", 200, "image filename"),
+    characterId: text(a.characterId || a.imageTag, 80, "character ID"),
+    identity: text(a.identity || "", 120, "character identity"),
+    description: text(a.description || "", 500, "character description"),
+    outfit: text(a.outfit || "", 300, "character outfit"),
   })) : current?.assignments || [];
   if (assignments.length > 10) throw new ModuleError("Use up to ten character assignments.");
   let prompt = "";
@@ -239,8 +258,18 @@ export async function saveRadarProject(body: Record<string, unknown>): Promise<R
   if (manualVideoUrl) checkedUrl(manualVideoUrl);
   const publishedUrls = Array.isArray(body.publishedUrls) ?
     body.publishedUrls.slice(0, 12).map((u: unknown) => checkedUrl(u)) : current?.publishedUrls || [];
+  const approvedImages = Array.isArray(body.approvedImages) ? body.approvedImages.slice(0, 10).map((a: Record<string, unknown>) => ({
+    characterId: text(a.characterId, 80, "approved character"), imageTag: text(a.imageTag, 20, "approved image tag"),
+    filename: text(a.filename, 200, "approved image filename"), mime: text(a.mime, 50, "image mime"),
+    prompt: text(a.prompt, 6000, "image prompt"), style: (() => { const value = text(a.style, 80, "image style");
+      if (!(imageStyles as readonly string[]).includes(value)) throw new ModuleError("Invalid approved image style.");
+      return value as CharacterImageStyle; })(),
+    provider: text(a.provider, 40, "image provider"), model: text(a.model, 100, "image model"),
+    approvedAt: text(a.approvedAt, 40, "approval time"),
+  })) : current?.approvedImages || [];
   const project: RadarProject = {
-    id, story, clip, manualVideoUrl, assignments,
+    id, story, clip, manualVideoUrl, assignments, approvedImages,
+    sceneDescription: text(body.sceneDescription || current?.sceneDescription || "", 500, "scene description"),
     environmentTag: text(body.environmentTag || "", 20, "environment tag"),
     prompt, captions, status, publishedUrls,
     notes: text(body.notes || current?.notes || "", 4000, "notes"),

@@ -1,3 +1,4 @@
+import { runTrendRadarSchedule } from "@/lib/trend-radar/schedule";
 import { syncApplicationReminders } from "@/lib/application-store";
 import { runModuleSchedule } from "@/lib/modules/workspace";
 import { runDiscovery } from "@/lib/run-discovery";
@@ -11,10 +12,11 @@ export async function GET(request: Request) {
   )
     return Response.json({ error: "Unauthorized" }, { status: 401 });
   try {
-    const [jobs, modules, reminders] = await Promise.allSettled([
+    const [jobs, modules, reminders, radar] = await Promise.allSettled([
       runDiscovery(),
       runModuleSchedule(),
       syncApplicationReminders(),
+      runTrendRadarSchedule(),
     ]);
     if (jobs.status === "rejected") return errorResponse(jobs.reason);
     const assistant = await runAssistantPreparation().catch(() => ({
@@ -28,6 +30,7 @@ export async function GET(request: Request) {
         reminders.status === "fulfilled"
           ? reminders.value
           : { error: "Application reminders unavailable." },
+      trendRadar: radar.status === "fulfilled" ? radar.value : { error: "Trend Radar scheduled refresh unavailable; nothing invented." },
       modules:
         modules.status === "fulfilled"
           ? modules.value

@@ -41,3 +41,35 @@ Run npm run typecheck, npm run lint, npm test, npm run build and npm run test:e2
 tests/trend-radar.test.ts covers strict ISO duration, unknown media qualities, headline merging, freshness, unique character tags and caption disclosure. Existing auth middleware protects /api/trend-radar; POST requires same-origin requests. No articles, YouTube files or real publishing operations are used in tests.
 
 Status: feature branch pending CI and browser review. Do not claim production acceptance before deploying and checking live feeds/search.
+
+## Football Humiliation Radar and real video studio (PR #14)
+
+The module now prioritizes source-backed heavy defeats and actual previewable comedy videos, not just news cards.
+
+- Optional fixture provider: API-Football. Set `API_FOOTBALL_KEY` (or `APISPORTS_KEY`) to enable completed-match 6/12/24/48-hour results. The server fetches at most three UTC dates per window, uses a 45-minute cache, and checks only finished fixtures. Heavy defeat = **3+ goal margin**; surprising narrow defeats are not inferred without opponent-quality evidence.
+- For each match the owner can fetch provider lineups, coach, player appearances/ratings and major recorded events. A player is suggested only if they **played** and a supplied rating <= 6.0 or an explicitly recorded match event supports it. An excellent player on a losing side is not automatically blamed. The absence of big-chance, error-to-goal, duel or opposition-strength data is explicitly unavailable. Some competitions have no lineup or rating coverage.
+- Official API docs: https://www.api-football.com/documentation_v3 . Existing API access may be suspended. No credentials means football data is **not available**, and source-backed RSS headline coverage remains.
+- Video previews: YouTube Data API video details are checked against exact ISO 8601 duration, **1–15 seconds**. Bounded one-to-three page searches (50 search results per page) with date/relevance sorting and rejection counts. At most a few top stories auto-request actual preview candidates, avoiding unlimited quota usage. Video findings are cached. Each YouTube search request costs quota and does **not** establish reuse rights or audible dialogue.
+- Personal owned-media library: local IndexedDB stores approved source video **bytes** and preserves original audio. Rights, manually listened-to speech/laughter, and performer count are **creator-confirmed**, not independently licensed or visually verified. Meta is stored separately in MongoDB. Browser site-data removal can delete the video bytes; back up originals.
+- Optional official X API recent post search: set `X_BEARER_TOKEN` with permission for v2 recent search. Returns provider-supplied timestamps and public metrics; no broad "trending" claim. With no API key, public X URLs can be recorded manually without claiming their content was read.
+- Character image generation: set existing `OPENAI_API_KEY` or `GEMINI_API_KEY`, optionally `TREND_RADAR_IMAGE_PROVIDER=openai|gemini` and `TREND_RADAR_IMAGE_MODEL` to a compatible image-capable model. Image requests really use the provider API and **verify image bytes**. A text-only model is not treated as an image. Supports an optional owner-supplied identity reference photo (max 4MB) and separate image per role. Provider quota, billing, permissions, policy and costs depend on the account; no connected API keys are accessible for live testing here.
+- Approved images are retained as **browser-local media** in IndexedDB; MongoDB stores exact image prompt and approval metadata. Regenerating a single character produces a draft until separately approved and does not overwrite others. Multiple independent image references map to stable character IDs even when people switch screen positions.
+- "Prepare for Kling" downloads a ZIP containing the owner's authorized original video, individually approved character images, manifest mapping, prompts, captions and AI-parody disclosure. A YouTube reference alone is **not** downloadable; the ZIP requires an authorized local source video. This tool does not generate videos on Kling.
+- The original concise Kling prompt structure remains unchanged and existing YouTube Research, Job Finder, Coding Bounties, CV Builder and Application Assistant features are not modified.
+- Video dialogue recognition, human tracking through complex crossings, automatic verified performer identification, universal player-error attribution, and direct Kling generation remain **not implemented**. Manual role and action entry remains available.
+
+### Acceptance and checks
+
+Run `npm run typecheck`, `npm run lint`, `npm test`, `npm run build`, `npm run test:e2e`. Review the PR checks and smoke test the app in a browser. Production API keys and uploaded-file rights are not available in repository code; live provider success must be verified in the user's deployment. Do not claim that an image was generated or a real video was inspected when none has been provided.
+
+
+### Additional discovery and operating settings
+
+- Optional official public X recent-search: `X_BEARER_TOKEN`, with account permission for `GET /2/tweets/search/recent`. Without that permission the UI explicitly reports unavailable; no scraping or invented social metrics is used.
+- Football RSS includes BBC, Guardian, Sky Sports and The Athletic. RSS endpoints can change, redirect or block requests; the dashboard reports individual feed failures and keeps known source links instead of making up stories. Football scores never come from RSS alone when the optional fixtures provider is available.
+- `TREND_RADAR_SCHEDULED_REFRESH=true` opts into Trend Radar refresh using the **existing** protected daily `/api/cron` route. It does not add cron invocations or provide minute-by-minute monitoring. Set nothing to leave the integration off.
+- MongoDB `trend_radar_notifications` stores deduplicated **in-app** new-opportunity notices for recently published source-backed headlines. It does not send emails or push notifications.
+- `TREND_RADAR_IMAGE_PROVIDER=auto|openai|gemini` and `TREND_RADAR_IMAGE_MODEL` select a supported image-capable model. The existing text AI model setting does NOT guarantee image capabilities. Image generation can require provider billing/verification and returns explicit quota/access/model errors.
+- Where a story has a reusable browser-local authorized comedy template, its preview is shown before external YouTube references. A discovered YouTube video is a reference and not automatically a legally editable file.
+- The latest feature changes are intentionally on `feat/trend-radar-complete-studio` pending PR review and CI, not automatically deployed to master.
+

@@ -1,4 +1,5 @@
 import type { YoutubeVideo } from "../modules/types";
+import type { ImageApproval } from "./image-policy";
 
 export type RadarCategory = "Football" | "Entertainment" | "Technology" | "World";
 export type RadarSource = { publisher: string; url: string; publishedAt: string };
@@ -38,6 +39,10 @@ export type RadarAssignment = {
   role: string;
   imageTag: string;
   imageFilename: string;
+  characterId?: string;
+  identity?: string;
+  description?: string;
+  outfit?: string;
 };
 export type RadarProject = {
   id: string;
@@ -46,6 +51,8 @@ export type RadarProject = {
   manualVideoUrl?: string;
   mediaNote?: string;
   assignments: RadarAssignment[];
+  approvedImages?: ImageApproval[];
+  sceneDescription?: string;
   environmentTag?: string;
   prompt: string;
   captions: Record<string, string>;
