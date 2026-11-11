@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { imageStyles, type CharacterImageStyle } from "./image-policy";
 import { aiJson, aiConnection } from "../ai";
 import { XMLParser } from "fast-xml-parser";
 import { db } from "../db";
@@ -246,7 +247,9 @@ export async function saveRadarProject(body: Record<string, unknown>): Promise<R
   const approvedImages = Array.isArray(body.approvedImages) ? body.approvedImages.slice(0, 10).map((a: Record<string, unknown>) => ({
     characterId: text(a.characterId, 80, "approved character"), imageTag: text(a.imageTag, 20, "approved image tag"),
     filename: text(a.filename, 200, "approved image filename"), mime: text(a.mime, 50, "image mime"),
-    prompt: text(a.prompt, 6000, "image prompt"), style: text(a.style, 80, "image style"),
+    prompt: text(a.prompt, 6000, "image prompt"), style: (() => { const value = text(a.style, 80, "image style");
+      if (!(imageStyles as readonly string[]).includes(value)) throw new ModuleError("Invalid approved image style.");
+      return value as CharacterImageStyle; })(),
     provider: text(a.provider, 40, "image provider"), model: text(a.model, 100, "image model"),
     approvedAt: text(a.approvedAt, 40, "approval time"),
   })) : current?.approvedImages || [];
