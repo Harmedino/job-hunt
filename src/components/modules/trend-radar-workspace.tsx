@@ -75,9 +75,13 @@ export default function TrendRadarWorkspace() {
   }, []);
   useEffect(() => {
     let active = true;
-    void load(hours).catch((e) => { if (active) setError(e.message); });
-    return () => { active = false; };
-  }, [hours, load]);
+    const timer = window.setTimeout(() => {
+      void request<Dashboard>(undefined, hours)
+        .then((result) => { if (active) setDashboard(result); })
+        .catch((e) => { if (active) setError(e.message); });
+    }, 0);
+    return () => { active = false; window.clearTimeout(timer); };
+  }, [hours]);
   useEffect(() => () => { if (localVideo) URL.revokeObjectURL(localVideo); }, [localVideo]);
   async function run(label: string, fn: () => Promise<void>) {
     if (busy) return;
