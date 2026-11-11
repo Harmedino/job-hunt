@@ -3464,3 +3464,40 @@ footer > span {
 .radar .radar-image-field {display:flex;flex-direction:column;gap:5px;min-width:0}
 .radar .radar-image-field input {width:100%}
 .radar .radar-manual-references {padding-top:15px;margin-top:14px;border-top:1px solid var(--border)}
+
+/* Football humiliation opportunities, reusable short-video library, character-image studio */
+.radar .radar-results,.radar .radar-template-grid,.radar .radar-generated-grid {display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:12px;margin:14px 0}
+.radar .radar-match-card,.radar .radar-template-card,.radar .radar-generated-card {display:flex;flex-direction:column;align-items:stretch;gap:9px;background:white;border:1px solid var(--border);border-radius:12px;padding:16px;min-width:0}
+.radar .radar-match-card.chosen {border-color:#72a884}
+.radar .radar-match-card strong {font-size:18px}
+.radar .radar-match-card p,.radar .radar-template-card p {color:#66776a;font-size:12px;line-height:1.6;margin:0}
+.radar .radar-match-label {font-size:11px!important;color:#74907d!important}
+.radar .radar-match-card small,.radar .radar-template-card small {color:#6c7b70;font-size:11px;line-height:1.6}
+.radar .radar-cast-panel {margin-top:20px;border:1px solid #d7e4d9;background:#f7faf7;border-radius:12px;padding:18px}
+.radar .radar-cast-panel h3 {margin:0 0 12px;font-size:17px}
+.radar .radar-cast-panel details {padding:9px 0;border-bottom:1px solid #e1e9e2}
+.radar .radar-cast-people {display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:7px;margin:13px 0}
+.radar .radar-cast-person {display:flex;align-items:start;gap:8px;background:#fff;border:1px solid #e0e9df;padding:10px;border-radius:8px;font-size:12px}
+.radar .radar-cast-person small {display:block;color:#697b70;margin-top:5px;line-height:1.5}
+.radar .radar-template-card button {margin-top:auto}
+.radar .radar-library-editor {border:1px dashed #bdcfc0;border-radius:9px;padding:14px;background:white;margin-top:10px}
+.radar .radar-library-editor summary {cursor:pointer;font-weight:650;color:#306447}
+.radar .radar-library-fields {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-top:14px}
+.radar .radar-library-fields label,.radar .radar-generated-card label {display:flex;flex-direction:column;gap:6px;font-size:12px;color:#4f6957}
+.radar .radar-library-fields label input,.radar .radar-library-fields label textarea,.radar .radar-library-fields label select,.radar .radar-generated-card label input,.radar .radar-generated-card label textarea {width:100%}
+.radar .radar-generated-grid {grid-template-columns:repeat(auto-fit,minmax(290px,1fr))}
+.radar .radar-generated-card >div:first-child {display:flex;flex-direction:column;gap:6px}
+.radar .radar-generated-card small {color:#68806d}
+.radar .radar-generated-preview {max-width:280px;width:100%;margin-inline:auto;background:#eef3ed;border-radius:9px;padding:6px}
+.radar .radar-generated-preview img {width:100%;max-height:490px;object-fit:contain}
+.radar .radar-generated-preview p {font-size:11px}
+.radar .radar-inline-clips {background:#f4f7f3;padding:11px;border-radius:8px;margin-top:8px}
+.radar .radar-inline-clips>strong {display:block;margin:0 0 7px;font-size:12px}
+.radar .radar-inline-clips>small {display:block;color:#7b897e;line-height:1.6}
+.radar .radar-inline-clip-grid {display:grid;grid-template-columns:repeat(auto-fit,minmax(155px,1fr));gap:9px;margin-top:8px}
+.radar .radar-inline-clip-grid article {display:flex;flex-direction:column;gap:6px;min-width:0;padding:7px;background:white;border-radius:7px;border:1px solid var(--border)}
+.radar .radar-inline-clip-grid iframe,.radar .radar-inline-clip-grid .radar-thumb {width:100%;aspect-ratio:16/9;border:0;border-radius:6px}
+.radar .radar-inline-clip-grid b {font-size:11px;line-height:1.4}
+.radar .radar-inline-clip-grid small,.radar .radar-inline-clip-grid p {font-size:10px;line-height:1.5;color:#667667}
+.radar .radar-inline-clip-grid .module-actions {margin-top:auto}
+@media(max-width:700px) {.radar .radar-library-fields {grid-template-columns:1fr} .radar .radar-generated-grid {grid-template-columns:minmax(0,1fr)}}
