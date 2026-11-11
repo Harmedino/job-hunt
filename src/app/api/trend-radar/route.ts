@@ -1,6 +1,7 @@
 import { recentHeavyDefeats, fixtureCastReport } from "@/lib/trend-radar/football";
 import { listComedyTemplates, saveComedyTemplate } from "@/lib/trend-radar/comedy-library";
 import { searchRadarClips, sceneSearchFor } from "@/lib/trend-radar/clip-search";
+import { searchXPosts, xConnection } from "@/lib/trend-radar/x-research";
 import { sameOrigin } from "@/lib/auth";
 import { moduleError, json } from "@/lib/modules/store";
 import { ModuleError } from "@/lib/modules/validation";
@@ -14,6 +15,7 @@ export async function GET(request: Request) {
     const scope = url.searchParams.get("scope");
     if (scope === "football") return json(await recentHeavyDefeats(Number(url.searchParams.get("hours") || 24)));
     if (scope === "templates") return json({ templates: await listComedyTemplates() });
+    if (scope === "connections") return json({ x: xConnection() });
     return json(await radarDashboard(url.searchParams.get("hours") || 24));
   } catch (e) { return moduleError(e); }
 }
@@ -34,6 +36,7 @@ export async function POST(request: Request) {
       case "story-clips": return json(await searchRadarClips({ query: sceneSearchFor(String(body.kind || "defeat")), maxSeconds: 15, pages: 1, order: "relevance" }));
       case "football-refresh": return json(await recentHeavyDefeats(Number(body.hours || 24), true));
       case "football-cast": return json(await fixtureCastReport(Number(body.fixtureId), Number(body.loserTeamId)));
+      case "x-search": return json(await searchXPosts(body.query));
       case "template-save": return json(await saveComedyTemplate(body));
       case "creative": return json(await creativeSuggestions(body.story));
       case "hide": return json(await hideStory(body.id));
